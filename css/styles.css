@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --adep-green: #008744;
+  --adep-green-dark: #006b35;
+  --adep-green-light: #e8f5ee;
+  --adep-red: #e52521;
+  --adep-red-dark: #c11c18;
+  --adep-red-light: #fdf0f0;
+  --adep-gold: #d4af37;
+  --adep-bg: #f8fafc;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #cbd5e1;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-heading {
+  font-family: 'Outfit', sans-serif;
+}
+
+.app-canvas {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+@media (min-width: 1024px) {
+  body {
+    padding: 1.5rem 0;
+  }
+  .app-canvas {
+    min-height: calc(100vh - 3rem);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    border: 1px solid #94a3b8;
+  }
+}
+
+.nav-tab {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.nav-tab.active {
+  color: #008744;
+  font-weight: 800;
+  background-color: #e8f5ee;
+}
+
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  background-color: #008744;
+  border-radius: 4px 4px 0 0;
+}
+
+.option-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid #e2e8f0;
+}
+
+.option-card:hover {
+  border-color: #008744;
+  background-color: #f4fbf7;
+  transform: translateY(-1px);
+}
+
+.option-card.selected {
+  border-color: #008744 !important;
+  background-color: #e8f5ee !important;
+  box-shadow: 0 4px 12px rgba(0, 135, 68, 0.15);
+}
+
+.field-error {
+  border-color: #e52521 !important;
+  background-color: #fdf0f0 !important;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-8px);
+  }
+  40%, 80% {
+    transform: translateX(8px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
