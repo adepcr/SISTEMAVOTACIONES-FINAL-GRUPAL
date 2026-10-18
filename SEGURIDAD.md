@@ -25,7 +25,7 @@ De la base de datos no se puede sacar el código: solo se guarda su huella (SHA-
 
 ## Pasos para activarlo (una sola vez, en la consola de Firebase)
 
-Entre a **https://console.firebase.google.com** → proyecto **proyectoabi-563e6**.
+Entre a **https://console.firebase.google.com** → proyecto **ADEP Vota** (`adep-vota`).
 
 ### 1. Activar el inicio de sesión
 1. Menú izquierdo: **Compilación → Authentication** → botón **Comenzar** (si aparece).
@@ -75,5 +75,5 @@ npx firebase emulators:exec --only firestore --project demo-adep "node reglas.te
 Para publicar las reglas desde la terminal en vez de la consola:
 
 ```bash
-npx firebase deploy --only firestore:rules --project proyectoabi-563e6
+npx firebase deploy --only firestore:rules --project adep-vota
 ```

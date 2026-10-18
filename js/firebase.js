@@ -11,13 +11,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyB9SnrUx1hsPT5VmjNWw18xusFlu6l3hjY",
-    authDomain: "proyectoabi-563e6.firebaseapp.com",
-    projectId: "proyectoabi-563e6",
-    storageBucket: "proyectoabi-563e6.firebasestorage.app",
-    messagingSenderId: "227799043670",
-    appId: "1:227799043670:web:0b41ab946a878d56af75f7",
-    measurementId: "G-1HC75JCXD4"
+    apiKey: "AIzaSyB0hIqG66W63u9hQztK7D5KxvLrVkkeDgw",
+    authDomain: "adep-vota.firebaseapp.com",
+    projectId: "adep-vota",
+    storageBucket: "adep-vota.firebasestorage.app",
+    messagingSenderId: "513410994049",
+    appId: "1:513410994049:web:ce987ca65f04f8dbf82280"
 };
 
 const app = initializeApp(firebaseConfig);
