@@ -140,27 +140,43 @@
                     <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar
                 </button>
 
+                <button type="button" id="ir-activar"
+                    class="w-full bg-white hover:bg-emerald-50 text-adep-green font-extrabold py-4 rounded-2xl text-lg border-2 border-emerald-300 flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-key"></i> Es mi primera vez: activar mi cuenta
+                </button>
+
                 <p class="text-sm text-gray-600 text-center bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <i class="fa-solid fa-circle-info text-adep-green mr-1"></i>
-                    ¿Olvidó su clave o no la tiene? Comuníquese con ADEP y le entregarán una nueva.
+                    ¿Olvidó su clave? Pida a ADEP un código de activación nuevo y vuelva a activar su cuenta.
                     <strong>No comparta su clave con nadie.</strong>
                 </p>
             </form>
 
-            <!-- ============ CREAR CLAVE PERSONAL (primer ingreso con clave temporal) ============ -->
-            <form id="form-clave" class="hidden space-y-5" novalidate>
+            <!-- ============ PRIMERA VEZ: activar la cuenta con el código de ADEP ============ -->
+            <form id="form-activar" class="hidden space-y-5" novalidate>
                 <div class="rounded-2xl p-4 text-center" style="background:#e8f5ee;border:2px solid #a7dcbf">
                     <i class="fa-solid fa-key text-3xl text-adep-green"></i>
-                    <h2 class="text-xl font-extrabold text-gray-900 mt-2">Hola, <span id="c-nombre"></span></h2>
-                    <p class="text-base text-gray-700 mt-1">La clave que le entregó ADEP es <strong>temporal</strong>. Ahora cree su <strong>clave personal</strong> de 6 números: solo usted la sabrá.</p>
+                    <h2 class="text-xl font-extrabold text-gray-900 mt-2">Activar mi cuenta</h2>
+                    <p class="text-base text-gray-700 mt-1">Use el <strong>código de activación</strong> que le entregó ADEP y cree su <strong>clave personal</strong> de 6 números. Solo usted la sabrá.</p>
                 </div>
                 <div>
-                    <label for="c-nueva" class="block text-base font-bold text-gray-800 mb-1">1. Su clave nueva (6 números)</label>
+                    <label for="act-cedula" class="block text-base font-bold text-gray-800 mb-1">1. Su número de cédula</label>
+                    <input id="act-cedula" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="username" placeholder="Solo números"
+                        class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
+                </div>
+                <div>
+                    <label for="act-codigo" class="block text-base font-bold text-gray-800 mb-1">2. Código de activación</label>
+                    <input id="act-codigo" type="text" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX"
+                        class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-mono font-bold tracking-widest uppercase text-center">
+                    <p class="text-sm text-gray-500 mt-1">Son 8 letras y números. El guion es opcional.</p>
+                </div>
+                <div>
+                    <label for="c-nueva" class="block text-base font-bold text-gray-800 mb-1">3. Cree su clave (6 números)</label>
                     <input id="c-nueva" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" placeholder="••••••"
                         class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none">
                 </div>
                 <div>
-                    <label for="c-repite" class="block text-base font-bold text-gray-800 mb-1">2. Escríbala otra vez</label>
+                    <label for="c-repite" class="block text-base font-bold text-gray-800 mb-1">4. Escriba la clave otra vez</label>
                     <input id="c-repite" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" placeholder="••••••"
                         class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none">
                 </div>
@@ -168,8 +184,9 @@
                 <p class="text-sm text-gray-600 bg-slate-50 border border-slate-200 rounded-xl p-3"><i class="fa-solid fa-lightbulb text-adep-gold mr-1"></i>No use números fáciles como 123456 o 111111, ni su fecha de nacimiento. Anótela en un lugar seguro.</p>
                 <p id="c-error" role="alert" aria-live="assertive" class="hidden text-base font-bold text-adep-red bg-adep-redLight border-2 border-red-200 rounded-xl p-3"></p>
                 <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-check"></i> Guardar mi clave y entrar
+                    <i class="fa-solid fa-check"></i> Activar mi cuenta y entrar
                 </button>
+                <button type="button" id="volver-ingreso" class="w-full text-base font-bold text-gray-600 underline py-2">Volver al ingreso</button>
             </form>
 
             <!-- ============ ADMINISTRADOR ============ -->
@@ -192,6 +209,26 @@
                 <button type="submit"
                     class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
                     <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar</button>
+                <button type="button" id="l-olvide" class="w-full text-base font-bold text-gray-600 underline py-2">Olvidé mi contraseña</button>
+            </form>
+
+            <!-- ============ INSTALACIÓN: primer administrador (solo aparece si aún no hay ninguno) ============ -->
+            <form id="form-instalar" class="hidden space-y-4" novalidate>
+                <div class="rounded-2xl p-4" style="background:#fffbeb;border:2px solid #fcd34d;color:#78350f">
+                    <h2 class="text-lg font-extrabold"><i class="fa-solid fa-screwdriver-wrench mr-1"></i> Configuración inicial</h2>
+                    <p class="text-sm mt-1">Todavía no hay administradores. Cree la cuenta del <strong>primer administrador</strong>. Esto solo se puede hacer una vez.</p>
+                </div>
+                <input id="i-nombre" type="text" placeholder="Nombre completo" autocomplete="name"
+                    class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
+                <input id="i-correo" type="email" placeholder="Correo electrónico" autocomplete="username"
+                    class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
+                <input id="i-pass" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password"
+                    class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
+                <input id="i-pass2" type="password" placeholder="Repita la contraseña" autocomplete="new-password"
+                    class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
+                <p id="i-error" role="alert" aria-live="assertive" class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2"></p>
+                <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-lg shadow-md">
+                    <i class="fa-solid fa-user-shield mr-1"></i> Crear primer administrador</button>
             </form>
 
             <p class="lg-seguro"><i class="fa-solid fa-lock"></i> Conexión segura · Sus datos están protegidos</p>
@@ -203,16 +240,24 @@
         // Esto funciona de inmediato, sin esperar a que cargue la base de datos (con internet lento puede tardar).
         (() => {
             const $ = id => document.getElementById(id);
+            const formularios = ['form-afiliado', 'form-activar', 'form-admin', 'form-instalar'];
+            window.mostrar = id => formularios.forEach(f => $(f).classList.toggle('hidden', f !== id));
             // ---------- Pestañas: Afiliado / Administrador ----------
             function modo(admin) {
-                $('form-afiliado').classList.toggle('hidden', admin);
-                $('form-admin').classList.toggle('hidden', !admin);
+                mostrar(admin ? (window.sinInstalar ? 'form-instalar' : 'form-admin') : 'form-afiliado');
                 $('tab-afi').setAttribute('aria-selected', String(!admin));
                 $('tab-adm').setAttribute('aria-selected', String(admin));
-                (admin ? $('l-correo') : $('a-cedula')).focus();
+                (admin ? (window.sinInstalar ? $('i-nombre') : $('l-correo')) : $('a-cedula')).focus();
             }
             $('tab-afi').addEventListener('click', () => modo(false));
             $('tab-adm').addEventListener('click', () => modo(true));
+            // ---------- Primera vez ----------
+            $('ir-activar').addEventListener('click', () => {
+                if ($('a-cedula').value) $('act-cedula').value = $('a-cedula').value;
+                mostrar('form-activar');
+                ($('act-cedula').value ? $('act-codigo') : $('act-cedula')).focus();
+            });
+            $('volver-ingreso').addEventListener('click', () => { mostrar('form-afiliado'); $('a-cedula').focus(); });
             // Si intentan ingresar antes de conectar, avisar en vez de recargar la página
             document.addEventListener('submit', e => {
                 if (window.dbListo) return;
@@ -225,22 +270,7 @@
     </script>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
-            from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyB9SnrUx1hsPT5VmjNWw18xusFlu6l3hjY",
-            authDomain: "proyectoabi-563e6.firebaseapp.com",
-            projectId: "proyectoabi-563e6",
-            storageBucket: "proyectoabi-563e6.firebasestorage.app",
-            messagingSenderId: "227799043670",
-            appId: "1:227799043670:web:0b41ab946a878d56af75f7",
-            measurementId: "G-1HC75JCXD4"
-        };
-
-        window.db = getFirestore(initializeApp(firebaseConfig));
-        window.fs = { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot };
+        import "./js/firebase.js";
 
         function cargar(src) {
             return new Promise((ok, fail) => {
@@ -253,21 +283,29 @@
         const $ = id => document.getElementById(id);
         const soloNumeros = s => s.replace(/\D/g, '');
         const showErr = (id, msg) => { $(id).textContent = msg; $(id).classList.toggle('hidden', !msg); };
+        const entrar = () => location.replace('index.html');
+        // Evita dobles clics mientras se espera la respuesta
+        async function ocupado(form, fn) {
+            const b = form.querySelector('button[type="submit"]');
+            if (b.disabled) return;
+            b.disabled = true; b.style.opacity = '.6';
+            try { await fn(); } finally { b.disabled = false; b.style.opacity = ''; }
+        }
 
+        let sesion = null;
         try {
             await cargar("js/db.js");
-            await DB.init();
-            await DB.seedDemo();
+            sesion = await DB.revisarSesion();
+            if (!sesion) window.sinInstalar = !(await DB.instalado());
         } catch (e) {
             console.error(e);
             alert("No se pudo conectar con la base de datos. Revise su internet e intente de nuevo.");
             throw e;
         }
-
-        if (DB.session()) location.replace('index.html');
+        if (sesion) { entrar(); await new Promise(() => { }); }   // ya tenía la sesión abierta
         window.dbListo = true;
 
-        // ---------- Afiliados ----------
+        // ---------- Afiliados: ingreso ----------
         const pin = $('a-pin'), cedula = $('a-cedula');
 
         function pintarPuntos() {
@@ -292,55 +330,83 @@
         if (guardada) { cedula.value = guardada; $('a-recordar').checked = true; pin.focus(); }
         else cedula.focus();
 
-        $('form-afiliado').addEventListener('submit', async e => {
+        $('form-afiliado').addEventListener('submit', e => {
             e.preventDefault();
-            const ced = soloNumeros(cedula.value), clave = soloNumeros(pin.value);
-            if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
-            if (clave.length < 6) { pin.focus(); return showErr('a-error', `Su clave tiene 6 números. Le faltan ${6 - clave.length}.`); }
-
-            const res = await DB.login(ced, clave);
-            if (res.error) { pin.value = ''; pintarPuntos(); pin.focus(); return showErr('a-error', res.error); }
-
-            if ($('a-recordar').checked) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
-            if (res.cambiarClave) return pedirClavePersonal(res, clave);
-            // pequeña espera para que Firestore reciba el registro antes de cambiar de página
-            setTimeout(() => location.href = 'index.html', 400);
+            ocupado(e.target, async () => {
+                const ced = soloNumeros(cedula.value), clave = soloNumeros(pin.value);
+                if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
+                if (clave.length < 6) { pin.focus(); return showErr('a-error', `Su clave tiene 6 números. Le faltan ${6 - clave.length}.`); }
+                showErr('a-error', '');
+                const res = await DB.loginAfiliado(ced, clave);
+                if (res.error) { pin.value = ''; pintarPuntos(); pin.focus(); return showErr('a-error', res.error); }
+                if ($('a-recordar').checked) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
+                entrar();
+            });
         });
 
-        // ---------- Primer ingreso: crear clave personal ----------
-        let temporal = null;
-        function pedirClavePersonal(res, clave) {
-            temporal = { cedula: res.cedula, clave };
-            $('c-nombre').textContent = res.nombre.split(' ')[0];
-            $('form-afiliado').classList.add('hidden');
-            $('lg-tabs').classList.add('hidden');
-            $('form-clave').classList.remove('hidden');
-            $('c-nueva').focus();
-        }
+        // ---------- Primera vez: activar con el código ----------
+        $('act-cedula').addEventListener('input', e => { e.target.value = soloNumeros(e.target.value); showErr('c-error', ''); });
+        $('act-codigo').addEventListener('input', e => {
+            const c = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+            e.target.value = c.length > 4 ? c.slice(0, 4) + '-' + c.slice(4) : c;
+            showErr('c-error', '');
+        });
         ['c-nueva', 'c-repite'].forEach(id => $(id).addEventListener('input', e => { e.target.value = soloNumeros(e.target.value).slice(0, 6); showErr('c-error', ''); }));
         $('c-ver').addEventListener('click', () => {
             const ver = $('c-nueva').type === 'password';
             ['c-nueva', 'c-repite'].forEach(id => $(id).type = ver ? 'text' : 'password');
             $('c-ver').querySelector('span').textContent = ver ? 'Ocultar claves' : 'Ver claves';
         });
-        $('form-clave').addEventListener('submit', async e => {
+        const FACILES = /^(\d)\1{5}$|^(012345|123456|234567|345678|456789|987654|876543|765432|654321|543210)$/;
+        $('form-activar').addEventListener('submit', e => {
             e.preventDefault();
-            const nueva = $('c-nueva').value, repite = $('c-repite').value;
-            if (nueva.length < 6) { $('c-nueva').focus(); return showErr('c-error', 'Su clave nueva debe tener 6 números.'); }
-            if (nueva !== repite) { $('c-repite').value = ''; $('c-repite').focus(); return showErr('c-error', 'Las dos claves no son iguales. Escríbala otra vez.'); }
-            const r = await DB.crearClavePersonal(temporal.cedula, temporal.clave, nueva);
-            if (r.error) return showErr('c-error', r.error);
-            setTimeout(() => location.href = 'index.html', 400);
+            ocupado(e.target, async () => {
+                const ced = $('act-cedula').value, cod = $('act-codigo').value.replace(/-/g, '');
+                const nueva = $('c-nueva').value, repite = $('c-repite').value;
+                if (ced.length < 9) { $('act-cedula').focus(); return showErr('c-error', 'Escriba su número de cédula completo (solo números).'); }
+                if (cod.length !== 8) { $('act-codigo').focus(); return showErr('c-error', 'El código de activación tiene 8 letras y números.'); }
+                if (nueva.length < 6) { $('c-nueva').focus(); return showErr('c-error', 'Su clave debe tener 6 números.'); }
+                if (FACILES.test(nueva)) { $('c-nueva').focus(); return showErr('c-error', 'Esa clave es muy fácil de adivinar. Elija otros números.'); }
+                if (nueva !== repite) { $('c-repite').value = ''; $('c-repite').focus(); return showErr('c-error', 'Las dos claves no son iguales. Escríbala otra vez.'); }
+                showErr('c-error', 'Activando su cuenta…');
+                const r = await DB.activar(ced, cod, nueva);
+                if (r.error) return showErr('c-error', r.error);
+                entrar();
+            });
         });
 
         // ---------- Administrador ----------
-        $('form-admin').addEventListener('submit', async e => {
+        $('form-admin').addEventListener('submit', e => {
             e.preventDefault();
-            const correo = $('l-correo').value.trim(), pass = $('l-pass').value;
-            if (!correo || !pass) return showErr('l-error', 'Ingrese su correo y contraseña.');
-            const res = await DB.login(correo, pass);
-            if (res.error) return showErr('l-error', res.error);
-            setTimeout(() => location.href = 'index.html', 400);
+            ocupado(e.target, async () => {
+                const correo = $('l-correo').value.trim(), pass = $('l-pass').value;
+                if (!correo || !pass) return showErr('l-error', 'Ingrese su correo y contraseña.');
+                const res = await DB.loginAdmin(correo, pass);
+                if (res.error) return showErr('l-error', res.error);
+                entrar();
+            });
+        });
+        $('l-olvide').addEventListener('click', async () => {
+            const correo = $('l-correo').value.trim();
+            if (!correo) { $('l-correo').focus(); return showErr('l-error', 'Escriba su correo y vuelva a tocar «Olvidé mi contraseña».'); }
+            try { await FB.sendPasswordResetEmail(FB.auth, correo); } catch (e) { console.error(e); }
+            // Mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados
+            showErr('l-error', `Si ${correo} es un administrador, recibirá un correo con un enlace para crear una contraseña nueva.`);
+        });
+
+        // ---------- Instalación: primer administrador ----------
+        $('form-instalar').addEventListener('submit', e => {
+            e.preventDefault();
+            ocupado(e.target, async () => {
+                const nombre = $('i-nombre').value.trim(), correo = $('i-correo').value.trim(), pass = $('i-pass').value;
+                if (!nombre || !correo || !pass) return showErr('i-error', 'Complete nombre, correo y contraseña.');
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showErr('i-error', 'Escriba un correo válido.');
+                if (pass.length < 8) return showErr('i-error', 'La contraseña debe tener al menos 8 caracteres.');
+                if (pass !== $('i-pass2').value) return showErr('i-error', 'Las contraseñas no son iguales.');
+                const r = await DB.instalar({ nombre, correo, pass });
+                if (r.error) return showErr('i-error', r.error);
+                entrar();
+            });
         });
     </script>
 </body>

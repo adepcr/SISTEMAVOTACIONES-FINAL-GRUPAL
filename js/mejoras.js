@@ -388,9 +388,9 @@
                 "Afiliados",
                 [
                     "Registre al afiliado con su nombre, cédula, filial y teléfono.",
-                    "El sistema crea una clave temporal de 6 números. Se muestra una sola vez: entréguela en persona o con el botón «Enviar por WhatsApp».",
-                    "Al entrar por primera vez, el afiliado crea su propia clave y la temporal deja de funcionar.",
-                    "Puede generar una nueva clave, desactivar o eliminar cuentas.",
+                    "El sistema crea un código de activación. Se muestra una sola vez: entréguelo en persona o con el botón «Enviar por WhatsApp».",
+                    "La primera vez, el afiliado toca «Es mi primera vez», escribe su cédula y el código, y crea su propia clave. El código sirve una sola vez.",
+                    "Si olvida su clave, use «Nuevo código». También puede desactivar o eliminar cuentas.",
                 ],
             ],
         },
@@ -400,6 +400,7 @@
                 [
                     "Cree cuentas con correo y contraseña de al menos 8 caracteres.",
                     "Ingresan desde «Soy administrador» en la pantalla de inicio.",
+                    "A otro administrador puede enviarle un correo para que cambie su contraseña.",
                     "Usted no puede desactivar ni eliminar su propia cuenta.",
                 ],
             ],

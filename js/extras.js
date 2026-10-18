@@ -172,11 +172,12 @@
             window.renderAudit();
         });
         q("xt-a-csv").addEventListener("click", exportarBitacora);
-        q("xt-a-borrar").addEventListener("click", () => {
+        q("xt-a-borrar").addEventListener("click", async () => {
             const n = DB.auditoria().length;
             if (!n) return showToast("La bitácora ya está vacía.");
             if (!confirm(`¿Borrar los ${n} registro(s) de la bitácora?\n\nEsto no se puede deshacer. Quedará anotado que usted (${user.nombre}) la borró.`)) return;
-            DB.limpiarAuditoria();
+            try { await DB.limpiarAuditoria(); }
+            catch (e) { console.error(e); return showToast("No se pudo borrar la bitácora. Intente de nuevo."); }
             q("xt-a-quitar").click();
             showToast("Bitácora borrada. Quedó registrado quién la borró.", "success");
         });

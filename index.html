@@ -427,22 +427,7 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
-            from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyB9SnrUx1hsPT5VmjNWw18xusFlu6l3hjY",
-            authDomain: "proyectoabi-563e6.firebaseapp.com",
-            projectId: "proyectoabi-563e6",
-            storageBucket: "proyectoabi-563e6.firebasestorage.app",
-            messagingSenderId: "227799043670",
-            appId: "1:227799043670:web:0b41ab946a878d56af75f7",
-            measurementId: "G-1HC75JCXD4"
-        };
-
-        window.db = getFirestore(initializeApp(firebaseConfig));
-        window.fs = { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot };
+        import "./js/firebase.js";
 
         function cargar(src) {
             return new Promise((ok, fail) => {
@@ -454,12 +439,14 @@
 
         try {
             await cargar("js/db.js");
-            await DB.init();
-            await cargar("js/app.js");
-            await cargar("js/extras.js");
-            await cargar("js/practica.js"); 
-            await cargar("js/reglas.js");
-            await cargar("js/importar.js"); 
+            if (!(await DB.init())) location.replace("login.html");   // sin sesión válida → ingreso
+            else {
+                await cargar("js/app.js");
+                await cargar("js/extras.js");
+                await cargar("js/practica.js");
+                await cargar("js/reglas.js");
+                await cargar("js/importar.js");
+            }
         } catch (e) {
             console.error(e);
             alert("No se pudo conectar con la base de datos. Revise su internet e intente de nuevo.");

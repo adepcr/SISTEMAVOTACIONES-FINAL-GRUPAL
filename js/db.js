@@ -1,266 +1,396 @@
-/* db.js - versión Firestore (datos en la nube, sesión local por dispositivo) */
+/* db.js - ADEP Vota · datos en Firestore protegidos por Firebase Authentication y reglas de seguridad
+   (ver firestore.rules). Mantiene la misma forma de uso que antes (DB.polls(), DB.votes(), ...):
+   lee de una copia en memoria que Firestore actualiza en tiempo real, y escribe en la nube.
+
+   Colecciones:
+     admins/{uid}            administradores
+     afiliados/{cédula}      padrón (uid = cuenta de Firebase enlazada al activarse)
+     activaciones/{cédula}   huella SHA-256 del código de activación (nunca el código)
+     acceso/{cédula}         correo interno de la cuenta, para poder ingresar con la cédula
+     cuentas/{uid}           cuenta de Firebase → cédula
+     polls/{id}              consultas
+     conteos/{id}            votos por opción (c0..c9, total). El voto secreto vive SOLO aquí.
+     participacion/{id_céd}  quién votó (nunca qué eligió) + código del comprobante
+     votos/{id_céd}          votos de consultas públicas (con nombre)
+     codigos/{código}        códigos de verificación de comprobantes
+     auditoria/{auto}        bitácora
+     config/general          ajustes (práctica, cantidad de afiliados activos)
+     config/instalado        existe cuando ya se creó el primer administrador */
 const DB = {
-    _cache: {},
-    _local: ['session'], // solo estas claves se quedan en el dispositivo
+    DOMINIO: 'afiliados.adepvota.cr',   // correos internos de las cuentas de afiliados (no reciben correo)
+    MAX_OPCIONES: 10,
 
-    // Descarga todo de Firestore y deja escuchando cambios de otros dispositivos
-    async init() {
-        const col = fs.collection(db, 'adep');
-        const snap = await fs.getDocs(col);
-        snap.forEach(d => { this._cache[d.id] = d.data().v; });
-        fs.onSnapshot(col, s => {
-            s.docChanges().forEach(c => {
-                if (c.doc.metadata.hasPendingWrites) return;
-                if (c.type === 'removed') delete this._cache[c.doc.id];
-                else this._cache[c.doc.id] = c.doc.data().v;
-            });
-        });
-    },
-    _get(k, d) {
-        try {
-            if (this._local.includes(k)) return JSON.parse(localStorage.getItem('adep_' + k)) ?? d;
-            const raw = this._cache[k];
-            return raw === undefined ? d : (JSON.parse(raw) ?? d);
-        } catch { return d; }
-    },
-    _set(k, v) {
-        if (this._local.includes(k)) { localStorage.setItem('adep_' + k, JSON.stringify(v)); return; }
-        const str = JSON.stringify(v);
-        this._cache[k] = str;
-        fs.setDoc(fs.doc(db, 'adep', k), { v: str }).catch(e => console.error('Error al guardar', k, e));
-    },
+    yo: null,
+    _polls: [], _conteos: {}, _part: [], _votos: [], _afiliados: {}, _admins: {}, _audit: [], _config: {},
+    _votesCache: null,
 
-    MAX_INTENTOS: 5,
-    BLOQUEO_MIN: 15,
-
-    // ---- Utilidades de seguridad ----
-    async hash(id, pass) {
-        const data = new TextEncoder().encode('adep|' + id + '|' + pass);
-        const buf = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+    // ================= Utilidades =================
+    _norm(id) { return String(id).toLowerCase().replace(/[\s-]/g, ''); },
+    _ref(...ruta) { return FB.doc(FB.db, ...ruta.map(String)); },
+    _col(nombre) { return FB.collection(FB.db, nombre); },
+    _ms(iso) { return iso ? new Date(iso).getTime() : 0; },
+    _falla(e, msg) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast(msg || 'No se pudo guardar el cambio. Revise su conexión e intente de nuevo.');
     },
-    genPin() {
-        const a = new Uint32Array(6); crypto.getRandomValues(a);
-        return Array.from(a, n => n % 10).join('');
+    // Firebase pide contraseñas más largas: la clave de 6 números se completa siempre igual
+    _claveAuth(pin) { return 'ADEP#' + pin + '#Vota'; },
+    _azar(n, letras) {
+        const a = new Uint32Array(n); crypto.getRandomValues(a);
+        return Array.from(a, x => letras[x % letras.length]).join('');
     },
     genCode() {
-        const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        const a = new Uint8Array(8); crypto.getRandomValues(a);
-        const s = Array.from(a, n => c[n % c.length]).join('');
+        const s = this._azar(8, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789');
         return `ADEP-${s.slice(0, 4)}-${s.slice(4)}`;
     },
+    // Código de activación: 8 caracteres sin letras que se confundan (I, L, O, 0, 1)
+    genActivacion() { const s = this._azar(8, 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'); return `${s.slice(0, 4)}-${s.slice(4)}`; },
+    _limpiarCodigo(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); },
+    // Huella SHA-256 del código (base64 "url", la misma que calculan las reglas de seguridad)
+    async _huella(ced, codigo) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ced + ':' + this._limpiarCodigo(codigo)));
+        return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_');
+    },
+    _errAuth(e) {
+        const c = (e && e.code) || '';
+        if (c.includes('too-many-requests')) return 'Demasiados intentos. Espere unos minutos e intente de nuevo.';
+        if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-login'))
+            return 'Los datos de ingreso no son correctos. Revise e intente de nuevo.';
+        if (c.includes('email-already-in-use')) return 'Ya existe una cuenta con ese correo.';
+        if (c.includes('invalid-email')) return 'El correo no es válido.';
+        if (c.includes('weak-password')) return 'La contraseña es muy débil. Use al menos 8 caracteres.';
+        if (c.includes('network')) return 'No hay conexión a internet. Revise e intente de nuevo.';
+        if (c.includes('requires-recent-login')) return 'Por seguridad, cierre sesión, vuelva a entrar e intente de nuevo.';
+        console.error(e);
+        return 'No se pudo completar. Intente de nuevo en unos minutos.';
+    },
 
-    // ---- Bitácora de auditoría ----
+    // ================= Sesión =================
+    _esperarSesion() {
+        return new Promise(ok => { const fin = FB.onAuthStateChanged(FB.auth, u => { fin(); ok(u); }); });
+    },
+    async _perfil(u) {
+        const leer = r => FB.getDoc(r).catch(() => null);
+        const adm = await leer(this._ref('admins', u.uid));
+        if (adm && adm.exists() && adm.data().activo !== false) {
+            const d = adm.data();
+            return { uid: u.uid, rol: 'Administrador', nombre: d.nombre, correo: d.correo, cedula: u.uid, provincia: '' };
+        }
+        const c = await leer(this._ref('cuentas', u.uid));
+        if (!c || !c.exists()) return null;
+        const ced = c.data().cedula;
+        const a = await leer(this._ref('afiliados', ced));
+        if (!a || !a.exists()) return null;
+        const d = a.data();
+        if (d.uid !== u.uid || d.activo === false) return null;
+        return { uid: u.uid, rol: 'Afiliado', nombre: d.nombre, cedula: ced, provincia: d.provincia || '', telefono: d.telefono || '' };
+    },
+    // Sesión guardada en este equipo (para la pantalla de ingreso)
+    async revisarSesion() {
+        const u = await this._esperarSesion();
+        if (!u) return null;
+        this.yo = await this._perfil(u);
+        if (!this.yo) await FB.signOut(FB.auth);
+        return this.yo;
+    },
+    // Carga inicial de index.html: false si no hay una sesión válida
+    async init() {
+        if (!(await this.revisarSesion())) return false;
+        await this._escuchar();
+        return true;
+    },
+    session() { return this.yo; },
+    async logout() {
+        await this.log('Cierre de sesión');
+        await FB.signOut(FB.auth);
+        this.yo = null;
+    },
+
+    async instalado() {
+        const s = await FB.getDoc(this._ref('config', 'instalado'));
+        return s.exists();
+    },
+    // Primera instalación: crea la cuenta del primer administrador (solo funciona una vez)
+    async instalar({ nombre, correo, pass }) {
+        let cred;
+        try { cred = await FB.createUserWithEmailAndPassword(FB.auth, correo.trim().toLowerCase(), pass); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        const uid = cred.user.uid, b = FB.writeBatch(FB.db);
+        b.set(this._ref('admins', uid), { nombre, correo: correo.trim().toLowerCase(), activo: true, creada: new Date().toISOString() });
+        b.set(this._ref('config', 'instalado'), { en: new Date().toISOString() });
+        try { await b.commit(); }
+        catch (e) {
+            await FB.deleteUser(cred.user).catch(() => { });
+            return { error: 'El sistema ya tiene un administrador. Ingrese con su cuenta o pida una a otro administrador.' };
+        }
+        await FB.setDoc(this._ref('config', 'general'), { practica_activa: true, padron: 0 }, { merge: true }).catch(() => { });
+        this.yo = await this._perfil(cred.user);
+        await this.log('Sistema instalado', 'Primer administrador creado');
+        return this.yo;
+    },
+    async loginAdmin(correo, pass) {
+        let cred;
+        try { cred = await FB.signInWithEmailAndPassword(FB.auth, correo.trim().toLowerCase(), pass); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        const p = await this._perfil(cred.user);
+        if (!p || p.rol !== 'Administrador') { await FB.signOut(FB.auth); return { error: 'Esta cuenta no tiene permisos de administrador.' }; }
+        this.yo = p;
+        await this.log('Ingreso al sistema', 'Administrador');
+        return p;
+    },
+    async loginAfiliado(cedula, pin) {
+        const ced = this._norm(cedula);
+        let acc;
+        try { acc = await FB.getDoc(this._ref('acceso', ced)); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        if (!acc.exists()) return { error: 'Esta cédula todavía no tiene la cuenta activada. Toque «Es mi primera vez» e ingrese el código de activación que le dio ADEP.', sinActivar: true };
+        let cred;
+        try { cred = await FB.signInWithEmailAndPassword(FB.auth, acc.data().email, this._claveAuth(pin)); }
+        catch (e) { return { error: this._errAuth(e).replace('Los datos de ingreso no son correctos', 'La cédula o la clave no son correctas') }; }
+        const p = await this._perfil(cred.user);
+        if (!p) { await FB.signOut(FB.auth); return { error: 'Su cuenta fue desactivada o su acceso fue renovado. Comuníquese con ADEP.' }; }
+        this.yo = p;
+        await FB.updateDoc(this._ref('afiliados', ced), { ultimoIngreso: new Date().toISOString() }).catch(() => { });
+        await this.log('Ingreso al sistema', 'Afiliado');
+        return p;
+    },
+    // Primera vez: con el código de activación, el afiliado crea su propia clave de 6 números
+    async activar(cedula, codigo, pin) {
+        const ced = this._norm(cedula), cod = this._limpiarCodigo(codigo);
+        if (cod.length !== 8) return { error: 'El código de activación tiene 8 letras y números (por ejemplo K7P2-9QXM).' };
+        const email = `${ced}.${this._azar(6, 'abcdefghijkmnpqrstuvwxyz23456789')}@${this.DOMINIO}`;
+        let cred;
+        try { cred = await FB.createUserWithEmailAndPassword(FB.auth, email, this._claveAuth(pin)); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        const u = cred.user, b = FB.writeBatch(FB.db);
+        b.update(this._ref('activaciones', ced), { usada: true, uid: u.uid, codigo: cod, usadaEn: FB.serverTimestamp() });
+        b.update(this._ref('afiliados', ced), { uid: u.uid, activado: true, authEmail: email, ultimoIngreso: new Date().toISOString() });
+        b.set(this._ref('cuentas', u.uid), { cedula: ced });
+        b.set(this._ref('acceso', ced), { email });
+        try { await b.commit(); }
+        catch (e) {
+            await FB.deleteUser(u).catch(() => FB.signOut(FB.auth));
+            return { error: 'La cédula o el código de activación no son correctos, o el código ya se usó. Revíselos o pida un código nuevo a ADEP.' };
+        }
+        this.yo = await this._perfil(u);
+        await this.log('Cuenta activada', this.yo ? this.yo.nombre : ced);
+        return this.yo;
+    },
+
+    // ================= Datos en tiempo real =================
+    _redibujar() {
+        clearTimeout(this._t);
+        this._t = setTimeout(() => { if (typeof renderAll === 'function') renderAll(); }, 250);
+    },
+    _escuchar1(q, fn) {
+        return new Promise(ok => {
+            let primero = true;
+            FB.onSnapshot(q, s => {
+                fn(s); this._votesCache = null;
+                if (primero) { primero = false; ok(); } else this._redibujar();
+            }, e => { console.error(e); if (primero) { primero = false; ok(); } });
+        });
+    },
+    _docs(s) { return s.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })); },
+    async _escuchar() {
+        const admin = this.yo.rol === 'Administrador';
+        const cargas = [
+            this._escuchar1(admin ? this._col('polls') : FB.query(this._col('polls'), FB.where('publicada', '==', true)), s => {
+                this._polls = this._docs(s).map(p => ({ ...p, id: Number(p.id) })).sort((a, b) => a.id - b.id);
+            }),
+            this._escuchar1(this._col('conteos'), s => {
+                this._conteos = {}; s.docs.forEach(d => { this._conteos[d.id] = d.data(); });
+            }),
+            this._escuchar1(admin ? this._col('participacion') : FB.query(this._col('participacion'), FB.where('cedula', '==', this.yo.cedula)), s => {
+                this._part = this._docs(s).map(r => ({ ...r, pollId: Number(r.pollId) }));
+            }),
+            this._escuchar1(this._col('votos'), s => {
+                this._votos = this._docs(s).map(v => ({ ...v, pollId: Number(v.pollId) }));
+            }),
+            this._escuchar1(this._ref('config', 'general'), s => { this._config = s.exists() ? s.data() : {}; })
+        ];
+        if (admin) cargas.push(
+            this._escuchar1(this._col('afiliados'), s => {
+                this._afiliados = {}; this._docs(s).forEach(a => { this._afiliados[a.id] = { ...a, cedula: a.id }; });
+                // Cantidad de afiliados activos, para que los afiliados vean el % de participación
+                const n = this.padron();
+                if (this._config.padron !== n) FB.setDoc(this._ref('config', 'general'), { padron: n }, { merge: true }).catch(() => { });
+            }),
+            this._escuchar1(this._col('admins'), s => {
+                this._admins = {}; this._docs(s).forEach(a => { this._admins[a.id] = { ...a, cedula: a.id }; });
+            }),
+            this._escuchar1(FB.query(this._col('auditoria'), FB.orderBy('fecha', 'desc'), FB.limit(1000)), s => {
+                this._audit = this._docs(s).map(a => ({ ...a, fecha: a.fecha && a.fecha.toDate ? a.fecha.toDate().toISOString() : new Date().toISOString() }));
+            })
+        );
+        await Promise.all(cargas);
+    },
+    // Compatibilidad: ajustes y "recordar cédula" (este último solo en el equipo)
+    _get(k, d) {
+        if (k === 'recordar') { try { return JSON.parse(localStorage.getItem('adep_' + k)) ?? d; } catch { return d; } }
+        if (k === 'users') {
+            const u = {};
+            Object.values(this._afiliados).forEach(a => { u[a.cedula] = { ...a, rol: 'Afiliado' }; });
+            Object.values(this._admins).forEach(a => { u[a.cedula] = { ...a, rol: 'Administrador' }; });
+            return u;
+        }
+        const v = this._config[k];
+        return v === undefined ? d : v;
+    },
+    _set(k, v) {
+        if (k === 'recordar') { localStorage.setItem('adep_' + k, JSON.stringify(v)); return; }
+        FB.setDoc(this._ref('config', 'general'), { [k]: v }, { merge: true }).catch(e => this._falla(e));
+    },
+    // Escribe muchas operaciones en tandas (Firestore acepta hasta 500 por tanda)
+    async _enTandas(ops) {
+        for (let i = 0; i < ops.length; i += 400) {
+            const b = FB.writeBatch(FB.db);
+            ops.slice(i, i + 400).forEach(f => f(b));
+            await b.commit();
+        }
+    },
+
+    // ================= Bitácora =================
     log(accion, detalle = '') {
-        const s = this._get('session', null);
-        const l = this._get('auditoria', []);
-        l.push({ fecha: new Date().toISOString(), accion, detalle, por: s ? s.nombre : 'Sistema' });
-        this._set('auditoria', l.slice(-500));
+        if (!this.yo || !FB.auth.currentUser) return Promise.resolve();
+        return FB.addDoc(this._col('auditoria'), {
+            fecha: FB.serverTimestamp(), accion: String(accion).slice(0, 120), detalle: String(detalle).slice(0, 300),
+            por: this.yo.nombre, uid: FB.auth.currentUser.uid
+        }).catch(e => console.error('Bitácora', e));
     },
-    auditoria() { return this._get('auditoria', []).slice().reverse(); },
+    auditoria() { return this._audit; },
     // Borra toda la bitácora; queda un único registro con quién la borró
-    limpiarAuditoria() {
-        const n = this._get('auditoria', []).length;
-        this._set('auditoria', []);
-        this.log('Bitácora borrada', `Se eliminaron ${n} registro(s)`);
-        return n;
+    async limpiarAuditoria() {
+        const s = await FB.getDocs(this._col('auditoria'));
+        await this._enTandas(s.docs.map(d => b => b.delete(d.ref)));
+        await this.log('Bitácora borrada', `Se eliminaron ${s.size} registro(s)`);
+        return s.size;
     },
 
-    // ---- Usuarios y sesión ----
-    async seedDemo() {
-        if (Object.keys(this._get('users', {})).length) return;
-        const passHash = await this.hash('admin@adep.cr', '123');
-        const users = this._get('users', {});
-        if (!users['admin@adep.cr']) {
-            users['admin@adep.cr'] = {
-                correo: 'admin@adep.cr', cedula: 'admin@adep.cr', nombre: 'Administrador ADEP',
-                passHash, rol: 'Administrador', provincia: '', activo: true
-            };
-            this._set('users', users);
-        }
+    // ================= Afiliados =================
+    afiliados() { return Object.values(this._afiliados); },
+    padron() {
+        if (this.yo && this.yo.rol === 'Administrador') return this.afiliados().filter(a => a.activo !== false).length;
+        return this._config.padron || 0;
     },
-    _norm(id) { return String(id).toLowerCase().replace(/[\s-]/g, ''); },
-    _startSession(u) {
-        const { pass, passHash, claveTemporal, ...safe } = u;
-        this._set('session', safe);
-        return safe;
-    },
-    async login(id, pass) {
-        await this.seedDemo();
-        const key = this._norm(id);
-        const intentos = this._get('intentos', {});
-        const reg = intentos[key] || { n: 0, hasta: 0 };
-
-        if (reg.hasta > Date.now()) {
-            const min = Math.ceil((reg.hasta - Date.now()) / 60000);
-            return { error: `Demasiados intentos. Espere ${min} minuto(s) o llame a ADEP.` };
-        }
-
-        const users = this._get('users', {});
-        const u = users[key];
-        let ok = false;
-        if (u) {
-            if (u.passHash) ok = u.passHash === await this.hash(key, pass);
-            else if (u.pass !== undefined && u.pass === pass) {
-                ok = true; u.passHash = await this.hash(key, pass); delete u.pass;
-            }
-        }
-
-        if (!ok) {
-            reg.n += 1;
-            let msg = 'La cédula o la clave no son correctas. Revise e intente de nuevo.';
-            if (reg.n >= this.MAX_INTENTOS) {
-                reg.hasta = Date.now() + this.BLOQUEO_MIN * 60000;
-                reg.n = 0;
-                msg = `Demasiados intentos. Espere ${this.BLOQUEO_MIN} minutos o llame a ADEP.`;
-                intentos[key] = reg; this._set('intentos', intentos);
-                this.log('Cuenta bloqueada temporalmente', key);
-                return { error: msg };
-            }
-            intentos[key] = reg; this._set('intentos', intentos);
-            return { error: msg };
-        }
-        if (u.activo === false) return { error: 'Su cuenta está desactivada. Comuníquese con ADEP.' };
-
-        delete intentos[key]; this._set('intentos', intentos);
-        // Clave temporal entregada por ADEP: el afiliado debe crear su clave personal antes de entrar
-        if (u.claveTemporal) return { cambiarClave: true, cedula: key, nombre: u.nombre };
-        u.ultimoIngreso = new Date().toISOString();
-        this._set('users', users);
-        const s = this._startSession(u);
-        this.log('Ingreso al sistema', s.rol);
-        return s;
-    },
-    session() {
-        const s = this._get('session', null);
-        if (!s) return null;
-        const u = this._get('users', {})[s.cedula];
-        if (!u || u.activo === false) { localStorage.removeItem('adep_session'); return null; }
-        return s;
-    },
-    // Clave temporal → clave personal (la elige el afiliado; ADEP ya no la conoce)
-    async crearClavePersonal(id, temporal, nueva) {
-        const key = this._norm(id);
-        const users = this._get('users', {});
-        const u = users[key];
-        if (!u || !u.claveTemporal || u.passHash !== await this.hash(key, temporal)) return { error: 'La clave temporal no es correcta. Ingrese de nuevo.' };
-        if (!/^\d{6}$/.test(nueva)) return { error: 'La clave debe tener 6 números.' };
-        if (nueva === temporal) return { error: 'La clave nueva debe ser distinta a la que le entregó ADEP.' };
-        if (/^(\d)\1{5}$/.test(nueva) || '0123456789'.includes(nueva) || '9876543210'.includes(nueva)) return { error: 'Esa clave es muy fácil de adivinar. Elija otros números.' };
-        u.passHash = await this.hash(key, nueva);
-        delete u.claveTemporal;
-        u.ultimoIngreso = new Date().toISOString();
-        this._set('users', users);
-        const s = this._startSession(u);
-        this.log('Clave personal creada', s.nombre);
-        return s;
-    },
-    logout() { this.log('Cierre de sesión'); localStorage.removeItem('adep_session'); },
-
-    // ---- Afiliados ----
-    afiliados() { return Object.values(this._get('users', {})).filter(u => u.rol === 'Afiliado'); },
-    padron() { return this.afiliados().filter(a => a.activo !== false).length; },
     async addAfiliado({ nombre, cedula, provincia, telefono }) {
         const key = this._norm(cedula);
-        const pass = this.genPin();
-        const passHash = await this.hash(key, pass);
-        const users = this._get('users', {});
-        if (users[key]) return { error: 'Ya existe un afiliado con esa cédula.' };
-        users[key] = { nombre, cedula: key, correo: '', telefono: telefono || '', passHash, claveTemporal: true, rol: 'Afiliado', provincia: provincia || '', activo: true, creada: new Date().toISOString() };
-        this._set('users', users);
+        if (this._afiliados[key]) return { error: 'Ya existe un afiliado con esa cédula.' };
+        const [r] = await this.crearAfiliados([{ nombre, cedula: key, provincia, telefono }]);
         this.log('Afiliado creado', `${nombre} (${key})${provincia ? ' · ' + provincia : ''}`);
-        return { cedula: key, pass };
+        return { cedula: key, pass: r.codigo };
     },
-    // Cambiar la filial (provincia) de un afiliado ya registrado
+    // Crea muchos afiliados con su código de activación. Devuelve [{...afiliado, codigo}]
+    async crearAfiliados(lista) {
+        const ahora = new Date().toISOString(), out = [], ops = [];
+        for (const a of lista) {
+            const ced = this._norm(a.cedula), codigo = this.genActivacion(), hash = await this._huella(ced, codigo);
+            ops.push(b => b.set(this._ref('afiliados', ced), { nombre: a.nombre, cedula: ced, provincia: a.provincia || '', telefono: a.telefono || '', activo: true, activado: false, uid: null, creada: ahora }));
+            ops.push(b => b.set(this._ref('activaciones', ced), { hash, usada: false, creada: ahora }));
+            out.push({ ...a, cedula: ced, codigo });
+        }
+        await this._enTandas(ops);
+        return out;
+    },
+    // Códigos de activación nuevos: la cuenta anterior deja de funcionar. Devuelve { cédula: código }
+    async nuevosCodigos(cedulas) {
+        const ahora = new Date().toISOString(), out = {}, ops = [];
+        for (const ced of cedulas) {
+            const codigo = this.genActivacion(), hash = await this._huella(ced, codigo);
+            ops.push(b => b.set(this._ref('activaciones', ced), { hash, usada: false, creada: ahora }));
+            ops.push(b => b.update(this._ref('afiliados', ced), { uid: null, activado: false }));
+            ops.push(b => b.delete(this._ref('acceso', ced)));
+            out[ced] = codigo;
+        }
+        await this._enTandas(ops);
+        return out;
+    },
+    async actualizarAfiliados(lista) {
+        await this._enTandas(lista.map(a => b => b.update(this._ref('afiliados', a.cedula), a.cambios)));
+    },
+    _cambiarAfiliado(cedula, cambios, accion, detalle) {
+        if (!this._afiliados[cedula]) return false;
+        FB.updateDoc(this._ref('afiliados', cedula), cambios).catch(e => this._falla(e));
+        this.log(accion, detalle);
+        return true;
+    },
     setFilial(cedula, provincia) {
-        const users = this._get('users', {});
-        if (!users[cedula] || users[cedula].rol !== 'Afiliado') return false;
-        users[cedula].provincia = provincia || '';
-        this._set('users', users);
-        this.log('Filial actualizada', `${users[cedula].nombre} (${cedula})${provincia ? ' · ' + provincia : ' · sin filial'}`);
-        return true;
+        const a = this._afiliados[cedula]; if (!a) return false;
+        return this._cambiarAfiliado(cedula, { provincia: provincia || '' }, 'Filial actualizada', `${a.nombre} (${cedula})${provincia ? ' · ' + provincia : ' · sin filial'}`);
     },
-    // Teléfono (WhatsApp) de un afiliado; se guarda ya normalizado (ej. 50688887777)
     setTelefono(cedula, telefono) {
-        const users = this._get('users', {});
-        if (!users[cedula] || users[cedula].rol !== 'Afiliado') return false;
-        users[cedula].telefono = telefono || '';
-        this._set('users', users);
-        this.log('Teléfono actualizado', `${users[cedula].nombre} (${cedula})`);
-        return true;
+        const a = this._afiliados[cedula]; if (!a) return false;
+        return this._cambiarAfiliado(cedula, { telefono: telefono || '' }, 'Teléfono actualizado', `${a.nombre} (${cedula})`);
     },
     async resetPass(cedula) {
-        const pass = this.genPin();
-        const passHash = await this.hash(cedula, pass);
-        const users = this._get('users', {});
-        if (!users[cedula]) return null;
-        users[cedula].passHash = passHash; delete users[cedula].pass;
-        if (users[cedula].rol === 'Afiliado') users[cedula].claveTemporal = true;
-        this._set('users', users);
-        const intentos = this._get('intentos', {}); delete intentos[cedula]; this._set('intentos', intentos);
-        this.log('Nueva clave generada', `${users[cedula].nombre} (${cedula})`);
-        return pass;
+        const a = this._afiliados[cedula]; if (!a) return null;
+        try {
+            const r = await this.nuevosCodigos([cedula]);
+            this.log('Nuevo código de activación', `${a.nombre} (${cedula})`);
+            return r[cedula];
+        } catch (e) { this._falla(e); return null; }
     },
-    setActivo(cedula, activo) {
-        const users = this._get('users', {});
-        if (users[cedula]) {
-            users[cedula].activo = activo; this._set('users', users);
-            this.log(activo ? 'Cuenta activada' : 'Cuenta desactivada', `${users[cedula].nombre} (${cedula})`);
+    setActivo(id, activo) {
+        if (this._admins[id]) {
+            FB.updateDoc(this._ref('admins', id), { activo }).catch(e => this._falla(e));
+            this.log(activo ? 'Cuenta activada' : 'Cuenta desactivada', `${this._admins[id].nombre} (${this._admins[id].correo})`);
+            return;
         }
+        const a = this._afiliados[id]; if (!a) return;
+        this._cambiarAfiliado(id, { activo }, activo ? 'Cuenta activada' : 'Cuenta desactivada', `${a.nombre} (${id})`);
     },
     deleteAfiliado(cedula, adminUser) {
-        const users = this._get('users', {});
-        if (users[cedula] && users[cedula].rol === 'Afiliado') {
-            const eliminados = this._get('afiliados_eliminados', []);
-            const { pass, passHash, ...sinClave } = users[cedula];
-            eliminados.push({
-                afiliado: sinClave,
-                eliminadoPor: { nombre: adminUser ? adminUser.nombre : 'Administrador', cedula: adminUser ? adminUser.cedula : 'Sin cédula' },
-                fecha: new Date().toLocaleString('es-CR')
-            });
-            this._set('afiliados_eliminados', eliminados);
-            this.log('Afiliado eliminado', `${sinClave.nombre} (${cedula})`);
-            delete users[cedula];
-            this._set('users', users);
-        }
+        const a = this._afiliados[cedula]; if (!a) return;
+        const b = FB.writeBatch(FB.db);
+        const { uid, authEmail, ...sinCuenta } = a;
+        b.set(FB.doc(this._col('eliminados')), {
+            tipo: 'Afiliado', datos: sinCuenta, fecha: new Date().toLocaleString('es-CR'),
+            eliminadoPor: adminUser ? adminUser.nombre : 'Administrador'
+        });
+        ['afiliados', 'activaciones', 'acceso'].forEach(c => b.delete(this._ref(c, cedula)));
+        b.commit().catch(e => this._falla(e));
+        this.log('Afiliado eliminado', `${a.nombre} (${cedula})`);
     },
 
-    // ---- Administradores ----
-    admins() { return Object.values(this._get('users', {})).filter(u => u.rol === 'Administrador'); },
+    // ================= Administradores =================
+    admins() { return Object.values(this._admins); },
     async addAdmin({ nombre, correo, pass }) {
-        const key = this._norm(correo);
-        const passHash = await this.hash(key, pass);
-        const users = this._get('users', {});
-        if (users[key]) return { error: 'Ya existe un usuario con ese correo.' };
-        users[key] = { nombre, correo: correo.trim().toLowerCase(), cedula: key, passHash, rol: 'Administrador', provincia: '', activo: true, creada: new Date().toISOString() };
-        this._set('users', users);
-        this.log('Administrador creado', `${nombre} (${users[key].correo})`);
-        return { correo: users[key].correo };
+        const a2 = FB.authSecundaria(), mail = correo.trim().toLowerCase();
+        let cred;
+        try { cred = await FB.createUserWithEmailAndPassword(a2, mail, pass); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        const uid = cred.user.uid;
+        await FB.signOut(a2).catch(() => { });
+        try { await FB.setDoc(this._ref('admins', uid), { nombre, correo: mail, activo: true, creada: new Date().toISOString() }); }
+        catch (e) { this._falla(e); return { error: 'No se pudo guardar el administrador.' }; }
+        this.log('Administrador creado', `${nombre} (${mail})`);
+        return { correo: mail };
     },
-    async setPass(key, pass) {
-        const passHash = await this.hash(key, pass);
-        const users = this._get('users', {});
-        if (!users[key]) return false;
-        users[key].passHash = passHash; delete users[key].pass;
-        this._set('users', users);
-        const intentos = this._get('intentos', {}); delete intentos[key]; this._set('intentos', intentos);
-        this.log('Contraseña cambiada', `${users[key].nombre} (${key})`);
-        return true;
+    // Su propia contraseña: se cambia aquí. La de otro administrador: se le envía un correo para cambiarla.
+    async setPass(uid, pass) {
+        const a = this._admins[uid]; if (!a) return { error: 'Administrador no encontrado.' };
+        if (uid === this.yo.uid) {
+            try { await FB.updatePassword(FB.auth.currentUser, pass); }
+            catch (e) { return { error: this._errAuth(e) }; }
+            this.log('Contraseña cambiada', `${a.nombre} (${a.correo})`);
+            return { ok: true };
+        }
+        try { await FB.sendPasswordResetEmail(FB.auth, a.correo); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        this.log('Correo para cambiar contraseña enviado', `${a.nombre} (${a.correo})`);
+        return { ok: true, correo: a.correo };
     },
-    deleteAdmin(key, quien) {
-        const users = this._get('users', {});
-        if (!users[key] || users[key].rol !== 'Administrador') return;
-        const log = this._get('admins_eliminados', []);
-        const { pass, passHash, ...sinClave } = users[key];
-        log.push({ admin: sinClave, eliminadoPor: quien ? quien.nombre : 'Administrador', fecha: new Date().toLocaleString('es-CR') });
-        this._set('admins_eliminados', log);
-        this.log('Administrador eliminado', `${sinClave.nombre} (${sinClave.correo})`);
-        delete users[key];
-        this._set('users', users);
+    deleteAdmin(uid, quien) {
+        const a = this._admins[uid]; if (!a) return;
+        const b = FB.writeBatch(FB.db);
+        b.set(FB.doc(this._col('eliminados')), { tipo: 'Administrador', datos: a, fecha: new Date().toLocaleString('es-CR'), eliminadoPor: quien ? quien.nombre : 'Administrador' });
+        b.delete(this._ref('admins', uid));
+        b.commit().catch(e => this._falla(e));
+        this.log('Administrador eliminado', `${a.nombre} (${a.correo})`);
     },
 
-    // ---- Votaciones ----
-    polls() { return this._get('polls', []); },
+    // ================= Votaciones =================
+    polls() { return this._polls; },
     estado(p) {
         if (!p.publicada) return 'borrador';
         const now = Date.now();
@@ -269,93 +399,120 @@ const DB = {
         return 'abierta';
     },
     addPoll(p) {
-        const polls = this.polls();
+        if ((p.opciones || []).length > this.MAX_OPCIONES) { this._falla(null, `Máximo ${this.MAX_OPCIONES} opciones por consulta.`); return null; }
         const poll = { id: Date.now(), publicada: false, publica: false, apertura: '', cierre: '', ...p, creada: new Date().toISOString() };
-        polls.push(poll); this._set('polls', polls);
+        const { id, ...datos } = poll;
+        const vacio = { total: 0 }; for (let i = 0; i < this.MAX_OPCIONES; i++) vacio['c' + i] = 0;
+        const b = FB.writeBatch(FB.db);
+        b.set(this._ref('polls', id), { ...datos, aperturaMs: this._ms(poll.apertura), cierreMs: this._ms(poll.cierre) });
+        b.set(this._ref('conteos', id), vacio);
+        b.commit().catch(e => this._falla(e, 'No se pudo guardar la consulta.'));
         this.log('Consulta creada', poll.titulo);
         return poll;
     },
     updatePoll(id, changes, motivo) {
-        this._set('polls', this.polls().map(p => p.id === id ? { ...p, ...changes } : p));
+        const c = { ...changes };
+        if ('apertura' in c) c.aperturaMs = this._ms(c.apertura);
+        if ('cierre' in c) c.cierreMs = this._ms(c.cierre);
+        FB.updateDoc(this._ref('polls', id), c).catch(e => this._falla(e));
         if (motivo) this.log(motivo);
     },
-    deletePoll(id) {
-        const p = this.polls().find(x => x.id === id);
-        this._set('polls', this.polls().filter(x => x.id !== id));
-        this._set('votes', this.votes().filter(v => v.pollId !== id));
-        this._set('voters', this.voters().filter(v => v.pollId !== id));
+    async deletePoll(id) {
+        const p = this._polls.find(x => x.id === id), pid = String(id), ops = [];
+        for (const c of ['participacion', 'votos', 'codigos']) {
+            const s = await FB.getDocs(FB.query(this._col(c), FB.where('pollId', '==', pid)));
+            s.docs.forEach(d => ops.push(b => b.delete(d.ref)));
+        }
+        ops.push(b => b.delete(this._ref('polls', pid)), b => b.delete(this._ref('conteos', pid)));
+        try { await this._enTandas(ops); } catch (e) { this._falla(e, 'No se pudo eliminar la consulta.'); return; }
         if (p) this.log('Consulta eliminada', p.titulo);
     },
 
-    // ---- Votos ----
-    votes() { return this._get('votes', []); },
-    voters() { return this._get('voters', []); },
-    hasVoted(pollId, cedula) {
-        return this.voters().some(v => v.pollId === pollId && v.cedula === cedula)
-            || this.votes().some(v => v.pollId === pollId && v.cedula === cedula);
+    // ================= Votos =================
+    // Lista de votos como antes: los secretos se reconstruyen desde el conteo (no tienen dueño)
+    votes() {
+        if (this._votesCache) return this._votesCache;
+        const out = [];
+        this._polls.forEach(p => {
+            if (p.publica) {
+                this._votos.filter(v => v.pollId === p.id)
+                    .forEach(v => out.push({ pollId: p.id, opcion: v.opcion, cedula: v.cedula, nombre: v.nombre, fecha: v.fecha, hash: v.codigo, publica: true }));
+                return;
+            }
+            const c = this._conteos[String(p.id)] || {};
+            p.opciones.forEach((o, i) => { for (let k = 0; k < (c['c' + i] || 0); k++) out.push({ pollId: p.id, opcion: o, publica: false }); });
+        });
+        return (this._votesCache = out);
     },
-    addVote(v) {
-        const poll = this.polls().find(p => p.id === v.pollId);
+    // Quién votó en consultas secretas (sin la opción). El afiliado solo ve lo suyo.
+    voters() {
+        const publica = new Set(this._polls.filter(p => p.publica).map(p => p.id));
+        return this._part.filter(r => !publica.has(r.pollId));
+    },
+    hasVoted(pollId, cedula) {
+        return this._part.some(r => r.pollId === pollId && r.cedula === cedula)
+            || this._votos.some(v => v.pollId === pollId && v.cedula === cedula);
+    },
+    async addVote(v) {
+        const poll = this._polls.find(p => p.id === v.pollId);
         if (!poll || this.estado(poll) !== 'abierta') return { error: 'Esta consulta no está abierta para votar.' };
-        if (!poll.opciones.includes(v.opcion)) return { error: 'La opción elegida no es válida.' };
-        if (this.hasVoted(v.pollId, v.cedula)) return { error: 'Ya emitió su voto en esta consulta.' };
-
-        const ahora = new Date();
-        const fechaCompleta = ahora.toLocaleString('es-CR');
-        const hash = this.genCode();
-        const vote = { pollId: v.pollId, opcion: v.opcion, hash, publica: !!poll.publica };
-        const all = this.votes();
-
-        if (poll.publica) {
-            vote.cedula = v.cedula; vote.nombre = v.nombre; vote.fecha = fechaCompleta;
-            all.push(vote);
-        } else {
-            vote.fecha = ahora.toLocaleDateString('es-CR');
-            const padron = this.voters(); padron.push({ pollId: v.pollId, cedula: v.cedula, fecha: fechaCompleta, codigo: hash });
-            delete vote.hash;
-            this._set('voters', padron);
-            all.splice(Math.floor(Math.random() * (all.length + 1)), 0, vote);
+        const idx = poll.opciones.indexOf(v.opcion);
+        if (idx < 0 || idx >= this.MAX_OPCIONES) return { error: 'La opción elegida no es válida.' };
+        if (this.hasVoted(poll.id, this.yo.cedula)) return { error: 'Ya emitió su voto en esta consulta.' };
+        const pid = String(poll.id), ced = this.yo.cedula, codigo = this.genCode(), ahora = new Date();
+        const fecha = ahora.toLocaleString('es-CR');
+        const b = FB.writeBatch(FB.db);
+        b.update(this._ref('conteos', pid), { ['c' + idx]: FB.increment(1), total: FB.increment(1) });
+        b.set(this._ref('participacion', pid + '_' + ced), { pollId: pid, cedula: ced, fecha, codigo });
+        b.set(this._ref('codigos', codigo), { pollId: pid, fecha: poll.publica ? fecha : ahora.toLocaleDateString('es-CR') });
+        if (poll.publica) b.set(this._ref('votos', pid + '_' + ced), { pollId: pid, cedula: ced, nombre: this.yo.nombre, opcion: v.opcion, idx, codigo, fecha });
+        try { await b.commit(); }
+        catch (e) {
+            console.error(e);
+            return { error: 'No se pudo registrar el voto. Revise su conexión e intente de nuevo. Recuerde que solo se puede votar una vez.' };
         }
-        this._set('votes', all);
         this.log('Voto emitido', `Consulta: ${poll.titulo}`.slice(0, 120));
-        return { ...vote, hash, fecha: fechaCompleta };
+        return { pollId: poll.id, opcion: v.opcion, hash: codigo, fecha };
     },
     asegurarCodigo(pollId, cedula) {
-        const padron = this.voters();
-        const r = padron.find(x => x.pollId === pollId && x.cedula === cedula);
-        if (!r) return '';
-        if (!r.codigo) { r.codigo = this.genCode(); this._set('voters', padron); }
-        return r.codigo;
+        const r = this._part.find(x => x.pollId === pollId && x.cedula === cedula);
+        return r ? r.codigo || '' : '';
     },
     // Restaurar un voto por equivocación: el afiliado podrá votar de nuevo.
-    // Voto público: se quita su voto directamente.
-    // Voto secreto: no se guarda quién eligió qué, así que se quita un voto de la opción que el afiliado indica.
-    restaurarVoto(pollId, cedula, opcion) {
-        const poll = this.polls().find(p => p.id === pollId);
+    // Voto público: se quita su voto. Voto secreto: se quita un voto de la opción que el afiliado indica.
+    async restaurarVoto(pollId, cedula, opcion) {
+        const poll = this._polls.find(p => p.id === pollId);
         if (!poll) return { error: 'Consulta no encontrada.' };
         if (this.estado(poll) !== 'abierta') return { error: 'Solo se puede restaurar un voto mientras la consulta está abierta.' };
-        const votes = this.votes();
+        const pid = String(pollId), id = pid + '_' + cedula;
+        const part = this._part.find(r => r.pollId === pollId && r.cedula === cedula);
+        if (!part) return { error: 'Este afiliado no ha votado.' };
+        let idx;
         if (poll.publica) {
-            const i = votes.findIndex(v => v.pollId === pollId && v.cedula === cedula);
-            if (i < 0) return { error: 'No se encontró el voto de este afiliado.' };
-            votes.splice(i, 1);
+            const v = this._votos.find(x => x.pollId === pollId && x.cedula === cedula);
+            if (!v) return { error: 'No se encontró el voto de este afiliado.' };
+            idx = v.idx;
         } else {
-            if (!this.voters().some(r => r.pollId === pollId && r.cedula === cedula)) return { error: 'Este afiliado no ha votado.' };
-            const i = votes.findIndex(v => v.pollId === pollId && v.opcion === opcion && !v.cedula);
-            if (i < 0) return { error: 'No hay votos registrados con esa opción.' };
-            votes.splice(i, 1);
+            idx = poll.opciones.indexOf(opcion);
+            if (idx < 0 || !((this._conteos[pid] || {})['c' + idx] > 0)) return { error: 'No hay votos registrados con esa opción.' };
         }
-        this._set('votes', votes);
-        this._set('voters', this.voters().filter(r => !(r.pollId === pollId && r.cedula === cedula)));
-        const a = this._get('users', {})[cedula];
+        const b = FB.writeBatch(FB.db);
+        b.update(this._ref('conteos', pid), { ['c' + idx]: FB.increment(-1), total: FB.increment(-1) });
+        b.delete(this._ref('participacion', id));
+        if (poll.publica) b.delete(this._ref('votos', id));
+        if (part.codigo) b.delete(this._ref('codigos', part.codigo));
+        try { await b.commit(); } catch (e) { this._falla(e); return { error: 'No se pudo restaurar el voto.' }; }
+        const a = this._afiliados[cedula];
         this.log('Voto restaurado', `${poll.titulo} · ${a ? a.nombre : cedula}`.slice(0, 120));
         return { ok: true };
     },
-    verify(code) {
+    async verify(code) {
         const c = String(code).trim().toUpperCase();
-        const v = this.votes().find(x => x.hash === c) || this.voters().find(x => x.codigo === c);
-        if (!v) return null;
-        const poll = this.polls().find(p => p.id === v.pollId);
-        return { titulo: poll ? poll.titulo : 'Consulta eliminada', fecha: v.fecha };
+        if (!/^ADEP-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)) return null;
+        let s;
+        try { s = await FB.getDoc(this._ref('codigos', c)); } catch { return null; }
+        if (!s.exists()) return null;
+        const d = s.data(), poll = this._polls.find(p => p.id === Number(d.pollId));
+        return { titulo: poll ? poll.titulo : 'Consulta no disponible', fecha: d.fecha };
     }
 };

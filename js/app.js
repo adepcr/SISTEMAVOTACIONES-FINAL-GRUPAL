@@ -16,7 +16,7 @@ const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const $ = id => document.getElementById(id);
 const fmt = iso => new Date(iso).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
 
-function logout() { DB.logout(); location.replace('login.html'); }
+async function logout() { await DB.logout(); location.replace('login.html'); }
 
 function switchTab(tab) {
     document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
@@ -187,10 +187,14 @@ function startConfirm(pid) {
 function closeConfirm() { $('modal-confirm').classList.add('hidden'); pendingPoll = null; }
 function confirmVote() { const pid = pendingPoll; closeConfirm(); if (pid) processVote(pid); }
 
-function processVote(pid) {
-    if (isAdmin) return;
+let votando = false;
+async function processVote(pid) {
+    if (isAdmin || votando) return;
     if (!selectedVotes[pid]) return;
-    const vote = DB.addVote({ pollId: pid, cedula: user.cedula, nombre: user.nombre, provincia: user.provincia, opcion: selectedVotes[pid] });
+    votando = true;
+    showToast('Enviando su voto…', 'success');
+    const vote = await DB.addVote({ pollId: pid, cedula: user.cedula, nombre: user.nombre, provincia: user.provincia, opcion: selectedVotes[pid] });
+    votando = false;
     if (vote.error) { renderAll(); return showToast(vote.error); }
     delete selectedVotes[pid];
     const poll = DB.polls().find(p => p.id === pid);
@@ -373,10 +377,12 @@ function startRestore(pid, ced) {
     if (poll.publica) {
         // Voto público: se sabe qué eligió, se quita directamente
         if (!confirm(`¿Restaurar el voto de ${nombre}? Podrá votar de nuevo en esta consulta.`)) return;
-        const r = DB.restaurarVoto(pid, ced);
-        if (r.error) return showToast(r.error);
-        showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
-        return renderAll();
+        DB.restaurarVoto(pid, ced).then(r => {
+            if (r.error) return showToast(r.error);
+            showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
+            renderAll();
+        });
+        return;
     }
     // Voto secreto: el afiliado indica qué opción eligió por error
     pendingRestore = { pid, ced };
@@ -387,13 +393,13 @@ function startRestore(pid, ced) {
 function closeRestore() { $('modal-restore').classList.add('hidden'); pendingRestore = null; }
 
 $('rs-cancel').addEventListener('click', closeRestore);
-$('rs-ok').addEventListener('click', () => {
+$('rs-ok').addEventListener('click', async () => {
     if (!pendingRestore) return;
     const { pid, ced } = pendingRestore;
     const poll = DB.polls().find(p => p.id === pid);
     const opcion = poll ? poll.opciones[+$('rs-opcion').value] : '';
-    const r = DB.restaurarVoto(pid, ced, opcion);
     closeRestore();
+    const r = await DB.restaurarVoto(pid, ced, opcion);
     if (r.error) return showToast(r.error);
     showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
     renderAll();
@@ -404,11 +410,11 @@ function refreshResultsAnimation() {
 }
 
 // ===== Verificación pública de comprobantes =====
-$('verify-form').addEventListener('submit', e => {
+$('verify-form').addEventListener('submit', async e => {
     e.preventDefault();
     const box = $('verify-result'), code = $('verify-code').value;
     if (!code.trim()) return;
-    const r = DB.verify(code);
+    const r = await DB.verify(code);
     box.classList.remove('hidden');
     if (r) {
         box.className = 'text-base font-bold rounded-xl p-4 border-2 bg-adep-greenLight text-adep-green border-emerald-200';
@@ -426,10 +432,10 @@ function createNewPoll(e) {
     const sinPreg = $('new-poll-noquestion').checked;
     const list = opts.value.split('\n').map(o => o.trim()).filter(Boolean);
     let bad = false;
-    [[title, !sinPreg && !title.value.trim()], [cat, !cat.value.trim()], [opts, list.length < 2]].forEach(([el, fail]) => {
+    [[title, !sinPreg && !title.value.trim()], [cat, !cat.value.trim()], [opts, list.length < 2 || list.length > DB.MAX_OPCIONES]].forEach(([el, fail]) => {
         if (fail) { el.classList.add('field-error'); $(`err-${el.id}`).classList.remove('hidden'); bad = true; }
     });
-    if (bad) return showToast('Rellene todos los campos requeridos.');
+    if (bad) return showToast(list.length > DB.MAX_OPCIONES ? `Máximo ${DB.MAX_OPCIONES} opciones por consulta.` : 'Rellene todos los campos requeridos.');
     const ap = $('new-poll-open').value, ci = $('new-poll-close').value;
     if (ap && ci && new Date(ci) <= new Date(ap)) return showToast('La fecha de cierre debe ser posterior a la de apertura.');
     DB.addPoll({
@@ -517,10 +523,10 @@ function telefonoWA(t) {
     return d.length >= 10 && d.length <= 15 ? d : '';
 }
 const telefonoTxt = t => t ? (t.startsWith('506') && t.length === 11 ? `${t.slice(3, 7)}-${t.slice(7)}` : '+' + t) : '';
-// Enlace de WhatsApp con el mensaje de la clave temporal (el administrador solo tiene que pulsar «Enviar»)
+// Enlace de WhatsApp con el mensaje del código de activación (el administrador solo tiene que pulsar «Enviar»)
 function enlaceWhatsApp(a, clave) {
     const url = new URL('login.html', location.href).href;
-    const msg = `Hola ${a.nombre.split(' ')[0]}, le saluda ADEP.\n\nSus datos para ingresar a ADEP Vota:\n• Cédula: ${a.cedula}\n• Clave temporal: ${clave}\n\nIngrese aquí: ${url}\n\nAl entrar, el sistema le pedirá crear su propia clave secreta. No comparta esta clave con nadie.`;
+    const msg = `Hola ${a.nombre.split(' ')[0]}, le saluda ADEP.\n\nSus datos para ingresar a ADEP Vota:\n• Cédula: ${a.cedula}\n• Código de activación: ${clave}\n\nIngrese aquí: ${url}\nToque «Es mi primera vez», escriba su cédula y este código, y cree su propia clave de 6 números. El código sirve una sola vez. No lo comparta con nadie.`;
     return `https://wa.me/${a.telefono}?text=${encodeURIComponent(msg)}`;
 }
 function botonWhatsApp(a, clave) {
@@ -543,7 +549,7 @@ function renderAfiliados() {
         <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
                 <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)}</p>
-                <p class="text-sm text-gray-500 truncate">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}</p>
+                <p class="text-sm text-gray-500 truncate">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}${a.activado ? '' : ' · <span class="text-amber-700 font-semibold">Cuenta sin activar</span>'}</p>
                 <p class="text-sm text-gray-600 flex items-center gap-2 flex-wrap mt-1"><span><i class="fa-solid fa-location-dot text-adep-green mr-1"></i>Filial:</span>
                     <select data-af-filial="${esc(a.cedula)}" aria-label="Filial de ${esc(a.nombre)}" class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold bg-white">
                         <option value="">Sin filial</option>
@@ -553,7 +559,7 @@ function renderAfiliados() {
             </div>
             <div class="flex flex-wrap gap-2 text-sm font-bold">
                 <button data-af="tel" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700"><i class="fa-solid fa-phone mr-1"></i>Teléfono</button>
-                <button data-af="reset" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Nueva clave</button>
+                <button data-af="reset" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Nuevo código</button>
                 <button data-af="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
                 <button data-af="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>
             </div>
@@ -568,10 +574,10 @@ function showCredentials(cedula, pin, filial) {
     box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado (la clave no se vuelve a mostrar):</p>
         <p>Cédula: <strong class="font-mono text-base">${esc(cedula)}</strong></p>
         ${filial ? `<p>Filial: <strong>${esc(filial)}</strong></p>` : ''}
-        <p>Clave temporal: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>
+        <p>Código de activación: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>
         ${a.telefono ? `<div class="mt-3">${botonWhatsApp(a, pin)}<p class="text-amber-800 mt-2">Se abrirá WhatsApp con el mensaje listo para ${esc(telefonoTxt(a.telefono))}. Después de enviarlo, borre el mensaje de su chat.</p></div>`
             : '<p class="text-amber-800 mt-2"><i class="fa-brands fa-whatsapp mr-1"></i>Para enviarla por WhatsApp, agregue el teléfono del afiliado con el botón «Teléfono».</p>'}
-        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>Al ingresar por primera vez, el sistema le pedirá crear su propia clave. Esta clave temporal dejará de funcionar.</p>`;
+        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>La primera vez, el afiliado toca «Es mi primera vez», escribe su cédula y este código, y crea su propia clave. El código sirve una sola vez.</p>`;
 }
 
 $('form-afiliado').addEventListener('submit', async e => {
@@ -626,7 +632,7 @@ function renderAdmins() {
                 <p class="text-sm text-gray-500 truncate">${esc(a.correo)} · ${a.activo === false ? 'Desactivado' : 'Activo'}</p>
             </div>
             <div class="flex flex-wrap gap-2 text-sm font-bold">
-                <button data-ad="pass" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Cambiar contraseña</button>
+                <button data-ad="pass" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">${yo ? 'Cambiar mi contraseña' : 'Enviar correo de contraseña'}</button>
                 ${yo ? '' : `
                 <button data-ad="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
                 <button data-ad="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>`}
@@ -662,11 +668,20 @@ $('admins-list').addEventListener('click', async e => {
     const id = b.dataset.id;
     if (id === user.cedula && b.dataset.ad !== 'pass') return; // no actuar sobre sí mismo
     if (b.dataset.ad === 'pass') {
-        const nueva = prompt('Nueva contraseña (mínimo 8 caracteres):');
-        if (nueva === null) return;
-        if (nueva.length < 8) return showToast('La contraseña debe tener al menos 8 caracteres.');
-        await DB.setPass(id, nueva);
-        showToast('Contraseña actualizada.', 'success');
+        if (id === user.cedula) {
+            const nueva = prompt('Nueva contraseña (mínimo 8 caracteres):');
+            if (nueva === null) return;
+            if (nueva.length < 8) return showToast('La contraseña debe tener al menos 8 caracteres.');
+            const r = await DB.setPass(id, nueva);
+            if (r.error) return showToast(r.error);
+            showToast('Contraseña actualizada.', 'success');
+        } else {
+            const a = DB.admins().find(x => x.cedula === id);
+            if (!confirm(`Se enviará un correo a ${a ? a.correo : 'este administrador'} con un enlace para crear una contraseña nueva. ¿Continuar?`)) return;
+            const r = await DB.setPass(id);
+            if (r.error) return showToast(r.error);
+            showToast(`Correo enviado a ${r.correo}.`, 'success');
+        }
     }
     if (b.dataset.ad === 'toggle') { const a = DB.admins().find(x => x.cedula === id); DB.setActivo(id, a.activo === false); }
     if (b.dataset.ad === 'del') {

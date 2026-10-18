@@ -1,0 +1,212 @@
+rules_version = '2';
+
+// ============================================================================
+// Reglas de seguridad de ADEP Vota (Firestore)
+// Publicarlas en: Firebase Console → Firestore Database → Reglas → pegar → Publicar
+//
+// Quién es quién:
+//   - Administrador: tiene un documento activo en /admins/{uid}
+//   - Afiliado: /cuentas/{uid} dice su cédula y /afiliados/{cédula}.uid es esa misma cuenta
+// Nadie puede leer ni escribir nada que no esté permitido aquí.
+// ============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function conectado() { return request.auth != null; }
+
+    function esAdmin() {
+      return conectado()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.activo == true;
+    }
+
+    // Cédula del afiliado conectado ('' si no es afiliado)
+    function miCedula() {
+      return exists(/databases/$(database)/documents/cuentas/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/cuentas/$(request.auth.uid)).data.cedula : '';
+    }
+
+    function esAfiliado() {
+      return conectado() && miCedula() != ''
+        && get(/databases/$(database)/documents/afiliados/$(miCedula())).data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/afiliados/$(miCedula())).data.activo == true;
+    }
+
+    function miembro() { return esAdmin() || esAfiliado(); }
+
+    // La votación está publicada y dentro de su horario
+    function abierta(pollId) {
+      let p = get(/databases/$(database)/documents/polls/$(pollId)).data;
+      return p.publicada == true
+        && (p.aperturaMs == 0 || request.time.toMillis() >= p.aperturaMs)
+        && (p.cierreMs == 0 || request.time.toMillis() < p.cierreMs);
+    }
+
+    // Este afiliado no había votado en esta consulta y su participación se registra en esta misma operación
+    function votoNuevo(pollId) {
+      let id = pollId + '_' + miCedula();
+      return !exists(/databases/$(database)/documents/participacion/$(id))
+        && existsAfter(/databases/$(database)/documents/participacion/$(id));
+    }
+
+    // ---------------- Configuración ----------------
+    match /config/{doc} {
+      allow get: if doc == 'instalado' || conectado();
+      allow list: if conectado();
+      // Primera instalación: el primer administrador se crea a sí mismo, una sola vez
+      allow create: if esAdmin()
+        || (doc == 'instalado' && conectado()
+            && !exists(/databases/$(database)/documents/config/instalado)
+            && existsAfter(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      allow update, delete: if esAdmin();
+    }
+
+    // ---------------- Administradores ----------------
+    match /admins/{uid} {
+      allow get: if esAdmin() || (conectado() && request.auth.uid == uid);
+      allow list: if esAdmin();
+      allow create: if esAdmin()
+        || (conectado() && request.auth.uid == uid
+            && !exists(/databases/$(database)/documents/config/instalado)
+            && existsAfter(/databases/$(database)/documents/config/instalado)
+            && request.resource.data.activo == true);
+      allow update, delete: if esAdmin();
+    }
+
+    // ---------------- Afiliados ----------------
+    match /afiliados/{ced} {
+      allow get: if esAdmin() || (conectado() && resource.data.uid == request.auth.uid);
+      allow list, create, delete: if esAdmin();
+      allow update: if esAdmin()
+        // Activación: la cuenta nueva queda enlazada solo si el código de activación fue correcto
+        || (conectado()
+            && resource.data.activo == true
+            && request.resource.data.uid == request.auth.uid
+            && get(/databases/$(database)/documents/activaciones/$(ced)).data.usada == false
+            && getAfter(/databases/$(database)/documents/activaciones/$(ced)).data.usada == true
+            && getAfter(/databases/$(database)/documents/activaciones/$(ced)).data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'activado', 'authEmail', 'ultimoIngreso']))
+        // El propio afiliado solo puede anotar su último ingreso
+        || (conectado() && resource.data.uid == request.auth.uid && resource.data.activo == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoIngreso']));
+    }
+
+    // Códigos de activación (solo se guarda su huella SHA-256, nunca el código)
+    match /activaciones/{ced} {
+      allow read, create, delete: if esAdmin();
+      allow update: if esAdmin()
+        || (conectado()
+            && resource.data.usada == false
+            && hashing.sha256(ced + ':' + request.resource.data.codigo).toBase64() == resource.data.hash
+            && request.resource.data.usada == true
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.usadaEn == request.time
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usada', 'uid', 'codigo', 'usadaEn']));
+    }
+
+    // Cédula → correo interno de la cuenta (lo necesita la pantalla de ingreso)
+    match /acceso/{ced} {
+      allow get: if true;
+      allow list, delete: if esAdmin();
+      allow create, update: if esAdmin()
+        || (conectado()
+            && getAfter(/databases/$(database)/documents/afiliados/$(ced)).data.uid == request.auth.uid
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.keys().hasOnly(['email']));
+    }
+
+    // Cuenta de Firebase → cédula
+    match /cuentas/{uid} {
+      allow get: if esAdmin() || (conectado() && request.auth.uid == uid);
+      allow list, update, delete: if esAdmin();
+      allow create: if conectado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['cedula'])
+        && getAfter(/databases/$(database)/documents/afiliados/$(request.resource.data.cedula)).data.uid == uid;
+    }
+
+    // ---------------- Votaciones ----------------
+    match /polls/{pollId} {
+      allow read: if esAdmin() || (esAfiliado() && resource.data.publicada == true);
+      allow write: if esAdmin();
+    }
+
+    // Conteo de votos: c0..c9 = votos por opción. El voto secreto existe SOLO aquí, sin cédula.
+    match /conteos/{pollId} {
+      allow read: if miembro();
+      allow create, delete: if esAdmin();
+      allow update: if esAdmin()
+        || (esAfiliado() && abierta(pollId) && votoNuevo(pollId) && sumaUnVoto());
+    }
+
+    // Exactamente una opción sube en 1 y el total sube en 1
+    function d(k) { return request.resource.data[k] - resource.data[k]; }
+    function cero_o_uno(k) { return d(k) == 0 || d(k) == 1; }
+    function sumaUnVoto() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'total'])
+        && d('total') == 1
+        && cero_o_uno('c0') && cero_o_uno('c1') && cero_o_uno('c2') && cero_o_uno('c3') && cero_o_uno('c4')
+        && cero_o_uno('c5') && cero_o_uno('c6') && cero_o_uno('c7') && cero_o_uno('c8') && cero_o_uno('c9')
+        && d('c0') + d('c1') + d('c2') + d('c3') + d('c4') + d('c5') + d('c6') + d('c7') + d('c8') + d('c9') == 1;
+    }
+
+    // Quién ya votó (nunca qué eligió)
+    match /participacion/{id} {
+      allow get: if esAdmin() || (esAfiliado() && resource.data.cedula == miCedula());
+      allow list: if esAdmin() || (esAfiliado() && resource.data.cedula == miCedula());
+      allow create: if esAfiliado()
+        && request.resource.data.keys().hasOnly(['pollId', 'cedula', 'fecha', 'codigo'])
+        && request.resource.data.cedula == miCedula()
+        && id == request.resource.data.pollId + '_' + miCedula()
+        && abierta(request.resource.data.pollId)
+        && getAfter(/databases/$(database)/documents/conteos/$(request.resource.data.pollId)).data.total
+             == get(/databases/$(database)/documents/conteos/$(request.resource.data.pollId)).data.total + 1
+        && existsAfter(/databases/$(database)/documents/codigos/$(request.resource.data.codigo));
+      allow update: if false;
+      allow delete: if esAdmin();
+    }
+
+    // Votos públicos (solo en consultas de voto público: nombre y opción visibles)
+    match /votos/{id} {
+      allow read: if miembro();
+      allow create: if esAfiliado()
+        && request.resource.data.keys().hasOnly(['pollId', 'cedula', 'nombre', 'opcion', 'idx', 'codigo', 'fecha'])
+        && request.resource.data.cedula == miCedula()
+        && id == request.resource.data.pollId + '_' + miCedula()
+        && get(/databases/$(database)/documents/polls/$(request.resource.data.pollId)).data.publica == true
+        && request.resource.data.opcion == get(/databases/$(database)/documents/polls/$(request.resource.data.pollId)).data.opciones[request.resource.data.idx]
+        && getAfter(/databases/$(database)/documents/conteos/$(request.resource.data.pollId)).data['c' + string(request.resource.data.idx)]
+             == get(/databases/$(database)/documents/conteos/$(request.resource.data.pollId)).data['c' + string(request.resource.data.idx)] + 1
+        && votoNuevo(request.resource.data.pollId);
+      allow update: if false;
+      allow delete: if esAdmin();
+    }
+
+    // Códigos de verificación de los comprobantes (el código es el nombre del documento)
+    match /codigos/{codigo} {
+      allow get: if miembro();
+      allow list, delete: if esAdmin();
+      allow create: if esAfiliado()
+        && request.resource.data.keys().hasOnly(['pollId', 'fecha'])
+        && votoNuevo(request.resource.data.pollId);
+      allow update: if false;
+    }
+
+    // ---------------- Bitácora ----------------
+    match /auditoria/{id} {
+      allow read, delete: if esAdmin();
+      allow create: if conectado()
+        && request.resource.data.keys().hasOnly(['fecha', 'accion', 'detalle', 'por', 'uid'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.fecha == request.time
+        && request.resource.data.accion is string && request.resource.data.accion.size() <= 120
+        && request.resource.data.detalle is string && request.resource.data.detalle.size() <= 300;
+      allow update: if false;
+    }
+
+    // Registros de cuentas eliminadas
+    match /eliminados/{id} {
+      allow read, write: if esAdmin();
+    }
+  }
+}
