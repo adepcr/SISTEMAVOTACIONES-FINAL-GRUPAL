@@ -2,8 +2,13 @@
 
 Cada vez que se sube un cambio a `main`, GitHub:
 1. Arma la app de Android (APK).
-2. Publica la página en **https://adep-vota.web.app** con el APK para descargar
-   (botón «Descargar la app para Android» en la pantalla de ingreso).
+2. Publica la página en **https://adep-vota.web.app**.
+
+El plan gratuito de Firebase **no permite poner el APK dentro de la página**. Para compartir la app:
+1. Descargue el APK: **Actions → Publicar app y página → la última ejecución → Artifacts → ADEP-Vota-android** (viene en un .zip).
+2. Súbalo a **Google Drive** → clic derecho → **Compartir** → «Cualquier persona con el enlace» → **Copiar enlace**.
+3. En la página, como administrador: **Afiliados → Enlace de descarga de la app** → pegue el enlace → **Guardar**.
+   Aparecerá el botón «Descargar la app para Android» en la pantalla de ingreso.
 
 Para el paso 2, GitHub necesita permiso para publicar en Firebase. Se configura **una sola vez**:
 
@@ -36,7 +41,5 @@ Para el paso 2, GitHub necesita permiso para publicar en Firebase. Se configura 
 Desde entonces se publica sola con cada cambio en `main`.
 
 ## Notas
-- El plan gratuito de Hosting permite **360 MB de descargas por día**. El APK pesa unos 9 MB:
-  alcanza para unas 35 descargas de la app por día (la página en sí pesa muy poco).
 - En iPhone no se instala el APK: en Safari se usa **Compartir → Agregar a pantalla de inicio**.
 - Las reglas de seguridad (`firestore.rules`) se siguen publicando a mano en la consola de Firebase cuando cambian.

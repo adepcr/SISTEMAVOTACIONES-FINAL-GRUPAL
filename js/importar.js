@@ -37,7 +37,25 @@
                 <button type="button" id="xi-wa-ok" class="${btnP}"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar</button>
             </div>
         </div>`);
-    DB.ajustesPublicos().then(a => { if (a.whatsappAyuda) q("xi-wa").value = telefonoTxt(a.whatsappAyuda); });
+    host.insertAdjacentHTML("beforebegin", `
+        <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
+            <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-android text-adep-green mr-1"></i> Enlace de descarga de la app (Android)</h3>
+            <p class="text-sm text-gray-500">Suba el archivo APK a Google Drive, compártalo como «Cualquier persona con el enlace» y pegue aquí el enlace. Aparecerá el botón «Descargar la app para Android» en la pantalla de ingreso.</p>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input id="xi-apk" type="url" placeholder="https://drive.google.com/..." class="flex-1 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold">
+                <button type="button" id="xi-apk-ok" class="${btnP}"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar</button>
+            </div>
+        </div>`);
+    DB.ajustesPublicos().then(a => {
+        if (a.whatsappAyuda) q("xi-wa").value = telefonoTxt(a.whatsappAyuda);
+        if (a.enlaceApp) q("xi-apk").value = a.enlaceApp;
+    });
+    q("xi-apk-ok").addEventListener("click", async () => {
+        const url = q("xi-apk").value.trim();
+        if (url && !/^https:\/\/\S+$/.test(url)) return showToast("Pegue un enlace completo que empiece con https://");
+        try { await DB.setEnlaceApp(url); showToast(url ? "Enlace de la app guardado." : "Enlace de la app borrado.", "success"); }
+        catch (e) { console.error(e); showToast("No se pudo guardar. Intente de nuevo."); }
+    });
     q("xi-wa-ok").addEventListener("click", async () => {
         const txt = q("xi-wa").value.trim(), num = telefonoWA(txt);
         if (txt && !num) return showToast("El número debe tener 8 números (o incluir el código de país).");

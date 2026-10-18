@@ -1,6 +1,8 @@
 # Cada vez que se sube un cambio a main:
 #   1) arma la app de Android (.apk) — queda en "Actions" → la ejecución → "Artifacts"
-#   2) publica la página en Firebase Hosting (https://adep-vota.web.app) con el APK para descargar.
+#   2) publica la página en Firebase Hosting (https://adep-vota.web.app).
+#      (El plan gratuito no permite poner el APK en la página: se comparte con un enlace de Google Drive,
+#       que el administrador pega en Afiliados → «Enlace de descarga de la app».)
 #      El paso 2 necesita el secreto FIREBASE_SERVICE_ACCOUNT (ver PUBLICAR.md); sin él, solo se arma el APK.
 name: Publicar app y página
 
@@ -30,8 +32,6 @@ jobs:
         with:
           name: ADEP-Vota-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Poner el APK dentro de la página
-        run: mkdir -p www/descargas && cp android/app/build/outputs/apk/debug/app-debug.apk www/descargas/ADEP-Vota.apk
       - name: Publicar en Firebase Hosting
         if: env.FB_SA != ''
         run: |

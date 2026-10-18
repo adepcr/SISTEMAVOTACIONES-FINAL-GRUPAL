@@ -247,7 +247,7 @@
             <p class="lg-seguro"><i class="fa-solid fa-lock"></i> Conexión segura · Sus datos están protegidos</p>
             <!-- Descarga de la app (solo en la página publicada, no dentro de la app) -->
             <div id="lg-app" class="hidden lg-app">
-                <a id="lg-apk" href="descargas/ADEP-Vota.apk" download="ADEP-Vota.apk"><i class="fa-brands fa-android"></i> Descargar la app para Android</a>
+                <a id="lg-apk" class="hidden" href="#" target="_blank" rel="noopener"><i class="fa-brands fa-android"></i> Descargar la app para Android</a>
                 <p id="lg-ios" class="hidden"><i class="fa-brands fa-apple"></i> En iPhone: toque <strong>Compartir</strong> y luego <strong>«Agregar a pantalla de inicio»</strong>.</p>
             </div>
             <script>
@@ -257,8 +257,12 @@
                     if (app || local) return;
                     const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
                     document.getElementById('lg-app').classList.remove('hidden');
-                    document.getElementById('lg-apk').classList.toggle('hidden', ios);
                     document.getElementById('lg-ios').classList.toggle('hidden', !ios);
+                    // El enlace de descarga (Google Drive) lo configura el administrador; se muestra cuando carga
+                    window.mostrarApk = url => {
+                        if (ios || !/^https:\/\//.test(url || '')) return;
+                        const a = document.getElementById('lg-apk'); a.href = url; a.classList.remove('hidden');
+                    };
                 })();
             </script>
             </div>
@@ -331,7 +335,8 @@
         // ---------- Afiliados: ingreso en dos pasos (cédula → clave o primera vez) ----------
         const pin = $('a-pin'), cedula = $('a-cedula');
         let paso = 1;
-        const ajustes = DB.ajustesPublicos();   // WhatsApp de ayuda (se carga mientras tanto)
+        const ajustes = DB.ajustesPublicos();   // WhatsApp de ayuda y enlace de la app (se cargan mientras tanto)
+        ajustes.then(a => window.mostrarApk && window.mostrarApk(a.enlaceApp));
 
         function pintarPuntos() {
             document.querySelectorAll('#dots .dot').forEach((d, i) => d.classList.toggle('on', i < pin.value.length));

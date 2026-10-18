@@ -185,6 +185,10 @@ const DB = {
         try { const s = await FB.getDoc(this._ref('config', 'publico')); return s.exists() ? s.data() : {}; }
         catch { return {}; }
     },
+    async setEnlaceApp(url) {
+        await FB.setDoc(this._ref('config', 'publico'), { enlaceApp: url || '' }, { merge: true });
+        this.log('Enlace de descarga de la app actualizado', url ? 'con enlace' : 'sin enlace');
+    },
     async setWhatsappAyuda(numero) {
         await FB.setDoc(this._ref('config', 'publico'), { whatsappAyuda: numero || '' }, { merge: true });
         this.log('WhatsApp de ayuda actualizado', numero || 'sin número');
