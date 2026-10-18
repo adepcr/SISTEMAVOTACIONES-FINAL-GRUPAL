@@ -51,7 +51,8 @@ service cloud.firestore {
 
     // ---------------- Configuración ----------------
     match /config/{doc} {
-      allow get: if doc == 'instalado' || conectado();
+      // 'instalado' y 'publico' (WhatsApp de ayuda) se leen antes de iniciar sesión
+      allow get: if doc == 'instalado' || doc == 'publico' || conectado();
       allow list: if conectado();
       // Primera instalación: el primer administrador se crea a sí mismo, una sola vez
       allow create: if esAdmin()

@@ -15,7 +15,8 @@
 ### Cómo ingresan los afiliados
 1. El administrador registra al afiliado (o lo importa desde Excel). El sistema genera un **código de activación** de 8 caracteres, por ejemplo `K7P2-9QXM`. Se muestra **una sola vez**.
 2. Se entrega en persona o por WhatsApp.
-3. El afiliado toca **«Es mi primera vez»**, escribe su cédula y el código, y **crea su propia clave de 6 números**. El código sirve una sola vez.
+3. El afiliado escribe su cédula y toca **«Continuar»**. Como es su primera vez, el sistema le pide el código y que **cree su propia clave de 6 números**. El código sirve una sola vez.
+4. En su propio celular la sesión queda abierta: no tendrá que escribir la clave cada vez.
 4. Después ingresa siempre con cédula y clave.
 5. ¿Olvidó la clave? El administrador pulsa **«Nuevo código»**: la cuenta anterior deja de funcionar y el afiliado repite el paso 3.
 

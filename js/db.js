@@ -138,12 +138,26 @@ const DB = {
         await this.log('Ingreso al sistema', 'Administrador');
         return p;
     },
+    // ¿Esta cédula ya activó su cuenta? → 'activa' | 'sin-activar' (no revela nada más)
+    async estadoCedula(cedula) {
+        const s = await FB.getDoc(this._ref('acceso', this._norm(cedula)));
+        return s.exists() ? 'activa' : 'sin-activar';
+    },
+    // Ajustes que se ven antes de iniciar sesión (WhatsApp de ayuda de ADEP)
+    async ajustesPublicos() {
+        try { const s = await FB.getDoc(this._ref('config', 'publico')); return s.exists() ? s.data() : {}; }
+        catch { return {}; }
+    },
+    async setWhatsappAyuda(numero) {
+        await FB.setDoc(this._ref('config', 'publico'), { whatsappAyuda: numero || '' }, { merge: true });
+        this.log('WhatsApp de ayuda actualizado', numero || 'sin número');
+    },
     async loginAfiliado(cedula, pin) {
         const ced = this._norm(cedula);
         let acc;
         try { acc = await FB.getDoc(this._ref('acceso', ced)); }
         catch (e) { return { error: this._errAuth(e) }; }
-        if (!acc.exists()) return { error: 'Esta cédula todavía no tiene la cuenta activada. Toque «Es mi primera vez» e ingrese el código de activación que le dio ADEP.', sinActivar: true };
+        if (!acc.exists()) return { error: 'Esta cédula todavía no tiene la cuenta activada. Toque «Cambiar», escriba su cédula y luego el código de activación que le dio ADEP.', sinActivar: true };
         let cred;
         try { cred = await FB.signInWithEmailAndPassword(FB.auth, acc.data().email, this._claveAuth(pin)); }
         catch (e) { return { error: this._errAuth(e).replace('Los datos de ingreso no son correctos', 'La cédula o la clave no son correctas') }; }

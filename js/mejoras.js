@@ -389,7 +389,8 @@
                 [
                     "Registre al afiliado con su nombre, cédula, filial y teléfono.",
                     "El sistema crea un código de activación. Se muestra una sola vez: entréguelo en persona o con el botón «Enviar por WhatsApp».",
-                    "La primera vez, el afiliado toca «Es mi primera vez», escribe su cédula y el código, y crea su propia clave. El código sirve una sola vez.",
+                    "La primera vez, el afiliado escribe su cédula, toca «Continuar», escribe el código y crea su propia clave. El código sirve una sola vez.",
+                    "Si un afiliado olvida su clave, use «Nuevo código» y envíeselo por WhatsApp. Abajo puede poner el WhatsApp de ADEP para que pidan ayuda.",
                     "Si olvida su clave, use «Nuevo código». También puede desactivar o eliminar cuentas.",
                 ],
             ],

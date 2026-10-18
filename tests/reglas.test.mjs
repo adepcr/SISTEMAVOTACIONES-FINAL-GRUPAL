@@ -36,6 +36,9 @@ await prueba("Admin crea afiliado y código de activación", async () => { const
   await assertSucceeds(b.commit()); });
 
 // ---------- Sin conectar ----------
+await prueba("Admin guarda el WhatsApp de ayuda", () => assertSucceeds(setDoc(doc(A, "config/publico"), { whatsappAyuda: "50622223333" })));
+await prueba("Sin conectar: puede leer el WhatsApp de ayuda", () => assertSucceeds(getDoc(doc(anon, "config/publico"))));
+await prueba("Sin conectar: NO puede leer la configuración general", () => assertFails(getDoc(doc(anon, "config/general"))));
 await prueba("Sin conectar: NO puede leer afiliados", () => assertFails(getDoc(doc(anon, "afiliados/101110111"))));
 await prueba("Sin conectar: NO puede leer votaciones", () => assertFails(getDoc(doc(anon, "polls/1"))));
 await prueba("Sin conectar: NO puede leer códigos de activación", () => assertFails(getDoc(doc(anon, "activaciones/101110111"))));
@@ -65,6 +68,7 @@ await prueba("Afiliada NO lee la bitácora", () => assertFails(getDocs(collectio
 await prueba("Afiliada NO puede hacerse administradora", () => assertFails(setDoc(doc(M, "admins/maria"), { nombre: "M", activo: true })));
 await prueba("Afiliada NO puede desactivar a otro", () => assertFails(updateDoc(doc(M, "afiliados/202220222"), { activo: false })));
 await prueba("Afiliada NO puede cambiar resultados", () => assertFails(updateDoc(doc(M, "conteos/1"), { c1: 100, total: 100 })));
+await prueba("Afiliada NO puede cambiar el WhatsApp de ayuda", () => assertFails(setDoc(doc(M, "config/publico"), { whatsappAyuda: "1" })));
 await prueba("Afiliada NO ve borradores", () => assertFails(getDoc(doc(M, "polls/4"))));
 await prueba("Afiliada ve votaciones publicadas", () => assertSucceeds(getDoc(doc(M, "polls/1"))));
 

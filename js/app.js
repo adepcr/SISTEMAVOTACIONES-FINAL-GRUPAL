@@ -16,7 +16,10 @@ const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const $ = id => document.getElementById(id);
 const fmt = iso => new Date(iso).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
 
-async function logout() { await DB.logout(); location.replace('login.html'); }
+async function logout() {
+    if (!isAdmin && !confirm('¿Desea cerrar sesión?\n\nSi la cierra, necesitará su clave para volver a entrar. Si este es su propio celular o computadora, puede dejarla abierta.')) return;
+    await DB.logout(); location.replace('login.html');
+}
 
 function switchTab(tab) {
     document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
@@ -526,7 +529,7 @@ const telefonoTxt = t => t ? (t.startsWith('506') && t.length === 11 ? `${t.slic
 // Enlace de WhatsApp con el mensaje del código de activación (el administrador solo tiene que pulsar «Enviar»)
 function enlaceWhatsApp(a, clave) {
     const url = new URL('login.html', location.href).href;
-    const msg = `Hola ${a.nombre.split(' ')[0]}, le saluda ADEP.\n\nSus datos para ingresar a ADEP Vota:\n• Cédula: ${a.cedula}\n• Código de activación: ${clave}\n\nIngrese aquí: ${url}\nToque «Es mi primera vez», escriba su cédula y este código, y cree su propia clave de 6 números. El código sirve una sola vez. No lo comparta con nadie.`;
+    const msg = `Hola ${a.nombre.split(' ')[0]}, le saluda ADEP.\n\nSus datos para ingresar a ADEP Vota:\n• Cédula: ${a.cedula}\n• Código de activación: ${clave}\n\nIngrese aquí: ${url}\nEscriba su cédula, toque «Continuar», escriba este código y cree su propia clave de 6 números. El código sirve una sola vez. No lo comparta con nadie.`;
     return `https://wa.me/${a.telefono}?text=${encodeURIComponent(msg)}`;
 }
 function botonWhatsApp(a, clave) {
@@ -577,7 +580,7 @@ function showCredentials(cedula, pin, filial) {
         <p>Código de activación: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>
         ${a.telefono ? `<div class="mt-3">${botonWhatsApp(a, pin)}<p class="text-amber-800 mt-2">Se abrirá WhatsApp con el mensaje listo para ${esc(telefonoTxt(a.telefono))}. Después de enviarlo, borre el mensaje de su chat.</p></div>`
             : '<p class="text-amber-800 mt-2"><i class="fa-brands fa-whatsapp mr-1"></i>Para enviarla por WhatsApp, agregue el teléfono del afiliado con el botón «Teléfono».</p>'}
-        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>La primera vez, el afiliado toca «Es mi primera vez», escribe su cédula y este código, y crea su propia clave. El código sirve una sola vez.</p>`;
+        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>La primera vez, el afiliado escribe su cédula, toca «Continuar», escribe este código y crea su propia clave. El código sirve una sola vez.</p>`;
 }
 
 $('form-afiliado').addEventListener('submit', async e => {

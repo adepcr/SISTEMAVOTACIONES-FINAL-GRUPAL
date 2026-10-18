@@ -28,7 +28,22 @@
                 <button type="button" id="xi-bulk" class="${btnS}"><i class="fa-solid fa-key mr-1"></i> Códigos nuevos en bloque</button>
                 <button type="button" id="xi-tpl" class="${btnG}"><i class="fa-solid fa-file-excel mr-1"></i> Descargar plantilla de Excel</button>
             </div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
+            <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i> WhatsApp de ayuda para afiliados</h3>
+            <p class="text-sm text-gray-500">Si un afiliado olvida su clave, en la pantalla de ingreso verá un botón para escribir a este número y pedir un código nuevo.</p>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input id="xi-wa" type="tel" inputmode="tel" placeholder="Número de WhatsApp de ADEP (8 números)" class="flex-1 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold">
+                <button type="button" id="xi-wa-ok" class="${btnP}"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar</button>
+            </div>
         </div>`);
+    DB.ajustesPublicos().then(a => { if (a.whatsappAyuda) q("xi-wa").value = telefonoTxt(a.whatsappAyuda); });
+    q("xi-wa-ok").addEventListener("click", async () => {
+        const txt = q("xi-wa").value.trim(), num = telefonoWA(txt);
+        if (txt && !num) return showToast("El número debe tener 8 números (o incluir el código de país).");
+        try { await DB.setWhatsappAyuda(num); showToast(num ? "WhatsApp de ayuda guardado." : "WhatsApp de ayuda borrado.", "success"); }
+        catch (e) { console.error(e); showToast("No se pudo guardar. Intente de nuevo."); }
+    });
 
     /* ---------- Utilidades ---------- */
     function parseCSV(text) {
@@ -228,7 +243,7 @@
     q("xi-bulk").addEventListener("click", () => {
         const opts = ['<option value="todas">Todas las filiales</option>', ...FILIALES.map(f => `<option>${E(f)}</option>`), '<option value="__sin">Sin filial</option>'].join("");
         abrir("Códigos de activación nuevos", `
-            <p class="text-base text-gray-700">Genera un código de activación nuevo para cada afiliado elegido. <strong>Sus claves actuales dejan de funcionar</strong> en cuanto confirme. Con el código, cada afiliado vuelve a crear su clave («Es mi primera vez»).</p>
+            <p class="text-base text-gray-700">Genera un código de activación nuevo para cada afiliado elegido. <strong>Sus claves actuales dejan de funcionar</strong> en cuanto confirme. Con el código, cada afiliado vuelve a crear su clave: escribe su cédula, toca «Continuar» y luego el código.</p>
             <div><label for="xb-fil" class="block text-sm font-bold text-gray-700 mb-1">¿A quiénes?</label>
                 <select id="xb-fil" class="w-full border-2 border-gray-300 rounded-xl p-3 text-base font-semibold bg-white">${opts}</select></div>
             <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" id="xb-act" checked class="w-5 h-5 accent-adep-green"> Solo cuentas activas</label>

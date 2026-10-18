@@ -99,56 +99,69 @@
             <!-- ============ AFILIADOS (por defecto) ============ -->
             <form id="form-afiliado" class="space-y-5" novalidate>
 
-                <div>
-                    <label for="a-cedula" class="block text-base font-bold text-gray-800 mb-1">1. Su número de
-                        cédula</label>
+                <!-- Paso 1: la cédula. El sistema decide si pide la clave o si es la primera vez. -->
+                <div id="paso-cedula">
+                    <label for="a-cedula" class="block text-base font-bold text-gray-800 mb-1">Su número de cédula</label>
                     <input id="a-cedula" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12"
                         autocomplete="username" placeholder="Solo números"
                         class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
                     <p class="text-sm text-gray-500 mt-1">Escríbala sin guiones ni espacios.</p>
                 </div>
 
-                <div>
-                    <label for="a-pin" class="block text-base font-bold text-gray-800 mb-1">2. Su clave de 6
-                        números</label>
-                    <input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"
-                        autocomplete="current-password" placeholder="••••••"
-                        class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none pr-4">
-                    <div class="flex items-center justify-between mt-2">
-                        <div id="dots" class="flex gap-2" aria-hidden="true">
-                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-                        </div>
-                        <button type="button" id="a-ver"
-                            class="text-base font-bold text-adep-green underline py-2 px-1">
-                            <i class="fa-solid fa-eye mr-1"></i><span>Ver clave</span>
-                        </button>
+                <!-- Paso 2: la clave -->
+                <div id="paso-clave" class="hidden space-y-5">
+                    <div class="flex items-center justify-between gap-3 rounded-2xl p-3" style="background:#e8f5ee;border:2px solid #a7dcbf">
+                        <p class="text-base font-bold text-gray-800"><i class="fa-solid fa-id-card text-adep-green mr-1"></i> Cédula <span id="a-cedula-ver" class="font-mono"></span></p>
+                        <button type="button" id="a-cambiar" class="text-base font-bold text-adep-green underline py-2 px-1">Cambiar</button>
                     </div>
+                    <div>
+                        <label for="a-pin" class="block text-base font-bold text-gray-800 mb-1">Su clave de 6 números</label>
+                        <input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                            autocomplete="current-password" placeholder="••••••"
+                            class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none pr-4">
+                        <div class="flex items-center justify-between mt-2">
+                            <div id="dots" class="flex gap-2" aria-hidden="true">
+                                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                            </div>
+                            <button type="button" id="a-ver"
+                                class="text-base font-bold text-adep-green underline py-2 px-1">
+                                <i class="fa-solid fa-eye mr-1"></i><span>Ver clave</span>
+                            </button>
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-3 text-base font-semibold text-gray-700 cursor-pointer">
+                        <input type="checkbox" id="a-recordar" class="w-6 h-6 accent-adep-green" checked>
+                        Recordar mi cédula en este equipo
+                    </label>
                 </div>
-
-                <label class="flex items-center gap-3 text-base font-semibold text-gray-700 cursor-pointer">
-                    <input type="checkbox" id="a-recordar" class="w-6 h-6 accent-adep-green">
-                    Recordar mi cédula en este equipo
-                </label>
 
                 <p id="a-error" role="alert" aria-live="assertive"
                     class="hidden text-base font-bold text-adep-red bg-adep-redLight border-2 border-red-200 rounded-xl p-3">
                 </p>
 
-                <button type="submit"
+                <button type="submit" id="a-boton"
                     class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar
+                    <i class="fa-solid fa-arrow-right"></i> <span>Continuar</span>
                 </button>
 
-                <button type="button" id="ir-activar"
-                    class="w-full bg-white hover:bg-emerald-50 text-adep-green font-extrabold py-4 rounded-2xl text-lg border-2 border-emerald-300 flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-key"></i> Es mi primera vez: activar mi cuenta
-                </button>
+                <!-- ¿Olvidó su clave? -->
+                <button type="button" id="a-olvide" class="hidden w-full text-lg font-bold text-adep-green underline py-2">¿Olvidó su clave?</button>
+                <div id="ayuda-olvido" class="hidden rounded-2xl p-4 space-y-3" style="background:#fffbeb;border:2px solid #fcd34d">
+                    <p class="text-base font-bold" style="color:#78350f"><i class="fa-solid fa-life-ring mr-1"></i> No se preocupe, tiene solución:</p>
+                    <ol class="text-base text-gray-800 space-y-1 list-decimal pl-6">
+                        <li>Pida a ADEP un <strong>código nuevo</strong>.</li>
+                        <li>Vuelva aquí, escriba su cédula y el código.</li>
+                        <li>Cree una clave nueva.</li>
+                    </ol>
+                    <a id="a-wa-ayuda" href="#" target="_blank" rel="noopener" class="hidden w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-lg font-extrabold text-white" style="background:#15803d">
+                        <i class="fa-brands fa-whatsapp text-2xl"></i> Pedir código nuevo por WhatsApp</a>
+                    <p id="a-sin-wa" class="text-base text-gray-700">Comuníquese con ADEP y pida un código nuevo.</p>
+                </div>
 
                 <p class="text-sm text-gray-600 text-center bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <i class="fa-solid fa-circle-info text-adep-green mr-1"></i>
-                    ¿Olvidó su clave? Pida a ADEP un código de activación nuevo y vuelva a activar su cuenta.
-                    <strong>No comparta su clave con nadie.</strong>
+                    <i class="fa-solid fa-shield-halved text-adep-green mr-1"></i>
+                    <strong>No comparta su clave con nadie.</strong> En su propio celular, la sesión queda abierta y no tendrá que escribirla cada vez.
                 </p>
             </form>
 
@@ -156,8 +169,8 @@
             <form id="form-activar" class="hidden space-y-5" novalidate>
                 <div class="rounded-2xl p-4 text-center" style="background:#e8f5ee;border:2px solid #a7dcbf">
                     <i class="fa-solid fa-key text-3xl text-adep-green"></i>
-                    <h2 class="text-xl font-extrabold text-gray-900 mt-2">Activar mi cuenta</h2>
-                    <p class="text-base text-gray-700 mt-1">Use el <strong>código de activación</strong> que le entregó ADEP y cree su <strong>clave personal</strong> de 6 números. Solo usted la sabrá.</p>
+                    <h2 class="text-xl font-extrabold text-gray-900 mt-2">¡Bienvenido(a)! Es su primera vez</h2>
+                    <p class="text-base text-gray-700 mt-1">Escriba el <strong>código</strong> que le entregó ADEP y cree su <strong>clave personal</strong> de 6 números. Solo se hace una vez.</p>
                 </div>
                 <div>
                     <label for="act-cedula" class="block text-base font-bold text-gray-800 mb-1">1. Su número de cédula</label>
@@ -186,7 +199,7 @@
                 <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
                     <i class="fa-solid fa-check"></i> Activar mi cuenta y entrar
                 </button>
-                <button type="button" id="volver-ingreso" class="w-full text-base font-bold text-gray-600 underline py-2">Volver al ingreso</button>
+                <button type="button" id="volver-ingreso" class="w-full text-base font-bold text-gray-600 underline py-2">Volver</button>
             </form>
 
             <!-- ============ ADMINISTRADOR ============ -->
@@ -251,12 +264,6 @@
             }
             $('tab-afi').addEventListener('click', () => modo(false));
             $('tab-adm').addEventListener('click', () => modo(true));
-            // ---------- Primera vez ----------
-            $('ir-activar').addEventListener('click', () => {
-                if ($('a-cedula').value) $('act-cedula').value = $('a-cedula').value;
-                mostrar('form-activar');
-                ($('act-cedula').value ? $('act-codigo') : $('act-cedula')).focus();
-            });
             $('volver-ingreso').addEventListener('click', () => { mostrar('form-afiliado'); $('a-cedula').focus(); });
             // Si intentan ingresar antes de conectar, avisar en vez de recargar la página
             document.addEventListener('submit', e => {
@@ -305,17 +312,47 @@
         if (sesion) { entrar(); await new Promise(() => { }); }   // ya tenía la sesión abierta
         window.dbListo = true;
 
-        // ---------- Afiliados: ingreso ----------
+        // ---------- Afiliados: ingreso en dos pasos (cédula → clave o primera vez) ----------
         const pin = $('a-pin'), cedula = $('a-cedula');
+        let paso = 1;
+        const ajustes = DB.ajustesPublicos();   // WhatsApp de ayuda (se carga mientras tanto)
 
         function pintarPuntos() {
             document.querySelectorAll('#dots .dot').forEach((d, i) => d.classList.toggle('on', i < pin.value.length));
         }
+        function irPaso(n) {
+            paso = n;
+            $('paso-cedula').classList.toggle('hidden', n !== 1);
+            $('paso-clave').classList.toggle('hidden', n !== 2);
+            $('a-olvide').classList.toggle('hidden', n !== 2);
+            $('ayuda-olvido').classList.add('hidden');
+            $('a-boton').querySelector('span').textContent = n === 1 ? 'Continuar' : 'Ingresar';
+            $('a-boton').querySelector('i').className = n === 1 ? 'fa-solid fa-arrow-right' : 'fa-solid fa-arrow-right-to-bracket';
+            showErr('a-error', '');
+            if (n === 1) cedula.focus();
+            else { $('a-cedula-ver').textContent = cedula.value; pin.value = ''; pintarPuntos(); pin.focus(); }
+        }
+        // Paso 1: según la cédula, pide la clave o lleva a «primera vez»
+        async function revisarCedula() {
+            const ced = soloNumeros(cedula.value);
+            if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
+            showErr('a-error', '');
+            let estado;
+            try { estado = await DB.estadoCedula(ced); }
+            catch (e) { console.error(e); return showErr('a-error', 'No hay conexión. Revise su internet e intente de nuevo.'); }
+            if (estado === 'activa') return irPaso(2);
+            $('act-cedula').value = ced;
+            mostrar('form-activar');
+            $('act-codigo').focus();
+        }
+
         cedula.addEventListener('input', () => { cedula.value = soloNumeros(cedula.value); showErr('a-error', ''); });
         pin.addEventListener('input', () => {
             pin.value = soloNumeros(pin.value).slice(0, 6);
             pintarPuntos(); showErr('a-error', '');
         });
+        $('a-cambiar').addEventListener('click', () => { localStorage.removeItem('adep_recordar'); irPaso(1); });
+        $('volver-ingreso').addEventListener('click', () => irPaso(1));
 
         $('a-ver').addEventListener('click', () => {
             const ver = pin.type === 'password';
@@ -325,20 +362,34 @@
             pin.focus();
         });
 
-        // Recordar SOLO la cédula (nunca la clave)
+        $('a-olvide').addEventListener('click', async () => {
+            const num = ((await ajustes).whatsappAyuda || '').replace(/\D/g, '');
+            const msg = `Hola ADEP, olvidé mi clave de ADEP Vota. Mi cédula es ${soloNumeros(cedula.value)}. ¿Me pueden enviar un código nuevo, por favor?`;
+            $('a-wa-ayuda').href = `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
+            $('a-wa-ayuda').classList.toggle('hidden', !num);
+            $('a-sin-wa').classList.toggle('hidden', !!num);
+            $('ayuda-olvido').classList.remove('hidden');
+            $('a-olvide').classList.add('hidden');
+        });
+
+        // Cédula recordada en este equipo: pasa directo a pedir la clave
         const guardada = DB._get('recordar', '');
-        if (guardada) { cedula.value = guardada; $('a-recordar').checked = true; pin.focus(); }
+        if (guardada) { cedula.value = guardada; revisarCedula(); }
         else cedula.focus();
 
         $('form-afiliado').addEventListener('submit', e => {
             e.preventDefault();
             ocupado(e.target, async () => {
+                if (paso === 1) return revisarCedula();
                 const ced = soloNumeros(cedula.value), clave = soloNumeros(pin.value);
-                if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
                 if (clave.length < 6) { pin.focus(); return showErr('a-error', `Su clave tiene 6 números. Le faltan ${6 - clave.length}.`); }
                 showErr('a-error', '');
                 const res = await DB.loginAfiliado(ced, clave);
-                if (res.error) { pin.value = ''; pintarPuntos(); pin.focus(); return showErr('a-error', res.error); }
+                if (res.error) {
+                    pin.value = ''; pintarPuntos(); pin.focus();
+                    if (/no son correctas/.test(res.error)) $('a-olvide').classList.remove('hidden');
+                    return showErr('a-error', res.error);
+                }
                 if ($('a-recordar').checked) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
                 entrar();
             });
@@ -371,6 +422,7 @@
                 showErr('c-error', 'Activando su cuenta…');
                 const r = await DB.activar(ced, cod, nueva);
                 if (r.error) return showErr('c-error', r.error);
+                DB._set('recordar', ced);
                 entrar();
             });
         });
