@@ -202,6 +202,30 @@
         </div>
     </main>
 
+    <script>
+        // Esto funciona de inmediato, sin esperar a que cargue la base de datos (con internet lento puede tardar).
+        (() => {
+            const $ = id => document.getElementById(id);
+            // ---------- Cambiar entre afiliado / administrador ----------
+            let modoAdmin = false;
+            $('toggle-modo').addEventListener('click', () => {
+                modoAdmin = !modoAdmin;
+                $('form-afiliado').classList.toggle('hidden', modoAdmin);
+                $('form-admin').classList.toggle('hidden', !modoAdmin);
+                $('toggle-modo').textContent = modoAdmin ? 'Volver al ingreso de afiliados' : 'Soy administrador';
+                (modoAdmin ? $('l-correo') : $('a-cedula')).focus();
+            });
+            // Si intentan ingresar antes de conectar, avisar en vez de recargar la página
+            document.addEventListener('submit', e => {
+                if (window.dbListo) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const err = e.target.querySelector('[role="alert"]');
+                if (err) { err.textContent = 'Conectando con el sistema… espere unos segundos e intente de nuevo.'; err.classList.remove('hidden'); }
+            }, true);
+        })();
+    </script>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
@@ -243,16 +267,7 @@
         }
 
         if (DB.session()) location.replace('index.html');
-
-        // ---------- Cambiar entre afiliado / administrador ----------
-        let modoAdmin = false;
-        $('toggle-modo').addEventListener('click', () => {
-            modoAdmin = !modoAdmin;
-            $('form-afiliado').classList.toggle('hidden', modoAdmin);
-            $('form-admin').classList.toggle('hidden', !modoAdmin);
-            $('toggle-modo').textContent = modoAdmin ? 'Volver al ingreso de afiliados' : 'Soy administrador';
-            (modoAdmin ? $('l-correo') : $('a-cedula')).focus();
-        });
+        window.dbListo = true;
 
         // ---------- Afiliados ----------
         const pin = $('a-pin'), cedula = $('a-cedula');
