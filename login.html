@@ -245,6 +245,22 @@
             </form>
 
             <p class="lg-seguro"><i class="fa-solid fa-lock"></i> Conexión segura · Sus datos están protegidos</p>
+            <!-- Descarga de la app (solo en la página publicada, no dentro de la app) -->
+            <div id="lg-app" class="hidden lg-app">
+                <a id="lg-apk" href="descargas/ADEP-Vota.apk" download="ADEP-Vota.apk"><i class="fa-brands fa-android"></i> Descargar la app para Android</a>
+                <p id="lg-ios" class="hidden"><i class="fa-brands fa-apple"></i> En iPhone: toque <strong>Compartir</strong> y luego <strong>«Agregar a pantalla de inicio»</strong>.</p>
+            </div>
+            <script>
+                (() => {
+                    const app = window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+                    const local = /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) || location.protocol === 'file:';
+                    if (app || local) return;
+                    const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+                    document.getElementById('lg-app').classList.remove('hidden');
+                    document.getElementById('lg-apk').classList.toggle('hidden', ios);
+                    document.getElementById('lg-ios').classList.toggle('hidden', !ios);
+                })();
+            </script>
             </div>
         </main>
     </div>

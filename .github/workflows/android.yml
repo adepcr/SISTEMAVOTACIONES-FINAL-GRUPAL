@@ -1,15 +1,19 @@
-# Construye la app de Android (.apk) cada vez que se sube un cambio.
-# El archivo queda en la pestaña "Actions" de GitHub → la ejecución → "Artifacts".
-name: App Android
+# Cada vez que se sube un cambio a main:
+#   1) arma la app de Android (.apk) — queda en "Actions" → la ejecución → "Artifacts"
+#   2) publica la página en Firebase Hosting (https://adep-vota.web.app) con el APK para descargar.
+#      El paso 2 necesita el secreto FIREBASE_SERVICE_ACCOUNT (ver PUBLICAR.md); sin él, solo se arma el APK.
+name: Publicar app y página
 
 on:
   push:
-    branches: [main, app-movil]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  apk:
+  publicar:
     runs-on: ubuntu-latest
+    env:
+      FB_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,3 +30,12 @@ jobs:
         with:
           name: ADEP-Vota-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Poner el APK dentro de la página
+        run: mkdir -p www/descargas && cp android/app/build/outputs/apk/debug/app-debug.apk www/descargas/ADEP-Vota.apk
+      - name: Publicar en Firebase Hosting
+        if: env.FB_SA != ''
+        run: |
+          echo "$FB_SA" > "$RUNNER_TEMP/cuenta.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/cuenta.json"
+          npx -y firebase-tools@14 deploy --only hosting --project adep-vota --non-interactive
+          rm -f "$RUNNER_TEMP/cuenta.json"

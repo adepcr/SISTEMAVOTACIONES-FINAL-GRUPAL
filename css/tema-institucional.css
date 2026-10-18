@@ -895,6 +895,41 @@ html.hc .lg-tabs button[aria-selected="true"] {
     outline: 3px solid #000;
 }
 
+.lg-app {
+    display: grid;
+    gap: .5rem;
+    text-align: center;
+}
+
+.lg-app.hidden,
+.lg-app .hidden {
+    display: none;
+}
+
+.lg-app a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    min-height: 54px;
+    border-radius: 1rem;
+    background: #17241e;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.05rem;
+    text-decoration: none;
+}
+
+.lg-app a i {
+    color: #8ff0bd;
+    font-size: 1.5rem;
+}
+
+.lg-app p {
+    color: var(--ink-soft);
+    font-size: .95rem;
+}
+
 .lg-seguro {
     text-align: center;
     font-size: .9rem;
