@@ -452,7 +452,10 @@
     const esAdmin = () => !!document.getElementById("tab-crear");
     const nombre = () => (typeof user !== "undefined" && user && user.nombre ? user.nombre.split(" ")[0] : "");
 
-    // ---- Boca: habla un rato, o mientras el navegador lee en voz alta ----
+    // ---- Boca: habla un rato, o mientras se lee en voz alta ----
+    // En la app de celular, js/app-movil.js define estaLeyendo/dejarDeLeer con la voz del teléfono
+    const leyendo = () => window.estaLeyendo ? window.estaLeyendo() : ("speechSynthesis" in window && speechSynthesis.speaking);
+    const callar = () => window.dejarDeLeer ? window.dejarDeLeer() : ("speechSynthesis" in window && speechSynthesis.speaking && speechSynthesis.cancel());
     let finHablar = null, vigilaVoz = null;
     function hablar(ms) {
         clearTimeout(finHablar);
@@ -464,7 +467,7 @@
         hablar(60000);
         setTimeout(() => {
             vigilaVoz = setInterval(() => {
-                if (!("speechSynthesis" in window) || !speechSynthesis.speaking) {
+                if (!leyendo()) {
                     clearInterval(vigilaVoz);
                     hablar(0);
                 }
@@ -530,7 +533,7 @@
             pintar();
             if (!antes) { saludar(); hablar(Math.min(6000, guia()[1] ? guia()[1].length * 900 + 800 : 1500)); }
         } else {
-            if ("speechSynthesis" in window && speechSynthesis.speaking) speechSynthesis.cancel();
+            callar();
             hablar(0);
         }
     }

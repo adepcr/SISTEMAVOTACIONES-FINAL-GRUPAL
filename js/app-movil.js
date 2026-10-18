@@ -13,7 +13,20 @@
 
     // En la app no existen las descargas del navegador: el archivo se guarda
     // y se abre el menú de "Compartir" para guardarlo, enviarlo o imprimirlo.
-    const { Filesystem, Share } = cap.Plugins;
+    const { Filesystem, Share, TextToSpeech } = cap.Plugins;
+
+    // Lectura en voz alta con la voz del teléfono (la del navegador no funciona dentro de la app)
+    if (TextToSpeech) {
+        let leyendo = false;
+        window.leer = texto => {
+            if (leyendo) { TextToSpeech.stop().catch(() => { }); leyendo = false; return true; } // segundo toque = detener
+            leyendo = true;
+            TextToSpeech.speak({ text: texto, lang: "es-MX", rate: 0.9 }).catch(() => { }).finally(() => { leyendo = false; });
+            return true;
+        };
+        window.estaLeyendo = () => leyendo;
+        window.dejarDeLeer = () => { if (leyendo) { TextToSpeech.stop().catch(() => { }); leyendo = false; } };
+    }
 
     async function guardarYCompartir(nombre, base64) {
         try {

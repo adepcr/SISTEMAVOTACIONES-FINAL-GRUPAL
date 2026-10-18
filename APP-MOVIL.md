@@ -32,6 +32,7 @@ Edite los archivos como siempre (`index.html`, `login.html`, `css/`, `js/`, `img
 Si agrega un archivo o carpeta nueva en la raíz, agréguelo también a la lista en `scripts/copiar-web.js`.
 
 ## Notas
-- En la app, los PDF y CSV no se "descargan": se abre el menú **Compartir** para guardarlos o enviarlos (`js/app-movil.js`).
-- El ícono está en `assets/icon.png` (1024×1024) e `img/icons/`. Para usar el logo oficial, reemplace esas imágenes y ejecute
-  `npx @capacitor/assets generate --android --ios`.
+- En la app, el acta, los comprobantes y los archivos de Excel no se "descargan": se abre el menú **Compartir** para guardarlos o enviarlos (`js/app-movil.js`).
+- «Escuchar» y el robot Robi usan la voz del teléfono (complemento `@capacitor-community/text-to-speech`).
+- El ícono usa el logo oficial de ADEP (`img/logo-adep.png`). Si cambia el logo, regenere los íconos con
+  `npx @capacitor/assets generate --android --ios` (usa los archivos de `assets/`).
