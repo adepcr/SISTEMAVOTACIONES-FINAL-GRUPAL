@@ -96,14 +96,14 @@
 
     /* ---------- Plantilla ---------- */
     q("xi-tpl").addEventListener("click", () => {
-        bajarExcel("Plantilla_afiliados_ADEP.xlsx", "Afiliados", [["Nombre", "Cédula", "Filial"], ["María Fernández Rojas", "102340567", "Heredia"], ["José Mora Vargas", "203450678", "Alajuela"]]);
+        bajarExcel("Plantilla_afiliados_ADEP.xlsx", "Afiliados", [["Nombre", "Cédula", "Filial", "Teléfono"], ["María Fernández Rojas", "102340567", "Heredia", "8888-1234"], ["José Mora Vargas", "203450678", "Alajuela", ""]]);
     });
 
     /* ---------- 1) Importar ---------- */
     q("xi-imp").addEventListener("click", () => {
         const m = abrir("Importar afiliados", `
             <ol class="list-decimal pl-5 space-y-1 text-base text-gray-700">
-                <li>Use la <strong>plantilla de Excel</strong>, con 3 columnas: <strong>Nombre, Cédula, Filial</strong>.</li>
+                <li>Use la <strong>plantilla de Excel</strong>, con las columnas <strong>Nombre, Cédula, Filial</strong> y <strong>Teléfono</strong> (opcional, para enviar la clave por WhatsApp).</li>
                 <li>Guarde el archivo como siempre (.xlsx). También se aceptan archivos CSV.</li>
                 <li>Elija el archivo aquí. <strong>Todavía no se crea nada</strong>: primero verá una vista previa.</li>
             </ol>
@@ -124,10 +124,10 @@
     });
 
     function analizar(rows) {
-        let ini = 0, iN = 0, iC = 1, iF = 2;
+        let ini = 0, iN = 0, iC = 1, iF = 2, iT = 3;
         const h = rows[0].map(norm);
         if (h.some(c => /ced|ident|nombre/.test(c))) {
-            ini = 1; iN = h.findIndex(c => /nombre/.test(c)); iC = h.findIndex(c => /ced|ident/.test(c)); iF = h.findIndex(c => /filial|provincia/.test(c));
+            ini = 1; iN = h.findIndex(c => /nombre/.test(c)); iC = h.findIndex(c => /ced|ident/.test(c)); iF = h.findIndex(c => /filial|provincia/.test(c)); iT = h.findIndex(c => /tel|celular|whatsapp|movil/.test(c));
             if (iN < 0 || iC < 0) return { error: "No encontré las columnas «Nombre» y «Cédula» en la primera fila." };
         }
         const users = DB._get("users", {}), vistos = new Set(), filas = [];
@@ -135,6 +135,9 @@
             const r = rows[i];
             const f = { n: i + 1, nombre: String(r[iN] || "").trim().replace(/\s+/g, " "), rawC: String(r[iC] || "").trim(), filial: "", cedula: "", estado: "nuevo", msg: "" };
             const rawF = iF >= 0 ? String(r[iF] || "").trim() : "";
+            const rawT = iT >= 0 ? String(r[iT] || "").trim() : "";
+            f.telefono = telefonoWA(rawT);
+            const avisoTel = rawT && !f.telefono ? "Teléfono no válido (no se guardará)." : "";
             const limpio = f.rawC.replace(/[\s.\-]/g, "");
             if (!f.nombre) { f.estado = "error"; f.msg = "Falta el nombre."; }
             else if (!/^\d+$/.test(limpio)) { f.estado = "error"; f.msg = /e\+?\d/i.test(limpio) ? "Excel cambió la cédula a notación científica. Formatee la columna como Texto." : "La cédula solo debe tener números."; }
@@ -153,6 +156,7 @@
                         if (users[key].rol !== "Afiliado") { f.estado = "error"; f.msg = "Esa cédula pertenece a otra cuenta."; }
                         else { f.estado = "existe"; f.actual = users[key].nombre; f.msg = users[key].nombre !== f.nombre ? "Nombre actual: " + users[key].nombre : ""; }
                     }
+                    if (f.estado !== "error" && avisoTel) f.msg = (f.msg ? f.msg + " " : "") + avisoTel;
                 }
             }
             filas.push(f);
@@ -175,11 +179,11 @@
             ${ex ? `<div class="rounded-xl p-3 space-y-2" style="background:#fffbeb;border:2px solid #fcd34d">
                 <p class="font-bold text-sm" style="color:#78350f">Para los ${ex} que ya existen (no se duplican):</p>
                 <label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" id="xi-nueva" class="w-5 h-5 mt-0.5 accent-adep-green"> Darles una clave nueva (la clave actual dejará de funcionar)</label>
-                <label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" id="xi-act" class="w-5 h-5 mt-0.5 accent-adep-green"> Actualizar su nombre y filial con los del archivo</label>
+                <label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" id="xi-act" class="w-5 h-5 mt-0.5 accent-adep-green"> Actualizar su nombre, filial y teléfono con los del archivo</label>
                 <p class="text-xs text-gray-600">Si no marca nada, se dejan tal como están.</p></div>` : ""}
             <div class="border border-gray-200 rounded-xl overflow-auto" style="max-height:38vh">
-                <table class="w-full text-sm"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-2 text-left">Línea</th><th class="p-2 text-left">Nombre</th><th class="p-2 text-left">Cédula</th><th class="p-2 text-left">Filial</th><th class="p-2 text-left">Estado</th></tr></thead><tbody>
-                ${mostrar.map(f => { const c = col[f.estado]; return `<tr class="border-t border-gray-100"><td class="p-2">${f.n}</td><td class="p-2">${E(f.nombre)}</td><td class="p-2 font-mono">${E(f.cedula || f.rawC)}</td><td class="p-2">${E(f.filial)}</td><td class="p-2"><span class="font-bold px-2 py-0.5 rounded-full" style="background:${c[0]};color:${c[1]}">${c[2]}</span>${f.msg ? `<div class="text-xs text-gray-600 mt-1">${E(f.msg)}</div>` : ""}</td></tr>`; }).join("")}
+                <table class="w-full text-sm"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-2 text-left">Línea</th><th class="p-2 text-left">Nombre</th><th class="p-2 text-left">Cédula</th><th class="p-2 text-left">Filial</th><th class="p-2 text-left">Teléfono</th><th class="p-2 text-left">Estado</th></tr></thead><tbody>
+                ${mostrar.map(f => { const c = col[f.estado]; return `<tr class="border-t border-gray-100"><td class="p-2">${f.n}</td><td class="p-2">${E(f.nombre)}</td><td class="p-2 font-mono">${E(f.cedula || f.rawC)}</td><td class="p-2">${E(f.filial)}</td><td class="p-2 font-mono">${E(telefonoTxt(f.telefono))}</td><td class="p-2"><span class="font-bold px-2 py-0.5 rounded-full" style="background:${c[0]};color:${c[1]}">${c[2]}</span>${f.msg ? `<div class="text-xs text-gray-600 mt-1">${E(f.msg)}</div>` : ""}</td></tr>`; }).join("")}
                 </tbody></table></div>
             ${filas.length > 300 ? `<p class="text-xs text-gray-500">Se muestran las primeras 300 filas de ${filas.length}; se procesan todas.</p>` : ""}
             <div class="grid gap-2">
@@ -210,13 +214,13 @@
         let cre = 0, ren = 0, act = 0;
         nuevos.forEach(f => {
             const k = DB._norm(f.cedula); if (users[k]) return;
-            users[k] = { nombre: f.nombre, cedula: k, correo: "", passHash: cl[k].passHash, claveTemporal: true, rol: "Afiliado", provincia: f.filial, activo: true, creada: ahora };
-            L.push({ nombre: f.nombre, cedula: k, filial: f.filial, clave: cl[k].pass, nota: "Nuevo" }); cre++;
+            users[k] = { nombre: f.nombre, cedula: k, correo: "", telefono: f.telefono, passHash: cl[k].passHash, claveTemporal: true, rol: "Afiliado", provincia: f.filial, activo: true, creada: ahora };
+            L.push({ nombre: f.nombre, cedula: k, filial: f.filial, telefono: f.telefono, clave: cl[k].pass, nota: "Nuevo" }); cre++;
         });
         exist.forEach(f => {
             const k = DB._norm(f.cedula), u = users[k]; if (!u || u.rol !== "Afiliado") return;
-            if (o.actualizar) { u.nombre = f.nombre; if (f.filial) u.provincia = f.filial; act++; }
-            if (o.nueva) { u.passHash = cl[k].passHash; u.claveTemporal = true; delete u.pass; L.push({ nombre: u.nombre, cedula: k, filial: u.provincia || "", clave: cl[k].pass, nota: "Clave nueva" }); ren++; }
+            if (o.actualizar) { u.nombre = f.nombre; if (f.filial) u.provincia = f.filial; if (f.telefono) u.telefono = f.telefono; act++; }
+            if (o.nueva) { u.passHash = cl[k].passHash; u.claveTemporal = true; delete u.pass; L.push({ nombre: u.nombre, cedula: k, filial: u.provincia || "", telefono: u.telefono || "", clave: cl[k].pass, nota: "Clave nueva" }); ren++; }
         });
         if (ren) { const it = DB._get("intentos", {}); keysR.forEach(k => delete it[k]); DB._set("intentos", it); }
         DB._set("users", users);
@@ -255,7 +259,7 @@
                 keys.forEach(k => {
                     const u = users[k]; if (!u || u.rol !== "Afiliado") return;
                     u.passHash = cl[k].passHash; u.claveTemporal = true; delete u.pass; delete it[k];
-                    L.push({ nombre: u.nombre, cedula: k, filial: u.provincia || "", clave: cl[k].pass, nota: "Clave nueva" });
+                    L.push({ nombre: u.nombre, cedula: k, filial: u.provincia || "", telefono: u.telefono || "", clave: cl[k].pass, nota: "Clave nueva" });
                 });
                 DB._set("users", users); DB._set("intentos", it);
                 DB.log("Claves renovadas en bloque", `${L.length} afiliado(s) · ${q("xb-fil").value === "todas" ? "todas las filiales" : q("xb-fil").value}`);
@@ -278,13 +282,14 @@
                 <button type="button" id="xr-print" class="${btnS}"><i class="fa-solid fa-print mr-1"></i> Imprimir hoja de claves</button>
             </div>
             <div class="border border-gray-200 rounded-xl overflow-auto" style="max-height:34vh">
-                <table class="w-full text-sm"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-2 text-left">Nombre</th><th class="p-2 text-left">Cédula</th><th class="p-2 text-left">Clave</th></tr></thead><tbody>
-                ${L.slice(0, 100).map(x => `<tr class="border-t border-gray-100"><td class="p-2">${E(x.nombre)}</td><td class="p-2 font-mono">${E(x.cedula)}</td><td class="p-2 font-mono font-black tracking-widest">${E(x.clave)}</td></tr>`).join("")}
+                <table class="w-full text-sm"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-2 text-left">Nombre</th><th class="p-2 text-left">Cédula</th><th class="p-2 text-left">Clave</th><th class="p-2 text-left">WhatsApp</th></tr></thead><tbody>
+                ${L.slice(0, 100).map(x => `<tr class="border-t border-gray-100"><td class="p-2">${E(x.nombre)}</td><td class="p-2 font-mono">${E(x.cedula)}</td><td class="p-2 font-mono font-black tracking-widest">${E(x.clave)}</td><td class="p-2">${x.telefono ? botonWhatsApp(x, x.clave).replace("wa-btn", "wa-btn wa-mini").replace("Enviar por WhatsApp", "Enviar") : '<span class="text-gray-500">Sin teléfono</span>'}</td></tr>`).join("")}
                 </tbody></table></div>
             ${L.length > 100 ? `<p class="text-xs text-gray-500">Se muestran 100 de ${L.length}; el Excel y la hoja impresa incluyen todas.</p>` : ""}
+            ${L.some(x => x.telefono) ? '<p class="text-sm text-gray-600"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i>«Enviar» abre WhatsApp con el mensaje listo para cada afiliado. Después de enviarlos, borre los mensajes de su chat.</p>' : ""}
             <button type="button" id="xr-fin" class="${btnG} w-full">Cerrar</button>`, "max-w-2xl");
         q("xr-csv").onclick = () => {
-            if (!bajarExcel(`Claves_ADEP_${hoy()}.xlsx`, "Claves", [["Nombre", "Cédula", "Filial", "Clave temporal", "Detalle"], ...L.map(x => [x.nombre, x.cedula, x.filial, x.clave, x.nota])])) return;
+            if (!bajarExcel(`Claves_ADEP_${hoy()}.xlsx`, "Claves", [["Nombre", "Cédula", "Filial", "Teléfono", "Clave temporal", "Detalle"], ...L.map(x => [x.nombre, x.cedula, x.filial, telefonoTxt(x.telefono), x.clave, x.nota])])) return;
             descargado = true; DB.log("Claves descargadas (Excel)", `${L.length} afiliado(s)`);
         };
         q("xr-print").onclick = () => {

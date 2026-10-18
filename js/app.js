@@ -510,6 +510,31 @@ $('dp-nopdf').addEventListener('click', () => { const id = pendingDel; if (id !=
 $('dp-cancel').addEventListener('click', closeDelPoll);
 
 // ===== Administrador: afiliados =====
+// Teléfono para WhatsApp: 8 dígitos de Costa Rica → se agrega 506. Devuelve '' si no es válido.
+function telefonoWA(t) {
+    const d = String(t || '').replace(/\D/g, '');
+    if (d.length === 8) return '506' + d;
+    return d.length >= 10 && d.length <= 15 ? d : '';
+}
+const telefonoTxt = t => t ? (t.startsWith('506') && t.length === 11 ? `${t.slice(3, 7)}-${t.slice(7)}` : '+' + t) : '';
+// Enlace de WhatsApp con el mensaje de la clave temporal (el administrador solo tiene que pulsar «Enviar»)
+function enlaceWhatsApp(a, clave) {
+    const url = new URL('login.html', location.href).href;
+    const msg = `Hola ${a.nombre.split(' ')[0]}, le saluda ADEP.\n\nSus datos para ingresar a ADEP Vota:\n• Cédula: ${a.cedula}\n• Clave temporal: ${clave}\n\nIngrese aquí: ${url}\n\nAl entrar, el sistema le pedirá crear su propia clave secreta. No comparta esta clave con nadie.`;
+    return `https://wa.me/${a.telefono}?text=${encodeURIComponent(msg)}`;
+}
+function botonWhatsApp(a, clave) {
+    return a.telefono
+        ? `<a href="${esc(enlaceWhatsApp(a, clave))}" target="_blank" rel="noopener" data-wa="${esc(a.cedula)}" class="wa-btn"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</a>`
+        : '';
+}
+// Registrar en la bitácora cada envío por WhatsApp (sin la clave)
+document.addEventListener('click', e => {
+    const w = e.target.closest('[data-wa]'); if (!w) return;
+    const a = DB.afiliados().find(x => x.cedula === w.dataset.wa);
+    DB.log('Clave enviada por WhatsApp', a ? `${a.nombre} (${a.cedula})` : w.dataset.wa);
+});
+
 function renderAfiliados() {
     const q = ($('af-buscar').value || '').toLowerCase().trim();
     const todos = DB.afiliados();
@@ -524,8 +549,10 @@ function renderAfiliados() {
                         <option value="">Sin filial</option>
                         ${FILIALES.map(f => `<option ${a.provincia === f ? 'selected' : ''}>${f}</option>`).join('')}
                     </select></p>
+                <p class="text-sm text-gray-600 mt-1"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i>${a.telefono ? esc(telefonoTxt(a.telefono)) : '<span class="text-gray-500">Sin teléfono</span>'}</p>
             </div>
             <div class="flex flex-wrap gap-2 text-sm font-bold">
+                <button data-af="tel" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700"><i class="fa-solid fa-phone mr-1"></i>Teléfono</button>
                 <button data-af="reset" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Nueva clave</button>
                 <button data-af="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
                 <button data-af="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>
@@ -536,20 +563,25 @@ $('af-buscar').addEventListener('input', renderAfiliados);
 
 function showCredentials(cedula, pin, filial) {
     const box = $('af-nueva');
+    const a = DB.afiliados().find(x => x.cedula === cedula) || { cedula, nombre: '' };
     box.classList.remove('hidden');
-    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado en persona (la clave no se vuelve a mostrar):</p>
+    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado (la clave no se vuelve a mostrar):</p>
         <p>Cédula: <strong class="font-mono text-base">${esc(cedula)}</strong></p>
         ${filial ? `<p>Filial: <strong>${esc(filial)}</strong></p>` : ''}
         <p>Clave temporal: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>
-        <p class="text-amber-800 mt-1"><i class="fa-solid fa-shield-halved mr-1"></i>Al ingresar por primera vez, el sistema le pedirá crear su propia clave. Esta clave temporal dejará de funcionar.</p>`;
+        ${a.telefono ? `<div class="mt-3">${botonWhatsApp(a, pin)}<p class="text-amber-800 mt-2">Se abrirá WhatsApp con el mensaje listo para ${esc(telefonoTxt(a.telefono))}. Después de enviarlo, borre el mensaje de su chat.</p></div>`
+            : '<p class="text-amber-800 mt-2"><i class="fa-brands fa-whatsapp mr-1"></i>Para enviarla por WhatsApp, agregue el teléfono del afiliado con el botón «Teléfono».</p>'}
+        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>Al ingresar por primera vez, el sistema le pedirá crear su propia clave. Esta clave temporal dejará de funcionar.</p>`;
 }
 
 $('form-afiliado').addEventListener('submit', async e => {
     e.preventDefault();
     const nombre = $('af-nombre').value.trim(), cedula = $('af-cedula').value.replace(/\D/g, ''), filial = $('af-filial').value;
+    const telTxt = $('af-telefono').value.trim(), telefono = telefonoWA(telTxt);
     if (!nombre || cedula.length < 9) return showToast('Ingrese el nombre y la cédula (mínimo 9 números).');
     if (!filial) return showToast('Seleccione la filial (provincia) del afiliado.');
-    const res = await DB.addAfiliado({ nombre, cedula, provincia: filial });
+    if (telTxt && !telefono) return showToast('El teléfono debe tener 8 números (o incluir el código de país).');
+    const res = await DB.addAfiliado({ nombre, cedula, provincia: filial, telefono });
     if (res.error) return showToast(res.error);
     $('form-afiliado').reset();
     showCredentials(res.cedula, res.pass, filial);
@@ -567,6 +599,15 @@ $('afiliados-list').addEventListener('click', async e => {
     const id = b.dataset.id;
     if (b.dataset.af === 'reset') { const pin = await DB.resetPass(id); if (pin) { const a = DB.afiliados().find(x => x.cedula === id); showCredentials(id, pin, a ? a.provincia : ''); } }
     if (b.dataset.af === 'toggle') { const a = DB.afiliados().find(x => x.cedula === id); DB.setActivo(id, a.activo === false); }
+    if (b.dataset.af === 'tel') {
+        const a = DB.afiliados().find(x => x.cedula === id); if (!a) return;
+        const nuevo = prompt(`Teléfono / WhatsApp de ${a.nombre} (8 números). Déjelo vacío para borrarlo:`, telefonoTxt(a.telefono));
+        if (nuevo === null) return;
+        const tel = telefonoWA(nuevo);
+        if (nuevo.trim() && !tel) return showToast('El teléfono debe tener 8 números (o incluir el código de país).');
+        DB.setTelefono(id, tel);
+        showToast(tel ? 'Teléfono guardado.' : 'Teléfono borrado.', 'success');
+    }
     if (b.dataset.af === 'del') {
         if (!confirm('¿Eliminar a este afiliado?')) return;
         DB.deleteAfiliado(id, user);

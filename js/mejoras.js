@@ -2,7 +2,8 @@
    1) Calendario propio para "Apertura" y "Cierre" (reemplaza la ventana simple del navegador).
       Los <input id="new-poll-open"> y <input id="new-poll-close"> siguen existiendo (ocultos)
       y conservan su valor, así app.js funciona igual.
-   2) Asistente (robot) que explica cada sección y guía a los afiliados para votar.
+   2) Asistente «Robi»: mini robot animado (parpadea y mueve la boca al hablar) que explica cada sección
+      a afiliados y administradores.
    Para quitarlo: borrar la línea <script src="js/mejoras.js"> de index.html. */
 (function () {
     "use strict";
@@ -38,21 +39,41 @@
   .cal-f button{flex:1 1 auto;min-height:52px;border-radius:.9rem;font-weight:800;font-size:1.05rem;border:2px solid #cfe3d6;background:#f3f7f5;color:#1c2b25;padding:0 1rem}
   .cal-f .ok{background:#008744;border-color:#008744;color:#fff}.cal-f .ok:disabled{opacity:.45;cursor:not-allowed}
   #bot{position:fixed;right:12px;bottom:12px;z-index:45;display:flex;flex-direction:column;align-items:flex-end;gap:.6rem;max-width:calc(100vw - 24px)}
-  #bot-btn{display:flex;align-items:center;gap:.5rem;min-height:56px;padding:.3rem 1.1rem .3rem .4rem;background:#fff;border:3px solid #008744;border-radius:999px;box-shadow:0 10px 24px -8px rgba(4,73,42,.6);font-weight:800;color:#04492a;font-size:1.05rem;cursor:pointer}
-  #bot-btn svg{width:44px;height:44px;flex-shrink:0}
+  #bot-btn{display:flex;align-items:center;gap:.4rem;padding:0 1rem 0 0;background:#fff;border:3px solid #008744;border-radius:999px;box-shadow:0 10px 24px -8px rgba(4,73,42,.6);font-weight:800;color:#04492a;font-size:1.05rem;cursor:pointer}
+  #bot-btn .rb{width:62px;height:62px;margin:-6px 0 -2px -4px}
   #bot-panel{width:min(24rem,calc(100vw - 24px));background:#fff;border:2px solid #008744;border-radius:1.4rem;box-shadow:0 24px 50px -16px rgba(4,73,42,.65);overflow:hidden}
-  #bot-panel[hidden]{display:none}
-  .bot-h{display:flex;align-items:center;justify-content:space-between;gap:.5rem;background:linear-gradient(135deg,#04492a,#008744);color:#fff;padding:.6rem .6rem .6rem 1rem;font-weight:800}
+  #bot-panel[hidden],#bot-globo[hidden]{display:none}
+  .bot-h{display:flex;align-items:center;gap:.6rem;background:linear-gradient(135deg,#04492a,#008744);color:#fff;padding:.45rem .6rem .45rem .5rem;font-weight:800}
+  .bot-h .rb{width:46px;height:46px;flex-shrink:0;background:rgba(255,255,255,.15);border-radius:50%;padding:2px}
+  .bot-h span{flex:1}
   .bot-h button{width:44px;height:44px;border-radius:.8rem;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:1.3rem}
   .bot-b{padding:1rem 1.1rem;max-height:55vh;overflow:auto}
   .bot-b h3{font-family:Outfit,sans-serif;font-size:1.3rem;color:#04492a;margin-bottom:.5rem}
   .bot-b ol{counter-reset:p;display:grid;gap:.6rem;padding:0;margin:.5rem 0 0;list-style:none}
-  .bot-b li{counter-increment:p;display:flex;gap:.7rem;line-height:1.45}
+  .bot-b li{counter-increment:p;display:flex;gap:.7rem;line-height:1.45;animation:rb-aparece .35s ease-out both}
   .bot-b li::before{content:counter(p);flex:0 0 1.9rem;height:1.9rem;border-radius:50%;background:#008744;color:#fff;font-weight:800;display:grid;place-items:center}
   .bot-aviso{background:#fff8e1;border:2px solid #f2d27a;border-radius:.85rem;padding:.6rem .8rem;font-weight:700;color:#6b4e00;margin-bottom:.5rem}
   .bot-f{padding:0 1.1rem 1rem}.bot-f button{min-height:48px;padding:0 1rem;border-radius:.9rem;border:2px solid #cfe3d6;background:#e8f5ee;color:#006b35;font-weight:800}
-  @media(max-width:640px){#bot-btn span{display:none}#bot-btn{padding:.3rem}}
-  html.hc .cal-btn,html.hc #bot-btn{border-color:#000;color:#000}`;
+  #bot-globo{position:relative;max-width:min(17rem,calc(100vw - 24px));background:#fff;border:2px solid #008744;border-radius:1.1rem;padding:.75rem 2.4rem .75rem 1rem;font-weight:700;color:#04492a;line-height:1.4;box-shadow:0 14px 30px -14px rgba(4,73,42,.6);cursor:pointer;animation:rb-aparece .3s ease-out}
+  #bot-globo::after{content:"";position:absolute;right:30px;bottom:-10px;width:16px;height:16px;background:#fff;border-right:2px solid #008744;border-bottom:2px solid #008744;transform:rotate(45deg)}
+  #bot-globo button{position:absolute;top:4px;right:4px;width:32px;height:32px;border:0;border-radius:.6rem;background:#e8f5ee;color:#006b35;font-size:1rem;line-height:1}
+  /* Animaciones del robot */
+  .rb .rb-todo{animation:rb-flota 3s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+  .rb .rb-ojos{animation:rb-parpadeo 4.5s infinite;transform-box:fill-box;transform-origin:center}
+  .rb .rb-luz{animation:rb-luz 2s ease-in-out infinite}
+  .rb .rb-boca{transform-box:fill-box;transform-origin:center}
+  .rb .rb-brazo{transform-box:fill-box;transform-origin:20% 90%}
+  #bot.hablando .rb-boca{animation:rb-habla .17s ease-in-out infinite alternate}
+  #bot.hablando .rb-luz{animation-duration:.5s}
+  #bot.saluda .rb-brazo{animation:rb-saludo .9s ease-in-out 2}
+  @keyframes rb-flota{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+  @keyframes rb-parpadeo{0%,90%,100%{transform:scaleY(1)}94%{transform:scaleY(.1)}}
+  @keyframes rb-luz{50%{opacity:.35}}
+  @keyframes rb-habla{0%{transform:scaleY(.6)}100%{transform:scaleY(3)}}
+  @keyframes rb-saludo{0%,100%{transform:rotate(0)}30%{transform:rotate(-28deg)}70%{transform:rotate(14deg)}}
+  @keyframes rb-aparece{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media(max-width:640px){#bot-btn span{display:none}#bot-btn{padding:0}#bot-btn .rb{margin:-4px}}
+  html.hc .cal-btn,html.hc #bot-btn,html.hc #bot-globo{border-color:#000;color:#000}`;
     const st = document.createElement("style");
     st.textContent = css;
     document.head.appendChild(st);
@@ -284,6 +305,16 @@
 
     /* ================= 2) ASISTENTE (ROBOT) ================= */
     const GUIA = {
+        resumen: {
+            ad: [
+                "Resumen general",
+                [
+                    "Las tarjetas muestran los afiliados activos, las votaciones abiertas, la participación y los votos de hoy.",
+                    "Abajo verá la participación de cada filial. Puede elegir una consulta en la lista.",
+                    "Use las pestañas de arriba para crear, gestionar y revisar votaciones.",
+                ],
+            ],
+        },
         votacion: {
             a: [
                 "Aquí usted vota",
@@ -356,8 +387,8 @@
             ad: [
                 "Afiliados",
                 [
-                    "Registre al afiliado con su nombre, cédula y filial.",
-                    "El sistema crea una clave temporal de 6 números. Se muestra una sola vez: entréguesela al afiliado en persona.",
+                    "Registre al afiliado con su nombre, cédula, filial y teléfono.",
+                    "El sistema crea una clave temporal de 6 números. Se muestra una sola vez: entréguela en persona o con el botón «Enviar por WhatsApp».",
                     "Al entrar por primera vez, el afiliado crea su propia clave y la temporal deja de funcionar.",
                     "Puede generar una nueva clave, desactivar o eliminar cuentas.",
                 ],
@@ -385,10 +416,25 @@
             ],
         },
     };
-    const SVG = `<svg viewBox="0 0 64 64" aria-hidden="true"><line x1="32" y1="4" x2="32" y2="13" stroke="#006b35" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="5" r="4" fill="#e52521"/><rect x="9" y="13" width="46" height="38" rx="13" fill="#008744"/><circle cx="7" cy="32" r="4" fill="#006b35"/><circle cx="57" cy="32" r="4" fill="#006b35"/><rect x="15" y="20" width="34" height="24" rx="9" fill="#fff"/><circle cx="25" cy="30" r="4.2" fill="#04492a"/><circle cx="39" cy="30" r="4.2" fill="#04492a"/><circle cx="26.2" cy="28.8" r="1.3" fill="#fff"/><circle cx="40.2" cy="28.8" r="1.3" fill="#fff"/><path d="M25 37q7 6 14 0" fill="none" stroke="#04492a" stroke-width="2.6" stroke-linecap="round"/><rect x="22" y="52" width="20" height="8" rx="4" fill="#006b35"/></svg>`;
+    // Mini robot: flota, parpadea y mueve la boca cuando habla (clase .hablando en #bot)
+    const ROBOT = `<svg class="rb" viewBox="0 0 64 64" aria-hidden="true"><g class="rb-todo">
+        <line x1="32" y1="6" x2="32" y2="13" stroke="#006b35" stroke-width="3" stroke-linecap="round"/>
+        <circle class="rb-luz" cx="32" cy="6" r="4" fill="#e52521"/>
+        <path class="rb-brazo" d="M53 40 q8 -2 8 -12" fill="none" stroke="#006b35" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="61" cy="27" r="3" fill="#d4af37"/>
+        <rect x="10" y="13" width="44" height="36" rx="13" fill="#008744"/>
+        <circle cx="8" cy="31" r="4" fill="#006b35"/><circle cx="56" cy="31" r="4" fill="#006b35"/>
+        <rect x="15.5" y="19" width="33" height="24" rx="9" fill="#fff"/>
+        <g class="rb-ojos"><ellipse cx="25" cy="28" rx="4" ry="4.4" fill="#04492a"/><ellipse cx="39" cy="28" rx="4" ry="4.4" fill="#04492a"/>
+        <circle cx="26.3" cy="26.6" r="1.3" fill="#fff"/><circle cx="40.3" cy="26.6" r="1.3" fill="#fff"/></g>
+        <circle cx="19.5" cy="34.5" r="2.2" fill="#f9a8b8" opacity=".8"/><circle cx="44.5" cy="34.5" r="2.2" fill="#f9a8b8" opacity=".8"/>
+        <rect class="rb-boca" x="27" y="35" width="10" height="3" rx="1.5" fill="#04492a"/>
+        <rect x="21" y="50" width="22" height="9" rx="4.5" fill="#006b35"/>
+        <circle cx="32" cy="54.5" r="2" fill="#d4af37"/></g></svg>`;
     let bot,
         panel,
         btn,
+        globo,
         actual = null,
         texto = "";
     const visto = (k) => {
@@ -403,6 +449,50 @@
             sessionStorage.setItem("adep_bot_" + k, "1");
         } catch { }
     };
+    const esAdmin = () => !!document.getElementById("tab-crear");
+    const nombre = () => (typeof user !== "undefined" && user && user.nombre ? user.nombre.split(" ")[0] : "");
+
+    // ---- Boca: habla un rato, o mientras el navegador lee en voz alta ----
+    let finHablar = null, vigilaVoz = null;
+    function hablar(ms) {
+        clearTimeout(finHablar);
+        bot.classList.add("hablando");
+        finHablar = setTimeout(() => bot.classList.remove("hablando"), ms);
+    }
+    function hablarMientrasLee() {
+        clearInterval(vigilaVoz);
+        hablar(60000);
+        setTimeout(() => {
+            vigilaVoz = setInterval(() => {
+                if (!("speechSynthesis" in window) || !speechSynthesis.speaking) {
+                    clearInterval(vigilaVoz);
+                    hablar(0);
+                }
+            }, 250);
+        }, 400);
+    }
+    function saludar() {
+        bot.classList.remove("saluda");
+        void bot.offsetWidth; // reinicia la animación
+        bot.classList.add("saluda");
+    }
+
+    // ---- Globo de texto: escribe letra por letra mientras mueve la boca ----
+    let escribiendo = null, ocultarGlobo = null;
+    function decir(frase) {
+        clearInterval(escribiendo);
+        clearTimeout(ocultarGlobo);
+        const t = globo.querySelector("p");
+        globo.hidden = false;
+        t.textContent = "";
+        let n = 0;
+        hablar(frase.length * 35 + 200);
+        escribiendo = setInterval(() => {
+            t.textContent = frase.slice(0, ++n);
+            if (n >= frase.length) clearInterval(escribiendo);
+        }, 35);
+        ocultarGlobo = setTimeout(() => { globo.hidden = true; }, 9000);
+    }
 
     function seccion() {
         const s = [...document.querySelectorAll("main > section")].find(
@@ -410,15 +500,16 @@
         );
         return s ? s.id.replace("sec-", "") : null;
     }
+    function guia() {
+        const g = GUIA[actual];
+        return g ? (esAdmin() ? g.ad : g.a) || [] : [];
+    }
     function pintar() {
         if (!actual) return;
-        const admin = !!document.getElementById("tab-crear"),
-            g = GUIA[actual];
-        if (!g) return;
-        const [t, pasos] = (admin ? g.ad : g.a) || [];
+        const [t, pasos] = guia();
         if (!t) return;
         let aviso = "";
-        if (!admin && actual === "votacion") {
+        if (!esAdmin() && actual === "votacion") {
             const n =
                 parseInt(
                     (document.getElementById("badge-pendientes") || {}).textContent,
@@ -427,13 +518,21 @@
             aviso = `<p class="bot-aviso">${n ? `Tiene ${n} ${n === 1 ? "votación pendiente" : "votaciones pendientes"}. ¡Vamos a votar!` : "No tiene votaciones pendientes por ahora."}</p>`;
         }
         panel.querySelector(".bot-b").innerHTML =
-            `<h3>${t}</h3>${aviso}<ol>${pasos.map((p) => `<li><span>${p}</span></li>`).join("")}</ol>`;
+            `<h3>${t}</h3>${aviso}<ol>${pasos.map((p, i) => `<li style="animation-delay:${i * 0.35}s"><span>${p}</span></li>`).join("")}</ol>`;
         texto = `${t}. ` + pasos.map((p, i) => `Paso ${i + 1}: ${p}`).join(" ");
     }
     function abrirBot(v) {
+        const antes = !panel.hidden;
         panel.hidden = !v;
         btn.setAttribute("aria-expanded", String(v));
-        if (v) pintar();
+        if (v) {
+            globo.hidden = true;
+            pintar();
+            if (!antes) { saludar(); hablar(Math.min(6000, guia()[1] ? guia()[1].length * 900 + 800 : 1500)); }
+        } else {
+            if ("speechSynthesis" in window && speechSynthesis.speaking) speechSynthesis.cancel();
+            hablar(0);
+        }
     }
     let espera = null;
     function revisar() {
@@ -444,10 +543,16 @@
             if (id !== actual) {
                 actual = id;
                 pintar();
-                const k = (document.getElementById("tab-crear") ? "ad" : "a") + id;
-                if (!visto(k)) {
+                const k = (esAdmin() ? "ad" : "a") + id;
+                if (!visto(k) && guia()[0]) {
                     marcar(k);
+                    // Primera visita a la sección: en computadora abre la explicación; en celular saluda con un globo
                     if (window.innerWidth > 640) abrirBot(true);
+                    else {
+                        abrirBot(false);
+                        saludar();
+                        decir(`¡Hola${nombre() ? ", " + nombre() : ""}! Toque aquí y le explico «${guia()[0]}».`);
+                    }
                 } else if (!panel.hidden) pintar();
                 else abrirBot(false);
             } else if (!panel.hidden) pintar();
@@ -458,23 +563,29 @@
         bot = document.createElement("div");
         bot.id = "bot";
         bot.innerHTML = `<div id="bot-panel" role="region" aria-label="Asistente ADEP" hidden>
-        <div class="bot-h"><span>Asistente ADEP</span><button type="button" aria-label="Cerrar asistente">✕</button></div>
+        <div class="bot-h">${ROBOT}<span>Robi, su asistente ADEP</span><button type="button" aria-label="Cerrar asistente">✕</button></div>
         <div class="bot-b" aria-live="polite"></div>
         <div class="bot-f"><button type="button" id="bot-oir"><i class="fa-solid fa-volume-high"></i> Escuchar</button></div></div>
-      <button type="button" id="bot-btn" aria-label="Abrir ayuda del asistente" aria-expanded="false">${SVG}<span>Ayuda</span></button>`;
+      <div id="bot-globo" role="status" hidden><p></p><button type="button" aria-label="Cerrar mensaje">✕</button></div>
+      <button type="button" id="bot-btn" aria-label="Abrir ayuda del asistente" aria-expanded="false">${ROBOT}<span>Ayuda</span></button>`;
         document.body.appendChild(bot);
         panel = bot.querySelector("#bot-panel");
         btn = bot.querySelector("#bot-btn");
+        globo = bot.querySelector("#bot-globo");
         btn.addEventListener("click", () => {
             actual = actual || seccion();
             abrirBot(panel.hidden);
+        });
+        globo.addEventListener("click", (e) => {
+            globo.hidden = true;
+            if (!e.target.closest("button")) abrirBot(true);
         });
         panel.querySelector(".bot-h button").addEventListener("click", () => {
             abrirBot(false);
             btn.focus();
         });
         panel.querySelector("#bot-oir").addEventListener("click", () => {
-            if (typeof leer === "function") leer(texto);
+            if (typeof leer === "function" && leer(texto)) hablarMientrasLee();
         });
         new MutationObserver(revisar).observe(document.querySelector("main"), {
             subtree: true,

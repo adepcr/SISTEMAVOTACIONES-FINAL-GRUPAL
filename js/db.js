@@ -160,13 +160,13 @@ const DB = {
     // ---- Afiliados ----
     afiliados() { return Object.values(this._get('users', {})).filter(u => u.rol === 'Afiliado'); },
     padron() { return this.afiliados().filter(a => a.activo !== false).length; },
-    async addAfiliado({ nombre, cedula, provincia }) {
+    async addAfiliado({ nombre, cedula, provincia, telefono }) {
         const key = this._norm(cedula);
         const pass = this.genPin();
         const passHash = await this.hash(key, pass);
         const users = this._get('users', {});
         if (users[key]) return { error: 'Ya existe un afiliado con esa cédula.' };
-        users[key] = { nombre, cedula: key, correo: '', passHash, claveTemporal: true, rol: 'Afiliado', provincia: provincia || '', activo: true, creada: new Date().toISOString() };
+        users[key] = { nombre, cedula: key, correo: '', telefono: telefono || '', passHash, claveTemporal: true, rol: 'Afiliado', provincia: provincia || '', activo: true, creada: new Date().toISOString() };
         this._set('users', users);
         this.log('Afiliado creado', `${nombre} (${key})${provincia ? ' · ' + provincia : ''}`);
         return { cedula: key, pass };
@@ -178,6 +178,15 @@ const DB = {
         users[cedula].provincia = provincia || '';
         this._set('users', users);
         this.log('Filial actualizada', `${users[cedula].nombre} (${cedula})${provincia ? ' · ' + provincia : ' · sin filial'}`);
+        return true;
+    },
+    // Teléfono (WhatsApp) de un afiliado; se guarda ya normalizado (ej. 50688887777)
+    setTelefono(cedula, telefono) {
+        const users = this._get('users', {});
+        if (!users[cedula] || users[cedula].rol !== 'Afiliado') return false;
+        users[cedula].telefono = telefono || '';
+        this._set('users', users);
+        this.log('Teléfono actualizado', `${users[cedula].nombre} (${cedula})`);
         return true;
     },
     async resetPass(cedula) {
