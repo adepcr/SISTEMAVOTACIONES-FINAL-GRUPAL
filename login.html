@@ -1,4 +1,4 @@
-<!-- este es el login.html CAMBIADOOOOOOOOOOOOOOO -->
+<!-- este es el login.html -->
 <!DOCTYPE html>
 <html lang="es" class="h-full">
 
@@ -17,16 +17,6 @@
     <link rel="stylesheet" href="css/tema-institucional.css">
     <script src="js/accesibilidad.js"></script>
     <style>
-        .login-bg {
-            background-image:
-                linear-gradient(135deg, rgba(0, 150, 75, 0.45), rgba(0, 175, 95, 0.30)),
-                url('img/fondo-adep.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            background-repeat: no-repeat;
-        }
-
         .big-input {
             font-size: 1.5rem;
             padding: 0.9rem 1rem;
@@ -64,27 +54,44 @@
     </style>
 </head>
 
-<body class="login-bg min-h-full flex items-center justify-center p-4 antialiased font-sans">
+<body class="login-bg min-h-full antialiased font-sans">
 
-    <main style="margin-bottom: 5rem"
-        class="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-t-8 border-adep-red overflow-hidden">
-        <div class="p-6 sm:p-8">
+    <div class="lg-fondo" aria-hidden="true"><span></span><span></span><span></span></div>
 
-            <!-- Logo e identidad -->
-            <div class="text-center mb-5">
-                <div class="w-28 h-28 mx-auto mb-3 drop-shadow-md">
-                    <img src="img/logo-adep.png" alt="Logo de ADEP" class="w-full h-full object-contain">
+    <div class="lg-shell">
+        <!-- Panel institucional -->
+        <aside class="lg-hero">
+            <div class="lg-marca">
+                <img src="img/logo-adep.png" alt="Logo de ADEP" class="lg-logo">
+                <div>
+                    <p class="lg-titulo">ADEP <span>Vota</span></p>
+                    <p class="lg-sub">Asociación de Educadores Pensionados</p>
                 </div>
-                <h1 class="text-xl font-extrabold text-adep-green font-heading">Asociación de Educadores Pensionados
-                </h1>
-                <p class="text-sm text-gray-600 mt-0.5">Portal de Votación ADEP</p>
+            </div>
+            <h1 class="lg-lema">Su voz cuenta.<br><span>Vote de forma segura</span> desde donde esté.</h1>
+            <ul class="lg-puntos">
+                <li><i class="fa-solid fa-user-secret"></i><div><strong>Voto secreto</strong><span>Nadie puede saber qué eligió usted.</span></div></li>
+                <li><i class="fa-solid fa-receipt"></i><div><strong>Comprobante verificable</strong><span>Recibe un código para confirmar que su voto se contó.</span></div></li>
+                <li><i class="fa-solid fa-universal-access"></i><div><strong>Fácil de usar</strong><span>Letra grande, lectura en voz alta y un asistente que le guía.</span></div></li>
+            </ul>
+            <p class="lg-valores">Comprensión <b>•</b> Fraternidad <b>•</b> Cooperación</p>
+        </aside>
+
+        <main class="lg-card">
+            <div class="lg-card-in">
+
+            <div class="lg-bienv">
+                <h2>Bienvenido(a)</h2>
+                <p>Ingrese a la Plataforma Oficial de Votación de ADEP.</p>
+            </div>
+
+            <div id="lg-tabs" class="lg-tabs" role="tablist" aria-label="Tipo de ingreso">
+                <button type="button" role="tab" id="tab-afi" aria-selected="true" aria-controls="form-afiliado"><i class="fa-solid fa-user"></i> Afiliado</button>
+                <button type="button" role="tab" id="tab-adm" aria-selected="false" aria-controls="form-admin"><i class="fa-solid fa-user-shield"></i> Administrador</button>
             </div>
 
             <!-- ============ AFILIADOS (por defecto) ============ -->
             <form id="form-afiliado" class="space-y-5" novalidate>
-                <h2 class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
-                    <i class="fa-solid fa-right-to-bracket text-adep-green"></i> Ingrese para votar
-                </h2>
 
                 <div>
                     <label for="a-cedula" class="block text-base font-bold text-gray-800 mb-1">1. Su número de
@@ -161,48 +168,45 @@
 
             <!-- ============ ADMINISTRADOR ============ -->
             <form id="form-admin" class="hidden space-y-4" novalidate>
-                <h2 class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
-                    <i class="fa-solid fa-user-shield text-adep-green"></i> Acceso de administración
-                </h2>
                 <div>
                     <label for="l-correo" class="block text-sm font-bold text-gray-700 mb-1"><i
                             class="fa-solid fa-envelope mr-1"></i> Correo electrónico</label>
                     <input id="l-correo" type="email" placeholder="correo@adep.cr" autocomplete="username"
-                        class="w-full border-2 border-gray-300 rounded-xl p-3 text-base focus:border-adep-green focus:outline-none">
+                        class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
                 </div>
                 <div>
                     <label for="l-pass" class="block text-sm font-bold text-gray-700 mb-1"><i
                             class="fa-solid fa-lock mr-1"></i> Contraseña</label>
                     <input id="l-pass" type="password" autocomplete="current-password"
-                        class="w-full border-2 border-gray-300 rounded-xl p-3 text-base focus:border-adep-green focus:outline-none">
+                        class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
                 </div>
                 <p id="l-error" role="alert" aria-live="assertive"
                     class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2">
                 </p>
                 <button type="submit"
-                    class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl text-base shadow-sm">Ingresar</button>
+                    class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar</button>
             </form>
 
-            <div class="mt-5 text-center">
-                <button type="button" id="toggle-modo"
-                    class="text-sm text-gray-500 hover:text-adep-green underline py-2">Soy administrador</button>
+            <p class="lg-seguro"><i class="fa-solid fa-lock"></i> Conexión segura · Sus datos están protegidos</p>
             </div>
-        </div>
-    </main>
+        </main>
+    </div>
 
     <script>
         // Esto funciona de inmediato, sin esperar a que cargue la base de datos (con internet lento puede tardar).
         (() => {
             const $ = id => document.getElementById(id);
-            // ---------- Cambiar entre afiliado / administrador ----------
-            let modoAdmin = false;
-            $('toggle-modo').addEventListener('click', () => {
-                modoAdmin = !modoAdmin;
-                $('form-afiliado').classList.toggle('hidden', modoAdmin);
-                $('form-admin').classList.toggle('hidden', !modoAdmin);
-                $('toggle-modo').textContent = modoAdmin ? 'Volver al ingreso de afiliados' : 'Soy administrador';
-                (modoAdmin ? $('l-correo') : $('a-cedula')).focus();
-            });
+            // ---------- Pestañas: Afiliado / Administrador ----------
+            function modo(admin) {
+                $('form-afiliado').classList.toggle('hidden', admin);
+                $('form-admin').classList.toggle('hidden', !admin);
+                $('tab-afi').setAttribute('aria-selected', String(!admin));
+                $('tab-adm').setAttribute('aria-selected', String(admin));
+                (admin ? $('l-correo') : $('a-cedula')).focus();
+            }
+            $('tab-afi').addEventListener('click', () => modo(false));
+            $('tab-adm').addEventListener('click', () => modo(true));
             // Si intentan ingresar antes de conectar, avisar en vez de recargar la página
             document.addEventListener('submit', e => {
                 if (window.dbListo) return;
@@ -303,7 +307,7 @@
             temporal = { cedula: res.cedula, clave };
             $('c-nombre').textContent = res.nombre.split(' ')[0];
             $('form-afiliado').classList.add('hidden');
-            $('toggle-modo').parentElement.classList.add('hidden');
+            $('lg-tabs').classList.add('hidden');
             $('form-clave').classList.remove('hidden');
             $('c-nueva').focus();
         }

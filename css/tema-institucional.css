@@ -721,21 +721,295 @@ html:not(.hc) body .app-canvas footer p+p {
    ========================================================================== */
 html:not(.hc) body.login-bg {
     background:
-        radial-gradient(900px 500px at 15% 0%, rgba(52, 211, 153, .35), transparent 60%),
-        linear-gradient(160deg, rgba(2, 45, 26, .9), rgba(0, 107, 53, .8)),
+        radial-gradient(900px 600px at 0% 0%, rgba(52, 211, 153, .3), transparent 60%),
+        radial-gradient(700px 500px at 100% 100%, rgba(212, 175, 55, .22), transparent 60%),
+        linear-gradient(150deg, rgba(2, 45, 26, .94), rgba(0, 107, 53, .86)),
         url('../img/fondo-adep.jpg') center / cover no-repeat fixed;
 }
 
-html body main.border-adep-red {
-    border-radius: 2rem;
-    border-top-width: 8px;
-    box-shadow: var(--shadow-lg);
-    max-width: 30rem;
+html.hc body.login-bg {
+    background: #fff;
 }
 
-html body main.border-adep-red h1 {
-    font-size: 1.45rem !important;
+/* Círculos de luz que se mueven despacio en el fondo */
+.lg-fondo {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.lg-fondo span {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: .35;
+    animation: lg-flota 18s ease-in-out infinite alternate;
+}
+
+.lg-fondo span:nth-child(1) { width: 380px; height: 380px; background: #34d399; top: -120px; left: -80px; }
+.lg-fondo span:nth-child(2) { width: 300px; height: 300px; background: var(--gold); bottom: -100px; right: -60px; animation-delay: -6s; }
+.lg-fondo span:nth-child(3) { width: 220px; height: 220px; background: var(--r); top: 45%; left: 55%; opacity: .14; animation-delay: -12s; }
+
+html.hc .lg-fondo {
+    display: none;
+}
+
+@keyframes lg-flota {
+    to { transform: translate(40px, 30px) scale(1.12); }
+}
+
+.lg-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 1.25rem;
+    width: min(100%, 1080px);
+    margin: 0 auto;
+    padding: 1.25rem 1rem 6rem;
+}
+
+/* ---------- Panel institucional ---------- */
+.lg-hero {
+    color: #fff;
+    animation: lg-entra .6s ease-out both;
+}
+
+.lg-marca {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+}
+
+.lg-logo {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, .25), 0 14px 30px -10px rgba(0, 0, 0, .55);
+    flex-shrink: 0;
+}
+
+.lg-titulo {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 900;
+    font-size: 2rem;
+    line-height: 1;
+    letter-spacing: -.02em;
+}
+
+.lg-titulo span {
+    color: #8ff0bd;
+}
+
+.lg-sub {
+    color: rgba(255, 255, 255, .85);
+    font-weight: 600;
+    font-size: .95rem;
+    margin-top: .3rem;
+}
+
+.lg-lema,
+.lg-puntos,
+.lg-valores {
+    display: none;
+}
+
+/* ---------- Tarjeta del formulario ---------- */
+html body main.lg-card {
+    background: #fff;
+    border-radius: 1.75rem;
+    box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .7);
+    border-top: 6px solid var(--r);
+    animation: lg-entra .6s .1s ease-out both;
+    width: 100%;
+    max-width: 30rem;
+    justify-self: center;
+}
+
+.lg-card-in {
+    padding: 1.5rem 1.25rem 1.25rem;
+    display: grid;
+    gap: 1.25rem;
+}
+
+.lg-bienv h2 {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 1.7rem;
     color: var(--g-deep);
+    line-height: 1.15;
+}
+
+.lg-bienv p {
+    color: var(--ink-soft);
+    margin-top: .25rem;
+}
+
+/* Pestañas Afiliado / Administrador */
+.lg-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .35rem;
+    padding: .35rem;
+    background: var(--g-mist);
+    border: 1px solid var(--line);
+    border-radius: 1.1rem;
+}
+
+.lg-tabs.hidden {
+    display: none;
+}
+
+.lg-tabs button {
+    min-height: 50px;
+    border-radius: .85rem;
+    font-weight: 800;
+    font-size: 1.02rem;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+}
+
+.lg-tabs button:hover {
+    color: var(--g-dark);
+}
+
+.lg-tabs button[aria-selected="true"] {
+    background: #fff;
+    color: var(--g-deep);
+    box-shadow: 0 1px 2px rgba(4, 73, 42, .1), 0 6px 14px -8px rgba(4, 73, 42, .45);
+}
+
+.lg-tabs button[aria-selected="true"] i {
+    color: var(--g);
+}
+
+html.hc .lg-tabs button[aria-selected="true"] {
+    outline: 3px solid #000;
+}
+
+.lg-seguro {
+    text-align: center;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line);
+    padding-top: 1rem;
+}
+
+.lg-seguro i {
+    color: var(--g);
+    margin-right: .3rem;
+}
+
+@keyframes lg-entra {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ---------- Computadora: dos columnas ---------- */
+@media (min-width: 900px) {
+    .lg-shell {
+        grid-template-columns: 1.05fr 1fr;
+        align-items: center;
+        gap: 3.5rem;
+        padding: 2.5rem 2rem 5rem;
+    }
+
+    .lg-logo {
+        width: 5.5rem;
+        height: 5.5rem;
+    }
+
+    .lg-titulo {
+        font-size: 2.6rem;
+    }
+
+    .lg-lema {
+        display: block;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 2.6rem;
+        line-height: 1.12;
+        letter-spacing: -.02em;
+        margin: 2.25rem 0 1.75rem;
+        color: #fff;
+    }
+
+    .lg-lema span {
+        color: #f6e08a;
+    }
+
+    .lg-puntos {
+        display: grid;
+        gap: .9rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .lg-puntos li {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+        background: rgba(255, 255, 255, .08);
+        border: 1px solid rgba(255, 255, 255, .16);
+        border-radius: 1.1rem;
+        padding: .95rem 1.1rem;
+        backdrop-filter: blur(6px);
+    }
+
+    .lg-puntos i {
+        width: 2.6rem;
+        height: 2.6rem;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        border-radius: .8rem;
+        background: rgba(255, 255, 255, .15);
+        color: #f6e08a;
+        font-size: 1.15rem;
+    }
+
+    .lg-puntos strong {
+        display: block;
+        font-size: 1.08rem;
+    }
+
+    .lg-puntos span {
+        color: rgba(255, 255, 255, .82);
+        font-size: .97rem;
+    }
+
+    .lg-valores {
+        display: block;
+        margin-top: 1.75rem;
+        font-size: .82rem;
+        font-weight: 700;
+        letter-spacing: .22em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, .7);
+    }
+
+    .lg-valores b {
+        color: var(--r);
+        margin: 0 .35rem;
+    }
+
+    html body main.lg-card {
+        justify-self: end;
+    }
+
+    .lg-card-in {
+        padding: 2.25rem 2.25rem 1.5rem;
+    }
 }
 
 html body .big-input {
