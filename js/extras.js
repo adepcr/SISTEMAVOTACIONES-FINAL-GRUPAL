@@ -2,8 +2,8 @@
    - Panel "Resumen" del administrador (tarjetas con datos reales)
    - Participación por filial (provincia)
    - Resultados con gráfico de dona, ganador destacado y aviso de empate (SVG, sin librerías)
-   - Exportar a CSV (resultados y bitácora) + filtros de bitácora por fecha y acción
-   - Acta oficial en PDF (con sello, resultados, participación y firmas)
+   - Exportar a Excel (resultados y bitácora) + filtros de bitácora por fecha y acción + borrar bitácora
+   - Acta oficial en PDF (con logo, resultados, participación y firmas)
    No modifica app.js ni db.js. Para quitarlo: borrar la línea  await cargar("js/extras.js");  de index.html */
 (function () {
     "use strict";
@@ -30,24 +30,23 @@
   .xt-leg div{display:flex;align-items:center;gap:.6rem;font-weight:600;color:#1c2b25}
   .xt-leg b.sw{width:1rem;height:1rem;border-radius:.3rem;flex-shrink:0}
   .xt-leg span.t{flex:1;min-width:0;overflow-wrap:anywhere}
-  .xt-leg .w{font-weight:900;color:#04492a}`;
+  .xt-leg .w{font-weight:900;color:#04492a}
+  .xt-filtros{background:#fff;border:1px solid #d5e2da;border-radius:1.25rem;padding:1.25rem;display:grid;gap:1rem;box-shadow:0 1px 2px rgba(4,73,42,.08),0 14px 32px -16px rgba(4,73,42,.35)}
+  .xt-filtros-campos{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .xt-lab{display:block;font-weight:800;color:#04492a;margin-bottom:.35rem}
+  .xt-filtros-acc{display:flex;flex-wrap:wrap;gap:.75rem}
+  .xt-filtros-acc button{flex:1 1 12rem;min-height:52px}
+  .xt-log{list-style:none;margin:0;padding:0;display:grid;gap:.75rem}
+  .xt-log li{background:#fff;border:1px solid #d5e2da;border-left:6px solid #008744;border-radius:1rem;padding:.9rem 1.1rem}
+  .xt-log li.borrada{border-left-color:#e52521;background:#fdf6f6}
+  .xt-log-top{display:flex;justify-content:space-between;align-items:baseline;gap:.25rem 1rem;flex-wrap:wrap}
+  .xt-log-top strong{color:#1c2b25;font-size:1.05rem}
+  .xt-log-top time{color:#4a5a53;font-size:.95rem;font-weight:600}
+  .xt-log-det{color:#33433c;margin-top:.25rem;overflow-wrap:anywhere}
+  .xt-log-por{color:#006b35;font-weight:700;font-size:.95rem;margin-top:.35rem}
+  .xt-log-por i{font-size:.8rem;margin-right:.25rem}`;
     document.head.appendChild(st);
 
-    /* ---------- Utilidades CSV ---------- */
-    function csv(filas) {
-        return "\ufeff" + filas.map(f => f.map(c => {
-            let s = String(c == null ? "" : c);
-            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // evita fórmulas en Excel
-            return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-        }).join(";")).join("\r\n");
-    }
-    function bajar(nombre, texto) {
-        const b = new Blob([texto], { type: "text/csv;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(b); a.download = nombre;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-    }
     const sello = () => new Date().toISOString().slice(0, 10);
 
     /* ---------- Gráfico de dona + ganador / empate ---------- */
@@ -137,7 +136,7 @@
         main.prepend(sec);
         q("xt-f-poll").addEventListener("change", e => { filialSel = e.target.value; renderFilial(); });
 
-        // Resultados: botón de exportar CSV junto a "Actualizar"
+        // Resultados: botón de exportar a Excel junto a "Actualizar"
         const head = q("sec-resultados").firstElementChild;
         const refresh = head && head.querySelector("button");
         if (refresh) {
@@ -145,24 +144,42 @@
             wrap.className = "flex gap-2 flex-wrap";
             refresh.replaceWith(wrap);
             wrap.append(refresh);
-            wrap.insertAdjacentHTML("beforeend", '<button type="button" id="xt-res-csv" class="bg-adep-greenLight text-adep-green hover:bg-emerald-100 font-bold text-sm px-4 py-2 rounded-xl border border-emerald-200 transition flex items-center gap-1.5"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>');
+            wrap.insertAdjacentHTML("beforeend", '<button type="button" id="xt-res-csv" class="bg-adep-greenLight text-adep-green hover:bg-emerald-100 font-bold text-sm px-4 py-2 rounded-xl border border-emerald-200 transition flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>');
         }
 
-        // Bitácora: filtros + exportar
+        // Bitácora: filtros con calendario + exportar + borrar
         q("audit-list").insertAdjacentHTML("beforebegin", `
-            <div class="bg-white border border-gray-200 rounded-2xl p-4 grid sm:grid-cols-4 gap-3 items-end mb-3">
-                <label class="block text-sm font-bold text-gray-700">Desde<input id="xt-a-desde" type="date" class="mt-1 w-full border-2 border-gray-300 rounded-xl p-2.5 font-semibold"></label>
-                <label class="block text-sm font-bold text-gray-700">Hasta<input id="xt-a-hasta" type="date" class="mt-1 w-full border-2 border-gray-300 rounded-xl p-2.5 font-semibold"></label>
-                <label class="block text-sm font-bold text-gray-700">Acción<select id="xt-a-acc" class="mt-1 w-full border-2 border-gray-300 rounded-xl p-2.5 font-semibold bg-white"><option value="">Todas</option></select></label>
-                <div class="flex gap-2">
-                    <button type="button" id="xt-a-limpiar" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl px-3">Limpiar</button>
-                    <button type="button" id="xt-a-csv" class="flex-1 bg-adep-green text-white font-bold rounded-xl px-3"><i class="fa-solid fa-file-csv mr-1"></i>CSV</button>
+            <div class="xt-filtros">
+                <div class="xt-filtros-campos">
+                    <div><label for="xt-a-desde" class="xt-lab">Desde</label><input id="xt-a-desde" type="date"></div>
+                    <div><label for="xt-a-hasta" class="xt-lab">Hasta</label><input id="xt-a-hasta" type="date"></div>
+                    <div><label for="xt-a-acc" class="xt-lab">Acción</label><select id="xt-a-acc" class="w-full bg-white font-semibold"><option value="">Todas</option></select></div>
+                </div>
+                <div class="xt-filtros-acc">
+                    <button type="button" id="xt-a-quitar" class="hidden bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl px-4"><i class="fa-solid fa-filter-circle-xmark mr-1"></i>Quitar filtros</button>
+                    <button type="button" id="xt-a-csv" class="bg-adep-green text-white font-bold rounded-xl px-4"><i class="fa-solid fa-file-excel mr-1"></i>Descargar Excel</button>
+                    <button type="button" id="xt-a-borrar" class="bg-adep-redLight text-adep-red border border-red-200 font-bold rounded-xl px-4"><i class="fa-solid fa-trash-can mr-1"></i>Borrar bitácora</button>
                 </div>
             </div>
-            <p id="xt-a-count" class="text-sm text-gray-500 mb-2"></p>`);
+            <p id="xt-a-count" class="text-sm text-gray-500"></p>`);
+        const conActividad = d => { const k = d.toDateString(); return DB.auditoria().some(a => new Date(a.fecha).toDateString() === k); };
+        const cal = [["xt-a-desde", "Mostrar desde el día"], ["xt-a-hasta", "Mostrar hasta el día"]].map(([id, t]) =>
+            window.ADEPCalendario ? window.ADEPCalendario.adjuntar(q(id), t, { soloFecha: true, vacio: "Cualquier día", marcar: conActividad }) : null);
         ["xt-a-desde", "xt-a-hasta", "xt-a-acc"].forEach(id => q(id).addEventListener("change", () => window.renderAudit()));
-        q("xt-a-limpiar").addEventListener("click", () => { q("xt-a-desde").value = ""; q("xt-a-hasta").value = ""; q("xt-a-acc").value = ""; window.renderAudit(); });
+        q("xt-a-quitar").addEventListener("click", () => {
+            q("xt-a-desde").value = ""; q("xt-a-hasta").value = ""; q("xt-a-acc").value = "";
+            cal.forEach(c => c && c.refrescar());
+            window.renderAudit();
+        });
         q("xt-a-csv").addEventListener("click", exportarBitacora);
+        q("xt-a-borrar").addEventListener("click", () => {
+            const n = DB.auditoria().length;
+            if (!n) return showToast("La bitácora ya está vacía.");
+            if (!confirm(`¿Borrar los ${n} registro(s) de la bitácora?\n\nEsto no se puede deshacer. Quedará anotado que usted (${user.nombre}) la borró.`)) return;
+            DB.limpiarAuditoria();
+            q("xt-a-quitar").click();
+            showToast("Bitácora borrada. Quedó registrado quién la borró.", "success");
+        });
         const rc = q("xt-res-csv"); if (rc) rc.addEventListener("click", exportarResultados);
     }
 
@@ -224,16 +241,15 @@
         const filas = [["Consulta", "Categoría", "Modalidad", "Estado", "Opción", "Votos", "% de votos", "Total de votos", "Afiliados activos", "% participación"]];
         DB.polls().forEach(p => {
             const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length;
-            const part = padron ? Math.round(total * 100 / padron) + "%" : "0%";
             p.opciones.forEach(o => {
                 const n = votes.filter(v => v.opcion === o).length;
-                filas.push([p.titulo, p.categoria, p.publica ? "Pública" : "Secreta", ESTADOS[DB.estado(p)], o, n, (total ? Math.round(n * 100 / total) : 0) + "%", total, padron, part]);
+                filas.push([p.titulo, p.categoria, p.publica ? "Pública" : "Secreta", ESTADOS[DB.estado(p)], o, n, total ? n / total : 0, total, padron, padron ? Math.min(1, total / padron) : 0]);
             });
         });
         if (filas.length === 1) return showToast("No hay resultados para exportar.");
-        bajar(`Resultados_ADEP_${sello()}.csv`, csv(filas));
-        DB.log("Resultados exportados a CSV");
-        showToast("Archivo descargado. Ábralo con Excel.", "success");
+        if (!bajarExcel(`Resultados_ADEP_${sello()}.xlsx`, "Resultados", filas, { porcentaje: [6, 9] })) return;
+        DB.log("Resultados exportados a Excel");
+        showToast("Archivo de Excel descargado.", "success");
     }
 
     /* ---------- Bitácora con filtros ---------- */
@@ -250,27 +266,46 @@
         sel.innerHTML = '<option value="">Todas</option>' + acc.map(a => `<option>${E(a)}</option>`).join("");
         sel.value = acc.includes(actual) ? actual : "";
         const l = auditFiltrada();
-        q("xt-a-count").textContent = `Mostrando ${Math.min(l.length, 150)} de ${l.length} registro(s) que coinciden · ${todas.length} en total.`;
-        q("audit-list").innerHTML = l.length ? `<div class="bg-white rounded-2xl border-2 border-gray-200 divide-y divide-gray-100">${l.slice(0, 150).map(a => `
-            <div class="p-3 sm:p-4">
-                <div class="flex justify-between gap-2 flex-wrap"><strong class="text-sm sm:text-base text-gray-900">${E(a.accion)}</strong><span class="text-sm text-gray-500">${fmtF(a.fecha)}</span></div>
-                ${a.detalle ? `<p class="text-sm text-gray-600">${E(a.detalle)}</p>` : ""}
-                <p class="text-xs text-gray-400">Por: ${E(a.por)}</p>
-            </div>`).join("")}</div>` : '<p class="text-base text-gray-500 text-center py-8">No hay registros con esos filtros.</p>';
+        const filtrando = !!(q("xt-a-desde").value || q("xt-a-hasta").value || q("xt-a-acc").value);
+        q("xt-a-quitar").classList.toggle("hidden", !filtrando);
+        q("xt-a-count").textContent = filtrando
+            ? `Mostrando ${Math.min(l.length, 150)} de ${l.length} registro(s) que coinciden · ${todas.length} en total.`
+            : `${todas.length} registro(s) en total${todas.length > 150 ? " · se muestran los 150 más recientes" : ""}.`;
+        q("audit-list").innerHTML = l.length ? `<ol class="xt-log">${l.slice(0, 150).map(a => `
+            <li class="${a.accion === "Bitácora borrada" ? "borrada" : ""}">
+                <div class="xt-log-top"><strong>${E(a.accion)}</strong><time datetime="${E(a.fecha)}">${fmtF(a.fecha)}</time></div>
+                ${a.detalle ? `<p class="xt-log-det">${E(a.detalle)}</p>` : ""}
+                <p class="xt-log-por"><i class="fa-solid fa-user"></i> ${E(a.por)}</p>
+            </li>`).join("")}</ol>` : `<p class="text-base text-gray-500 text-center py-8">${todas.length ? "No hay registros con esos filtros." : "La bitácora está vacía."}</p>`;
     };
     function exportarBitacora() {
         const l = auditFiltrada();
         if (!l.length) return showToast("No hay registros para exportar.");
-        const filas = [["Fecha", "Acción", "Detalle", "Por"], ...l.map(a => [fmtF(a.fecha), a.accion, a.detalle || "", a.por])];
-        bajar(`Bitacora_ADEP_${sello()}.csv`, csv(filas));
-        DB.log("Bitácora exportada a CSV", `${l.length} registro(s)`);
-        showToast("Archivo descargado. Ábralo con Excel.", "success");
+        const filas = [["Fecha", "Hora", "Acción", "Detalle", "Realizado por"], ...l.map(a => {
+            const d = new Date(a.fecha);
+            return [d.toLocaleDateString("es-CR"), d.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit" }), a.accion, a.detalle || "", a.por];
+        })];
+        if (!bajarExcel(`Bitacora_ADEP_${sello()}.xlsx`, "Bitácora", filas)) return;
+        DB.log("Bitácora exportada a Excel", `${l.length} registro(s)`);
+        showToast("Archivo de Excel descargado.", "success");
     }
 
     /* ---------- Acta oficial en PDF ---------- */
-    function acta(pollId) {
+    let logoActa = null; // imagen del logo en formato dataURL (se carga una vez)
+    async function cargarLogo() {
+        if (logoActa) return logoActa;
+        try {
+            const r = await fetch("img/logo-adep.png");
+            if (!r.ok) return null;
+            const b = await r.blob();
+            logoActa = await new Promise((ok, fail) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = fail; f.readAsDataURL(b); });
+        } catch { logoActa = null; }
+        return logoActa;
+    }
+    async function acta(pollId) {
         const p = DB.polls().find(x => x.id === pollId);
         if (!p) return showToast("Consulta no encontrada.");
+        const logo = await cargarLogo();
         const { jsPDF } = window.jspdf, doc = new jsPDF();
         const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length, padron = DB.padron();
         const marco = () => {
@@ -278,11 +313,15 @@
             doc.setDrawColor(229, 37, 33); doc.setLineWidth(0.3); doc.rect(10, 10, 190, 277);
         };
         marco();
-        // Sello ADEP
-        doc.setDrawColor(0, 135, 68); doc.setLineWidth(1.4); doc.circle(105, 32, 15);
-        doc.setDrawColor(229, 37, 33); doc.setLineWidth(0.8); doc.circle(105, 32, 12.3);
-        doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(0, 135, 68);
-        doc.text("ADEP", 105, 34, { align: "center" });
+        // Logo ADEP (si no se puede cargar la imagen, se dibuja un sello)
+        if (logo) doc.addImage(logo, "PNG", 89, 15, 32, 32);
+        else {
+            doc.setDrawColor(0, 135, 68); doc.setLineWidth(1.4); doc.circle(105, 32, 15);
+            doc.setDrawColor(229, 37, 33); doc.setLineWidth(0.8); doc.circle(105, 32, 12.3);
+            doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(0, 135, 68);
+            doc.text("ADEP", 105, 34, { align: "center" });
+        }
+        doc.setFont("helvetica", "bold"); doc.setTextColor(0, 135, 68);
         doc.setFontSize(12); doc.text("ASOCIACIÓN DE EDUCADORES PENSIONADOS", 105, 56, { align: "center" });
         doc.setFontSize(17); doc.setTextColor(4, 73, 42); doc.text("ACTA OFICIAL DE RESULTADOS", 105, 67, { align: "center" });
         doc.setDrawColor(229, 37, 33); doc.setLineWidth(0.8); doc.line(40, 71, 170, 71);
@@ -355,6 +394,7 @@
         doc.save(`Acta_${(p.titulo || "consulta").replace(/[^\wÁÉÍÓÚáéíóúñÑ]+/g, "_").slice(0, 25)}_${sello()}.pdf`);
     }
 
+    window.generarActa = acta; // también la usa "Eliminar consulta" en app.js
     document.addEventListener("click", e => {
         const b = e.target.closest("[data-xt-acta]");
         if (b) acta(+b.dataset.xtActa);

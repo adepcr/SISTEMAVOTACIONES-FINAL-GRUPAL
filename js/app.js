@@ -342,15 +342,12 @@ function renderResults() {
             return `<div><div class="flex justify-between text-sm sm:text-base font-semibold text-gray-800"><span>${esc(o)}</span><span>${vs.length} (${pct}%)</span></div>
                 <div class="h-4 bg-slate-100 rounded-full overflow-hidden mt-1"><div class="bar-fill h-full bg-adep-green rounded-full transition-all duration-700" style="width:${pct}%"></div></div>${names}</div>`;
         }).join('');
-        const botones = isAdmin ? `
-            <button onclick="downloadPDF(${p.id})" class="bg-adep-red text-white text-sm font-bold px-3 py-1.5 rounded-lg hover:bg-adep-redDark flex items-center gap-1 shadow-sm"><i class="fa-solid fa-file-pdf"></i> PDF</button>` : '';
         return `<div class="bg-white rounded-2xl border-2 border-gray-200 p-4 sm:p-6 space-y-4">
             <div class="flex justify-between items-start gap-2 flex-wrap">
                 <h3 class="font-extrabold text-base sm:text-lg text-gray-900">${esc(p.titulo)}</h3>
                 <div class="flex items-center gap-2 flex-wrap">
                     ${badgeEstado(p)}
                     <span class="text-xs font-bold text-adep-green bg-adep-greenLight px-2.5 py-1 rounded-full whitespace-nowrap">${p.publica ? 'Nombres visibles' : 'Voto secreto'}</span>
-                    ${botones}
                 </div>
             </div>
             <div class="space-y-4">${rows}</div>
@@ -401,46 +398,6 @@ $('rs-ok').addEventListener('click', () => {
     showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
     renderAll();
 });
-
-function downloadPDF(pollId) {
-    const poll = DB.polls().find(p => p.id === pollId);
-    if (!poll) return showToast('Consulta no encontrada.');
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const votes = DB.votes().filter(v => v.pollId === poll.id);
-    const total = votes.length, padron = DB.padron();
-    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-    doc.text('ADEP - Reporte Oficial de Resultados', 14, 20);
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-    const enc = [
-        `Consulta: ${poll.titulo}`, `Categoría: ${poll.categoria}`,
-        `Modalidad: ${poll.publica ? 'Pública (Nombres visibles)' : 'Anónima'}`,
-        `Estado: ${ESTADO[DB.estado(poll)][0]}${horario(poll) ? ' · ' + horario(poll) : ''}`,
-        `Fecha y Hora de emisión: ${new Date().toLocaleString('es-CR')}`,
-        `Generado por Administrador: ${user.nombre} (${user.cedula})`
-    ];
-    let y = 28;
-    enc.forEach(t => { const l = doc.splitTextToSize(t, 180); doc.text(l, 14, y); y += l.length * 5 + 1; });
-    doc.setLineWidth(0.5); doc.line(14, y, 196, y); y += 9;
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-    doc.text(`Total de votos: ${total} de ${padron} afiliados (${padron ? Math.round(total * 100 / padron) : 0}% de participación)`, 14, y); y += 10;
-    poll.opciones.forEach(opcion => {
-        const vs = votes.filter(v => v.opcion === opcion);
-        const pct = total ? Math.round(vs.length * 100 / total) : 0;
-        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-        doc.text(`${opcion}: ${vs.length} voto(s) (${pct}%)`, 14, y); y += 6;
-        const nombres = vs.filter(v => v.nombre).map(v => v.nombre);
-        if (poll.publica && nombres.length) {
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-            const lineas = doc.splitTextToSize(`Afiliados: ${nombres.join(', ')}`, 175);
-            doc.text(lineas, 18, y); y += lineas.length * 5;
-        }
-        y += 4;
-        if (y > 270) { doc.addPage(); y = 20; }
-    });
-    DB.log('Reporte PDF generado', poll.titulo);
-    doc.save(`Resultados_${poll.titulo.substring(0, 15)}_${Date.now()}.pdf`);
-}
 
 function refreshResultsAnimation() {
     document.querySelectorAll('.bar-fill').forEach(b => { const w = b.style.width; b.style.width = '0%'; setTimeout(() => b.style.width = w, 150); });
@@ -526,11 +483,11 @@ $('manage-list').addEventListener('click', e => {
         if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;
         DB.updatePoll(id, { cierre: new Date().toISOString() }, `Consulta cerrada manualmente: ${p.titulo}`);
     }
-    if (act === 'del') return openDelPoll(id); // pregunta si desea descargar el PDF antes de eliminar
+    if (act === 'del') return openDelPoll(id); // pregunta si desea descargar el acta antes de eliminar
     renderAll();
 });
 
-// ===== Administrador: eliminar consulta (ofrece descargar el PDF primero) =====
+// ===== Administrador: eliminar consulta (ofrece descargar el acta primero) =====
 function openDelPoll(id) {
     const p = DB.polls().find(x => x.id === id); if (!p) return;
     pendingDel = id;
@@ -544,9 +501,9 @@ function finishDelete(id) {
     showToast('Consulta eliminada.', 'success');
     renderAll();
 }
-$('dp-pdf').addEventListener('click', () => {
+$('dp-pdf').addEventListener('click', async () => {
     const id = pendingDel; if (id === null) return;
-    downloadPDF(id);
+    await generarActa(id);
     finishDelete(id);
 });
 $('dp-nopdf').addEventListener('click', () => { const id = pendingDel; if (id !== null) finishDelete(id); });
@@ -580,10 +537,11 @@ $('af-buscar').addEventListener('input', renderAfiliados);
 function showCredentials(cedula, pin, filial) {
     const box = $('af-nueva');
     box.classList.remove('hidden');
-    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado (la clave no se vuelve a mostrar):</p>
+    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado en persona (la clave no se vuelve a mostrar):</p>
         <p>Cédula: <strong class="font-mono text-base">${esc(cedula)}</strong></p>
         ${filial ? `<p>Filial: <strong>${esc(filial)}</strong></p>` : ''}
-        <p>Clave de 6 números: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>`;
+        <p>Clave temporal: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>
+        <p class="text-amber-800 mt-1"><i class="fa-solid fa-shield-halved mr-1"></i>Al ingresar por primera vez, el sistema le pedirá crear su propia clave. Esta clave temporal dejará de funcionar.</p>`;
 }
 
 $('form-afiliado').addEventListener('submit', async e => {
@@ -688,19 +646,54 @@ function renderAudit() {
         </div>`).join('')}</div>` : '<p class="text-base text-gray-500 text-center py-8">Aún no hay actividad registrada.</p>';
 }
 
+// ===== Bienvenida con el nombre del usuario =====
+function saludo() {
+    const h = new Date().getHours();
+    return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
+function renderBienvenida() {
+    let b = $('bienvenida');
+    if (!b) {
+        b = document.createElement('div');
+        b.id = 'bienvenida';
+        document.querySelector('main').before(b);
+    }
+    const nombre = esc(user.nombre.split(' ')[0]);
+    const f = new Date().toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const hoy = f.charAt(0).toUpperCase() + f.slice(1);
+    let detalle, accion = '';
+    if (isAdmin) {
+        const abiertas = DB.polls().filter(p => DB.estado(p) === 'abierta').length;
+        detalle = `Panel de administración · ${abiertas} ${abiertas === 1 ? 'votación abierta' : 'votaciones abiertas'}`;
+    } else {
+        const pend = DB.polls().filter(p => p.publicada && DB.estado(p) === 'abierta' && !DB.hasVoted(p.id, user.cedula)).length;
+        detalle = pend ? `Tiene ${pend} ${pend === 1 ? 'votación pendiente' : 'votaciones pendientes'}.` : 'No tiene votaciones pendientes por ahora.';
+        if (pend) accion = `<button type="button" onclick="switchTab('votacion')" class="bv-btn"><i class="fa-solid fa-check-to-slot"></i> Ir a votar</button>`;
+    }
+    b.innerHTML = `<div class="bv-txt">
+            <p class="bv-fecha">${esc(hoy)}</p>
+            <h2 class="bv-hola">${saludo()}, ${nombre} <span aria-hidden="true">👋</span></h2>
+            <p class="bv-det">Bienvenido(a) a ADEP Vota. ${detalle}</p>
+        </div>${accion}`;
+}
+
 // ===== Modales =====
 function closeModal() { $('modal-success').classList.add('hidden'); }
 function closeModalAndGoReceipts() { closeModal(); switchTab('comprobantes'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeConfirm(); closeModal(); closeDelPoll(); closeRestore(); } });
 
 function renderAll() {
+    renderBienvenida();
     renderPolls(); renderReceipts(); renderResults();
     if (isAdmin) { renderManage(); renderAfiliados(); renderAdmins(); renderAudit(); }
 }
 
 // ===== Inicio =====
 if (user) {
-    $('user-name').innerText = user.nombre;
+    const partes = user.nombre.trim().split(/\s+/);
+    $('user-name').innerText = partes.slice(0, 2).join(' ');
+    $('user-name').title = user.nombre;
+    $('user-avatar').innerText = (partes[0][0] + (partes[1] ? partes[1][0] : '')).toUpperCase();
     $('user-role').innerText = (!isAdmin && user.provincia) ? `${user.rol} · ${user.provincia}` : user.rol;
     document.querySelectorAll('[data-rol]').forEach(t => { if (t.dataset.rol !== user.rol) t.remove(); });
     switchTab('votacion');

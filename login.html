@@ -146,6 +146,31 @@
                 </p>
             </form>
 
+            <!-- ============ CREAR CLAVE PERSONAL (primer ingreso con clave temporal) ============ -->
+            <form id="form-clave" class="hidden space-y-5" novalidate>
+                <div class="rounded-2xl p-4 text-center" style="background:#e8f5ee;border:2px solid #a7dcbf">
+                    <i class="fa-solid fa-key text-3xl text-adep-green"></i>
+                    <h2 class="text-xl font-extrabold text-gray-900 mt-2">Hola, <span id="c-nombre"></span></h2>
+                    <p class="text-base text-gray-700 mt-1">La clave que le entregó ADEP es <strong>temporal</strong>. Ahora cree su <strong>clave personal</strong> de 6 números: solo usted la sabrá.</p>
+                </div>
+                <div>
+                    <label for="c-nueva" class="block text-base font-bold text-gray-800 mb-1">1. Su clave nueva (6 números)</label>
+                    <input id="c-nueva" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" placeholder="••••••"
+                        class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none">
+                </div>
+                <div>
+                    <label for="c-repite" class="block text-base font-bold text-gray-800 mb-1">2. Escríbala otra vez</label>
+                    <input id="c-repite" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" placeholder="••••••"
+                        class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none">
+                </div>
+                <button type="button" id="c-ver" class="text-base font-bold text-adep-green underline py-2 px-1"><i class="fa-solid fa-eye mr-1"></i><span>Ver claves</span></button>
+                <p class="text-sm text-gray-600 bg-slate-50 border border-slate-200 rounded-xl p-3"><i class="fa-solid fa-lightbulb text-adep-gold mr-1"></i>No use números fáciles como 123456 o 111111, ni su fecha de nacimiento. Anótela en un lugar seguro.</p>
+                <p id="c-error" role="alert" aria-live="assertive" class="hidden text-base font-bold text-adep-red bg-adep-redLight border-2 border-red-200 rounded-xl p-3"></p>
+                <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-check"></i> Guardar mi clave y entrar
+                </button>
+            </form>
+
             <!-- ============ ADMINISTRADOR ============ -->
             <form id="form-admin" class="hidden space-y-4" novalidate>
                 <h2 class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
@@ -264,7 +289,34 @@
             if (res.error) { pin.value = ''; pintarPuntos(); pin.focus(); return showErr('a-error', res.error); }
 
             if ($('a-recordar').checked) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
+            if (res.cambiarClave) return pedirClavePersonal(res, clave);
             // pequeña espera para que Firestore reciba el registro antes de cambiar de página
+            setTimeout(() => location.href = 'index.html', 400);
+        });
+
+        // ---------- Primer ingreso: crear clave personal ----------
+        let temporal = null;
+        function pedirClavePersonal(res, clave) {
+            temporal = { cedula: res.cedula, clave };
+            $('c-nombre').textContent = res.nombre.split(' ')[0];
+            $('form-afiliado').classList.add('hidden');
+            $('toggle-modo').parentElement.classList.add('hidden');
+            $('form-clave').classList.remove('hidden');
+            $('c-nueva').focus();
+        }
+        ['c-nueva', 'c-repite'].forEach(id => $(id).addEventListener('input', e => { e.target.value = soloNumeros(e.target.value).slice(0, 6); showErr('c-error', ''); }));
+        $('c-ver').addEventListener('click', () => {
+            const ver = $('c-nueva').type === 'password';
+            ['c-nueva', 'c-repite'].forEach(id => $(id).type = ver ? 'text' : 'password');
+            $('c-ver').querySelector('span').textContent = ver ? 'Ocultar claves' : 'Ver claves';
+        });
+        $('form-clave').addEventListener('submit', async e => {
+            e.preventDefault();
+            const nueva = $('c-nueva').value, repite = $('c-repite').value;
+            if (nueva.length < 6) { $('c-nueva').focus(); return showErr('c-error', 'Su clave nueva debe tener 6 números.'); }
+            if (nueva !== repite) { $('c-repite').value = ''; $('c-repite').focus(); return showErr('c-error', 'Las dos claves no son iguales. Escríbala otra vez.'); }
+            const r = await DB.crearClavePersonal(temporal.cedula, temporal.clave, nueva);
+            if (r.error) return showErr('c-error', r.error);
             setTimeout(() => location.href = 'index.html', 400);
         });
 

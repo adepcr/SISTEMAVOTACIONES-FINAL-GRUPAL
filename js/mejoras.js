@@ -23,6 +23,10 @@
   .cal-d{height:46px;border:0;border-radius:.75rem;background:#fff;font-weight:700;font-size:1.05rem;color:#1c2b25;cursor:pointer}
   .cal-d:hover{background:#e8f5ee}.cal-d.hoy{box-shadow:inset 0 0 0 2px #e52521}
   .cal-d.sel,.cal-d.sel:hover{background:#008744;color:#fff}
+  .cal-d{position:relative}.cal-d.act::after{content:"";position:absolute;left:50%;bottom:5px;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:#e52521}
+  .cal-d.sel.act::after{background:#fff}
+  .cal-ley{display:flex;align-items:center;gap:.4rem;margin-top:.6rem;font-size:.9rem;font-weight:600;color:#4a5a53}
+  .cal-ley b{width:8px;height:8px;border-radius:50%;background:#e52521}
   .cal-t{display:flex;align-items:center;gap:.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #d5e2da;flex-wrap:wrap}
   .cal-t label{font-weight:800;color:#04492a;margin-right:.25rem}
   .cal-t select{min-height:48px;border:2px solid #b6c6bc;border-radius:.8rem;padding:0 .6rem;font-size:1.1rem;font-weight:700;background:#fff}
@@ -72,6 +76,10 @@
     const pad = (n) => String(n).padStart(2, "0");
     const toVal = (d) =>
         `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const leerValor = (v) => new Date(v.length === 10 ? v + "T00:00" : v); // "AAAA-MM-DD" en hora local
+    const toDia = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const largoDia = (d) =>
+        d.toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const largo = (d) =>
         d.toLocaleString("es-CR", {
             weekday: "long",
@@ -85,19 +93,21 @@
         S = null;
 
     function syncBtn(input, btn) {
-        const v = input.value;
+        const v = input.value, o = btn._cal || {};
         btn.classList.toggle("vacio", !v);
         btn.querySelector("span").textContent = v
-            ? largo(new Date(v))
-            : "Elegir fecha y hora (opcional)";
+            ? (o.soloFecha ? largoDia : largo)(leerValor(v))
+            : o.vacio || "Elegir fecha y hora (opcional)";
     }
     function abrir(input, btn, titulo) {
-        const base = input.value ? new Date(input.value) : null,
+        const base = input.value ? leerValor(input.value) : null,
             hoy = new Date();
         const ref = base || hoy;
         S = {
             input,
             btn,
+            soloFecha: !!(btn._cal && btn._cal.soloFecha),
+            marcar: btn._cal && btn._cal.marcar,
             y: ref.getFullYear(),
             m: ref.getMonth(),
             sel: base
@@ -110,7 +120,7 @@
         ov = document.createElement("div");
         ov.className = "cal-ov";
         ov.innerHTML = `<div class="cal-box" role="dialog" aria-modal="true" aria-label="${titulo}">
-      <div class="cal-top"><b>${titulo}</b><span>Elija el día y la hora</span></div><div class="cal-in"></div></div>`;
+      <div class="cal-top"><b>${titulo}</b><span>${S.soloFecha ? "Elija el día" : "Elija el día y la hora"}</span></div><div class="cal-in"></div></div>`;
         ov.addEventListener("click", (e) => {
             if (e.target === ov) cerrar();
         });
@@ -135,8 +145,9 @@
         for (let d = 1; d <= n; d++) {
             const dt = new Date(S.y, S.m, d),
                 esSel = S.sel && +S.sel === +dt,
-                esHoy = dt.toDateString() === hoy.toDateString();
-            cells += `<button type="button" class="cal-d${esSel ? " sel" : ""}${esHoy ? " hoy" : ""}" data-d="${d}" aria-pressed="${!!esSel}" aria-label="${dt.toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long" })}">${d}</button>`;
+                esHoy = dt.toDateString() === hoy.toDateString(),
+                act = S.marcar && S.marcar(dt);
+            cells += `<button type="button" class="cal-d${esSel ? " sel" : ""}${esHoy ? " hoy" : ""}${act ? " act" : ""}" data-d="${d}" aria-pressed="${!!esSel}" aria-label="${dt.toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long" })}${act ? ", con actividad" : ""}">${d}</button>`;
         }
         const hs = Array.from(
             { length: 12 },
@@ -152,12 +163,14 @@
             (S.mi % 5
                 ? `<option value="${S.mi}" selected>${pad(S.mi)}</option>`
                 : "");
+        const hora = `<div class="cal-t"><label for="cal-h">Hora</label><select id="cal-h" aria-label="Hora">${hs}</select><b>:</b><select id="cal-m" aria-label="Minutos">${ms}</select>
+        <span class="cal-ap"><button type="button" data-ap="0" aria-pressed="${!S.pm}">a. m.</button><button type="button" data-ap="1" aria-pressed="${S.pm}">p. m.</button></span></div>`;
         ov.querySelector(".cal-in").innerHTML = `
       <div class="cal-nav"><button type="button" data-nav="-1" aria-label="Mes anterior"><i class="fa-solid fa-chevron-left"></i></button><b>${MESES[S.m]} ${S.y}</b><button type="button" data-nav="1" aria-label="Mes siguiente"><i class="fa-solid fa-chevron-right"></i></button></div>
       <div class="cal-g">${cells}</div>
-      <div class="cal-t"><label for="cal-h">Hora</label><select id="cal-h" aria-label="Hora">${hs}</select><b>:</b><select id="cal-m" aria-label="Minutos">${ms}</select>
-        <span class="cal-ap"><button type="button" data-ap="0" aria-pressed="${!S.pm}">a. m.</button><button type="button" data-ap="1" aria-pressed="${S.pm}">p. m.</button></span></div>
-      <div class="cal-res" role="status">${S.sel ? "Elegido: " + largo(fecha()) : "Toque un día del calendario."}</div>
+      ${S.marcar ? '<p class="cal-ley"><b></b> Días con actividad registrada</p>' : ""}
+      ${S.soloFecha ? "" : hora}
+      <div class="cal-res" role="status">${resTxt()}</div>
       <div class="cal-f"><button type="button" data-a="borrar">Borrar</button><button type="button" data-a="cancel">Cancelar</button><button type="button" class="ok" data-a="ok" ${S.sel ? "" : "disabled"}>Aceptar</button></div>`;
     }
     const fecha = () =>
@@ -168,11 +181,13 @@
             (S.h % 12) + (S.pm ? 12 : 0),
             S.mi,
         );
+    const resTxt = () =>
+        S.sel
+            ? "Elegido: " + (S.soloFecha ? largoDia(S.sel) : largo(fecha()))
+            : "Toque un día del calendario.";
     function refrescarRes() {
         const r = ov.querySelector(".cal-res");
-        r.textContent = S.sel
-            ? "Elegido: " + largo(fecha())
-            : "Toque un día del calendario.";
+        r.textContent = resTxt();
         ov.querySelector("[data-a=ok]").disabled = !S.sel;
     }
     document.addEventListener("click", (e) => {
@@ -205,7 +220,7 @@
         } else if (a) {
             if (a.dataset.a === "cancel") return cerrar();
             if (a.dataset.a === "borrar") S.input.value = "";
-            if (a.dataset.a === "ok" && S.sel) S.input.value = toVal(fecha());
+            if (a.dataset.a === "ok" && S.sel) S.input.value = S.soloFecha ? toDia(S.sel) : toVal(fecha());
             S.input.dispatchEvent(new Event("input", { bubbles: true }));
             S.input.dispatchEvent(new Event("change", { bubbles: true }));
             syncBtn(S.input, S.btn);
@@ -234,28 +249,36 @@
         true,
     );
 
+    // Reemplaza un <input> de fecha por el botón del calendario. El input queda oculto y conserva el valor.
+    // opciones: { soloFecha: true (sin hora), vacio: "texto sin fecha", marcar: fecha => true para poner un punto }
+    function adjuntar(input, titulo, opciones = {}) {
+        const lab = input.id && document.querySelector(`label[for="${input.id}"]`);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cal-btn";
+        btn._cal = opciones;
+        btn.innerHTML =
+            '<i class="fa-regular fa-calendar-days" aria-hidden="true"></i><span></span>';
+        btn.setAttribute("aria-label", lab ? lab.textContent.trim() : titulo);
+        input.style.display = "none";
+        input.after(btn);
+        btn.addEventListener("click", () => abrir(input, btn, titulo));
+        if (input.form)
+            input.form.addEventListener("reset", () =>
+                setTimeout(() => syncBtn(input, btn), 0),
+            );
+        syncBtn(input, btn);
+        return { refrescar: () => syncBtn(input, btn) };
+    }
+    window.ADEPCalendario = { adjuntar };
+
     function initCalendarios() {
         [
             ["new-poll-open", "Fecha y hora de apertura"],
             ["new-poll-close", "Fecha y hora de cierre"],
         ].forEach(([id, titulo]) => {
             const input = document.getElementById(id);
-            if (!input) return;
-            const lab = document.querySelector(`label[for="${id}"]`);
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "cal-btn";
-            btn.innerHTML =
-                '<i class="fa-regular fa-calendar-days" aria-hidden="true"></i><span></span>';
-            btn.setAttribute("aria-label", lab ? lab.textContent.trim() : titulo);
-            input.style.display = "none";
-            input.after(btn);
-            btn.addEventListener("click", () => abrir(input, btn, titulo));
-            if (input.form)
-                input.form.addEventListener("reset", () =>
-                    setTimeout(() => syncBtn(input, btn), 0),
-                );
-            syncBtn(input, btn);
+            if (input) adjuntar(input, titulo);
         });
     }
 
@@ -303,7 +326,7 @@
                 [
                     "Revise los resultados de cada consulta.",
                     "Abra «Registro de participación» para ver quién ya votó y quién está pendiente.",
-                    "El botón «PDF» descarga el reporte oficial.",
+                    "El botón «Acta» descarga el acta oficial en PDF, con el logo de ADEP.",
                 ],
             ],
         },
@@ -325,7 +348,7 @@
                     "Publique o retire cada consulta.",
                     "«Cerrar ahora» detiene la votación.",
                     "Si ya hay votos, la modalidad (secreta o pública) no se puede cambiar.",
-                    "«Eliminar» le ofrece descargar el PDF antes de borrar.",
+                    "«Eliminar» le ofrece descargar el acta antes de borrar.",
                 ],
             ],
         },
@@ -334,7 +357,8 @@
                 "Afiliados",
                 [
                     "Registre al afiliado con su nombre, cédula y filial.",
-                    "El sistema crea una clave de 6 números. Se muestra una sola vez: entréguesela al afiliado.",
+                    "El sistema crea una clave temporal de 6 números. Se muestra una sola vez: entréguesela al afiliado en persona.",
+                    "Al entrar por primera vez, el afiliado crea su propia clave y la temporal deja de funcionar.",
                     "Puede generar una nueva clave, desactivar o eliminar cuentas.",
                 ],
             ],
@@ -354,6 +378,8 @@
                 "Bitácora",
                 [
                     "Aquí queda registrado quién hizo qué y cuándo.",
+                    "Use «Desde» y «Hasta» para buscar por fechas. Los días con actividad tienen un punto rojo.",
+                    "«Borrar bitácora» elimina todo el registro; queda anotado quién lo borró.",
                     "Los votos nunca guardan la opción elegida.",
                 ],
             ],
@@ -421,7 +447,7 @@
                 const k = (document.getElementById("tab-crear") ? "ad" : "a") + id;
                 if (!visto(k)) {
                     marcar(k);
-                    abrirBot(true);
+                    if (window.innerWidth > 640) abrirBot(true);
                 } else if (!panel.hidden) pintar();
                 else abrirBot(false);
             } else if (!panel.hidden) pintar();

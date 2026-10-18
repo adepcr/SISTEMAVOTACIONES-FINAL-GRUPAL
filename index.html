@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script defer src="js/excel.js"></script>
 
     <script src="js/tailwind-config.js"></script>
     <link rel="stylesheet" href="css/styles.css">
@@ -39,7 +41,7 @@
             <div class="px-4 py-3 flex items-center justify-between gap-3">
                 <div class="flex items-center space-x-3 cursor-pointer select-none" onclick="switchTab('votacion')">
                     <div class="relative w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 drop-shadow-sm">
-                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEOONBRhmPrMlxu-7KhLL73j9GkvgOf7k4esek3AhPDC2WbUT_r3tladt8&s=10" alt="ADEP Logo" class="logo-img">
+                        <img src="img/logo-adep.png" alt="Logo de ADEP" class="logo-img">
                     </div>
                     <div>
                         <div class="flex items-center gap-1.5">
@@ -56,7 +58,7 @@
 
                 <!-- Usuario en sesión -->
                 <div class="flex items-center gap-2 bg-slate-100 border border-slate-200 pl-3 pr-1.5 py-1.5 rounded-xl max-w-[55%]">
-                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                    <div id="user-avatar" class="user-avatar flex-shrink-0" aria-hidden="true"></div>
                     <div class="leading-tight min-w-0">
                         <div id="user-name" class="text-xs font-bold text-gray-800 truncate">---</div>
                         <div id="user-role" class="text-[10px] font-semibold text-adep-green">---</div>
@@ -181,7 +183,7 @@
             <section id="sec-afiliados" class="hidden space-y-5">
                 <div class="border-b border-gray-200 pb-3">
                     <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Afiliados</h2>
-                    <p class="text-sm text-gray-500">Registre afiliados con su cédula y entrégueles la clave de 6 números generada. Solo ellos podrán ingresar.</p>
+                    <p class="text-sm text-gray-500">Registre afiliados con su cédula y entrégueles en persona la clave temporal generada. Al ingresar por primera vez, cada afiliado crea su propia clave.</p>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
                     <form id="form-afiliado" class="grid sm:grid-cols-2 gap-3" novalidate>
@@ -381,9 +383,9 @@
                 </div>
                 <div class="p-6 space-y-4 text-center">
                     <p id="dp-title" class="font-bold text-gray-900"></p>
-                    <p class="text-sm text-gray-600">Se borrarán la consulta y todos sus votos. ¿Desea descargar el PDF con los resultados antes de eliminarla?</p>
+                    <p class="text-sm text-gray-600">Se borrarán la consulta y todos sus votos. ¿Desea descargar el acta con los resultados antes de eliminarla?</p>
                     <div class="grid gap-3">
-                        <button id="dp-pdf" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-file-pdf mr-1"></i> Descargar PDF y eliminar</button>
+                        <button id="dp-pdf" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-stamp mr-1"></i> Descargar acta y eliminar</button>
                         <button id="dp-nopdf" class="w-full bg-adep-redLight text-adep-red border border-red-200 font-bold py-3 rounded-xl">Eliminar sin descargar</button>
                         <button id="dp-cancel" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Cancelar</button>
                     </div>

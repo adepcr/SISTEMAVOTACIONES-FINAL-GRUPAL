@@ -58,6 +58,13 @@ const DB = {
         this._set('auditoria', l.slice(-500));
     },
     auditoria() { return this._get('auditoria', []).slice().reverse(); },
+    // Borra toda la bitácora; queda un único registro con quién la borró
+    limpiarAuditoria() {
+        const n = this._get('auditoria', []).length;
+        this._set('auditoria', []);
+        this.log('Bitácora borrada', `Se eliminaron ${n} registro(s)`);
+        return n;
+    },
 
     // ---- Usuarios y sesión ----
     async seedDemo() {
@@ -74,7 +81,7 @@ const DB = {
     },
     _norm(id) { return String(id).toLowerCase().replace(/[\s-]/g, ''); },
     _startSession(u) {
-        const { pass, passHash, ...safe } = u;
+        const { pass, passHash, claveTemporal, ...safe } = u;
         this._set('session', safe);
         return safe;
     },
@@ -116,6 +123,8 @@ const DB = {
         if (u.activo === false) return { error: 'Su cuenta está desactivada. Comuníquese con ADEP.' };
 
         delete intentos[key]; this._set('intentos', intentos);
+        // Clave temporal entregada por ADEP: el afiliado debe crear su clave personal antes de entrar
+        if (u.claveTemporal) return { cambiarClave: true, cedula: key, nombre: u.nombre };
         u.ultimoIngreso = new Date().toISOString();
         this._set('users', users);
         const s = this._startSession(u);
@@ -129,6 +138,23 @@ const DB = {
         if (!u || u.activo === false) { localStorage.removeItem('adep_session'); return null; }
         return s;
     },
+    // Clave temporal → clave personal (la elige el afiliado; ADEP ya no la conoce)
+    async crearClavePersonal(id, temporal, nueva) {
+        const key = this._norm(id);
+        const users = this._get('users', {});
+        const u = users[key];
+        if (!u || !u.claveTemporal || u.passHash !== await this.hash(key, temporal)) return { error: 'La clave temporal no es correcta. Ingrese de nuevo.' };
+        if (!/^\d{6}$/.test(nueva)) return { error: 'La clave debe tener 6 números.' };
+        if (nueva === temporal) return { error: 'La clave nueva debe ser distinta a la que le entregó ADEP.' };
+        if (/^(\d)\1{5}$/.test(nueva) || '0123456789'.includes(nueva) || '9876543210'.includes(nueva)) return { error: 'Esa clave es muy fácil de adivinar. Elija otros números.' };
+        u.passHash = await this.hash(key, nueva);
+        delete u.claveTemporal;
+        u.ultimoIngreso = new Date().toISOString();
+        this._set('users', users);
+        const s = this._startSession(u);
+        this.log('Clave personal creada', s.nombre);
+        return s;
+    },
     logout() { this.log('Cierre de sesión'); localStorage.removeItem('adep_session'); },
 
     // ---- Afiliados ----
@@ -140,7 +166,7 @@ const DB = {
         const passHash = await this.hash(key, pass);
         const users = this._get('users', {});
         if (users[key]) return { error: 'Ya existe un afiliado con esa cédula.' };
-        users[key] = { nombre, cedula: key, correo: '', passHash, rol: 'Afiliado', provincia: provincia || '', activo: true, creada: new Date().toISOString() };
+        users[key] = { nombre, cedula: key, correo: '', passHash, claveTemporal: true, rol: 'Afiliado', provincia: provincia || '', activo: true, creada: new Date().toISOString() };
         this._set('users', users);
         this.log('Afiliado creado', `${nombre} (${key})${provincia ? ' · ' + provincia : ''}`);
         return { cedula: key, pass };
@@ -160,6 +186,7 @@ const DB = {
         const users = this._get('users', {});
         if (!users[cedula]) return null;
         users[cedula].passHash = passHash; delete users[cedula].pass;
+        if (users[cedula].rol === 'Afiliado') users[cedula].claveTemporal = true;
         this._set('users', users);
         const intentos = this._get('intentos', {}); delete intentos[cedula]; this._set('intentos', intentos);
         this.log('Nueva clave generada', `${users[cedula].nombre} (${cedula})`);
