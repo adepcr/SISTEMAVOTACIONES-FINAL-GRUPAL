@@ -1,0 +1,283 @@
+<!-- este es el login.html CAMBIADOOOOOOOOOOOOOOO -->
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingresar | ADEP Vota</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/accesibilidad.css">
+    <link rel="stylesheet" href="css/tema-institucional.css">
+    <script src="js/accesibilidad.js"></script>
+    <style>
+        .login-bg {
+            background-image:
+                linear-gradient(135deg, rgba(0, 150, 75, 0.45), rgba(0, 175, 95, 0.30)),
+                url('img/fondo-adep.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+
+        .big-input {
+            font-size: 1.5rem;
+            padding: 0.9rem 1rem;
+            border-width: 3px;
+        }
+
+        .big-input:focus {
+            box-shadow: 0 0 0 4px rgba(0, 135, 68, .25);
+        }
+
+        .pin-input {
+            letter-spacing: .5em;
+            text-align: center;
+            font-weight: 800;
+        }
+
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 9999px;
+            background: #e2e8f0;
+            transition: background .15s;
+        }
+
+        .dot.on {
+            background: #008744;
+        }
+
+        button:focus-visible,
+        a:focus-visible,
+        input:focus-visible {
+            outline: 3px solid #E52521;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+
+<body class="login-bg min-h-full flex items-center justify-center p-4 antialiased font-sans">
+
+    <main style="margin-bottom: 5rem"
+        class="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-t-8 border-adep-red overflow-hidden">
+        <div class="p-6 sm:p-8">
+
+            <!-- Logo e identidad -->
+            <div class="text-center mb-5">
+                <div class="w-24 h-24 mx-auto mb-3 drop-shadow-sm">
+                    <svg viewBox="0 0 100 100" class="w-full h-full" aria-hidden="true">
+                        <circle cx="50" cy="50" r="48" fill="none" stroke="#008744" stroke-width="5" />
+                        <circle cx="50" cy="50" r="44.5" fill="#FFFFFF" />
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="#E52521" stroke-width="4" />
+                        <circle cx="50" cy="50" r="39" fill="#FFFFFF" />
+                        <text x="50" y="32" font-family="'Outfit', sans-serif" font-weight="900" font-size="20"
+                            fill="#008744" text-anchor="middle">ADEP</text>
+                        <g transform="translate(26, 38) scale(0.95)">
+                            <path d="M 25 24 Q 13 18 0 22 L 0 5 Q 13 2 25 8 Q 37 2 50 5 L 50 22 Q 37 18 25 24 Z"
+                                fill="#FFFFFF" stroke="#008744" stroke-width="2.2" stroke-linecap="round" />
+                            <line x1="25" y1="8" x2="25" y2="24" stroke="#008744" stroke-width="2" />
+                        </g>
+                    </svg>
+                </div>
+                <h1 class="text-xl font-extrabold text-adep-green font-heading">Asociación de Educadores Pensionados
+                </h1>
+                <p class="text-sm text-gray-600 mt-0.5">Portal de Votación ADEP</p>
+            </div>
+
+            <!-- ============ AFILIADOS (por defecto) ============ -->
+            <form id="form-afiliado" class="space-y-5" novalidate>
+                <h2 class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket text-adep-green"></i> Ingrese para votar
+                </h2>
+
+                <div>
+                    <label for="a-cedula" class="block text-base font-bold text-gray-800 mb-1">1. Su número de
+                        cédula</label>
+                    <input id="a-cedula" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12"
+                        autocomplete="username" placeholder="Solo números"
+                        class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
+                    <p class="text-sm text-gray-500 mt-1">Escríbala sin guiones ni espacios.</p>
+                </div>
+
+                <div>
+                    <label for="a-pin" class="block text-base font-bold text-gray-800 mb-1">2. Su clave de 6
+                        números</label>
+                    <input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                        autocomplete="current-password" placeholder="••••••"
+                        class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none pr-4">
+                    <div class="flex items-center justify-between mt-2">
+                        <div id="dots" class="flex gap-2" aria-hidden="true">
+                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                        </div>
+                        <button type="button" id="a-ver"
+                            class="text-base font-bold text-adep-green underline py-2 px-1">
+                            <i class="fa-solid fa-eye mr-1"></i><span>Ver clave</span>
+                        </button>
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-3 text-base font-semibold text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="a-recordar" class="w-6 h-6 accent-adep-green">
+                    Recordar mi cédula en este equipo
+                </label>
+
+                <p id="a-error" role="alert" aria-live="assertive"
+                    class="hidden text-base font-bold text-adep-red bg-adep-redLight border-2 border-red-200 rounded-xl p-3">
+                </p>
+
+                <button type="submit"
+                    class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar
+                </button>
+
+                <p class="text-sm text-gray-600 text-center bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <i class="fa-solid fa-circle-info text-adep-green mr-1"></i>
+                    ¿Olvidó su clave o no la tiene? Comuníquese con ADEP y le entregarán una nueva.
+                    <strong>No comparta su clave con nadie.</strong>
+                </p>
+            </form>
+
+            <!-- ============ ADMINISTRADOR ============ -->
+            <form id="form-admin" class="hidden space-y-4" novalidate>
+                <h2 class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-user-shield text-adep-green"></i> Acceso de administración
+                </h2>
+                <div>
+                    <label for="l-correo" class="block text-sm font-bold text-gray-700 mb-1"><i
+                            class="fa-solid fa-envelope mr-1"></i> Correo electrónico</label>
+                    <input id="l-correo" type="email" placeholder="correo@adep.cr" autocomplete="username"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 text-base focus:border-adep-green focus:outline-none">
+                </div>
+                <div>
+                    <label for="l-pass" class="block text-sm font-bold text-gray-700 mb-1"><i
+                            class="fa-solid fa-lock mr-1"></i> Contraseña</label>
+                    <input id="l-pass" type="password" autocomplete="current-password"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 text-base focus:border-adep-green focus:outline-none">
+                </div>
+                <p id="l-error" role="alert" aria-live="assertive"
+                    class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2">
+                </p>
+                <button type="submit"
+                    class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl text-base shadow-sm">Ingresar</button>
+            </form>
+
+            <div class="mt-5 text-center">
+                <button type="button" id="toggle-modo"
+                    class="text-sm text-gray-500 hover:text-adep-green underline py-2">Soy administrador</button>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
+            from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB9SnrUx1hsPT5VmjNWw18xusFlu6l3hjY",
+            authDomain: "proyectoabi-563e6.firebaseapp.com",
+            projectId: "proyectoabi-563e6",
+            storageBucket: "proyectoabi-563e6.firebasestorage.app",
+            messagingSenderId: "227799043670",
+            appId: "1:227799043670:web:0b41ab946a878d56af75f7",
+            measurementId: "G-1HC75JCXD4"
+        };
+
+        window.db = getFirestore(initializeApp(firebaseConfig));
+        window.fs = { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot };
+
+        function cargar(src) {
+            return new Promise((ok, fail) => {
+                const s = document.createElement("script");
+                s.src = src; s.onload = ok; s.onerror = () => fail(new Error("No cargó " + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        const $ = id => document.getElementById(id);
+        const soloNumeros = s => s.replace(/\D/g, '');
+        const showErr = (id, msg) => { $(id).textContent = msg; $(id).classList.toggle('hidden', !msg); };
+
+        try {
+            await cargar("js/db.js");
+            await DB.init();
+            await DB.seedDemo();
+        } catch (e) {
+            console.error(e);
+            alert("No se pudo conectar con la base de datos. Revise su internet e intente de nuevo.");
+            throw e;
+        }
+
+        if (DB.session()) location.replace('index.html');
+
+        // ---------- Cambiar entre afiliado / administrador ----------
+        let modoAdmin = false;
+        $('toggle-modo').addEventListener('click', () => {
+            modoAdmin = !modoAdmin;
+            $('form-afiliado').classList.toggle('hidden', modoAdmin);
+            $('form-admin').classList.toggle('hidden', !modoAdmin);
+            $('toggle-modo').textContent = modoAdmin ? 'Volver al ingreso de afiliados' : 'Soy administrador';
+            (modoAdmin ? $('l-correo') : $('a-cedula')).focus();
+        });
+
+        // ---------- Afiliados ----------
+        const pin = $('a-pin'), cedula = $('a-cedula');
+
+        function pintarPuntos() {
+            document.querySelectorAll('#dots .dot').forEach((d, i) => d.classList.toggle('on', i < pin.value.length));
+        }
+        cedula.addEventListener('input', () => { cedula.value = soloNumeros(cedula.value); showErr('a-error', ''); });
+        pin.addEventListener('input', () => {
+            pin.value = soloNumeros(pin.value).slice(0, 6);
+            pintarPuntos(); showErr('a-error', '');
+        });
+
+        $('a-ver').addEventListener('click', () => {
+            const ver = pin.type === 'password';
+            pin.type = ver ? 'text' : 'password';
+            $('a-ver').querySelector('span').textContent = ver ? 'Ocultar clave' : 'Ver clave';
+            $('a-ver').querySelector('i').className = `fa-solid ${ver ? 'fa-eye-slash' : 'fa-eye'} mr-1`;
+            pin.focus();
+        });
+
+        // Recordar SOLO la cédula (nunca la clave)
+        const guardada = DB._get('recordar', '');
+        if (guardada) { cedula.value = guardada; $('a-recordar').checked = true; pin.focus(); }
+        else cedula.focus();
+
+        $('form-afiliado').addEventListener('submit', async e => {
+            e.preventDefault();
+            const ced = soloNumeros(cedula.value), clave = soloNumeros(pin.value);
+            if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
+            if (clave.length < 6) { pin.focus(); return showErr('a-error', `Su clave tiene 6 números. Le faltan ${6 - clave.length}.`); }
+
+            const res = await DB.login(ced, clave);
+            if (res.error) { pin.value = ''; pintarPuntos(); pin.focus(); return showErr('a-error', res.error); }
+
+            if ($('a-recordar').checked) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
+            // pequeña espera para que Firestore reciba el registro antes de cambiar de página
+            setTimeout(() => location.href = 'index.html', 400);
+        });
+
+        // ---------- Administrador ----------
+        $('form-admin').addEventListener('submit', async e => {
+            e.preventDefault();
+            const correo = $('l-correo').value.trim(), pass = $('l-pass').value;
+            if (!correo || !pass) return showErr('l-error', 'Ingrese su correo y contraseña.');
+            const res = await DB.login(correo, pass);
+            if (res.error) return showErr('l-error', res.error);
+            setTimeout(() => location.href = 'index.html', 400);
+        });
+    </script>
+</body>
+
+</html>

@@ -1,367 +1,711 @@
-// Almacenamiento local de estado de votos y selecciones
-const selectedVotes = {}; // { 1: { optionText: "", value: "" } }
-const completedVotes = new Set();
-const userReceipts = [];
-let totalPollsCount = 3;
+/* este es el app.js */
+// ===== Sesión: si no hay usuario, volver al login =====
+const user = DB.session();
+if (!user) location.replace('login.html');
+const isAdmin = !!user && user.rol === 'Administrador';
+const selectedVotes = {};   // { pollId: textoOpción }
+const receiptData = {};     // { hash: datos del comprobante } para generar PDF
+let pendingPoll = null;     // consulta que se está confirmando
+let lastHash = null;        // último comprobante emitido
+let pendingDel = null;      // consulta que se quiere eliminar
+let pendingRestore = null;  // { pid, ced } voto que se quiere restaurar
 
-// Cambiar entre Pestañas de la App
-function switchTab(tabName) {
-    document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
-    document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
+const FILIALES = ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacaste', 'Puntarenas', 'Limón'];
 
-    document.getElementById(`sec-${tabName}`).classList.remove('hidden');
-    document.getElementById(`tab-${tabName}`).classList.add('active');
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+const fmt = iso => new Date(iso).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+
+function logout() { DB.logout(); location.replace('login.html'); }
+
+function switchTab(tab) {
+    document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    $(`sec-${tab}`).classList.remove('hidden');
+    $(`tab-${tab}`).classList.add('active');
+    renderAll();
+    window.scrollTo({ top: 0 });
 }
 
-// Selección visual e interactiva de opción
-function selectOption(pollNum, optionText, cardElem) {
-    if (completedVotes.has(pollNum)) return; // Ya votado
-
-    // Limpiar selección previa en el grupo
-    const parent = document.getElementById(`options-group-${pollNum}`);
-    if (parent) {
-        parent.querySelectorAll('.option-card').forEach(card => card.classList.remove('selected'));
-    }
-
-    // Marcar actual
-    cardElem.classList.add('selected');
-    const radio = cardElem.querySelector('input[type="radio"]');
-    if (radio) radio.checked = true;
-
-    // Guardar en objeto temporal
-    selectedVotes[pollNum] = {
-        text: optionText,
-        val: radio ? radio.value : optionText
-    };
-
-    // Ocultar alerta de error de pregunta si estaba activa
-    const errSpan = document.getElementById(`err-poll-${pollNum}`);
-    if (errSpan) errSpan.classList.add('hidden');
+function clearError(id) {
+    const i = $(id), e = $(`err-${id}`);
+    if (i) i.classList.remove('field-error');
+    if (e) e.classList.add('hidden');
 }
 
-// Limpiar estilos de error en inputs
-function clearError(inputId) {
-    const input = document.getElementById(inputId);
-    const errSpan = document.getElementById(`err-${inputId}`);
-    if (input) input.classList.remove('field-error');
-    if (errSpan) errSpan.classList.add('hidden');
+function showToast(msg, type = 'error') {
+    const ok = type !== 'error', t = document.createElement('div');
+    t.setAttribute('role', 'status');
+    t.className = `p-4 rounded-2xl shadow-lg border text-sm sm:text-base font-bold flex items-center gap-3 pointer-events-auto transition-all duration-300 ${ok ? 'bg-adep-green text-white border-emerald-700' : 'bg-adep-red text-white border-red-700'}`;
+    t.innerHTML = `<i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'} text-lg"></i><span class="flex-1">${esc(msg)}</span>`;
+    $('toast-container').appendChild(t);
+    setTimeout(() => { t.classList.add('opacity-0'); setTimeout(() => t.remove(), 300); }, 4500);
 }
 
-// Mostrar Toast de Notificación
-function showToast(message, type = 'error') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    
-    const isError = type === 'error';
-    toast.className = `p-3.5 rounded-2xl shadow-lg border text-xs sm:text-sm font-bold flex items-center gap-3 transition-all duration-300 transform translate-y-2 pointer-events-auto ${
-        isError 
-        ? 'bg-adep-red text-white border-red-700' 
-        : 'bg-adep-green text-white border-emerald-700'
-    }`;
+// ===== Helpers de estado =====
+const ESTADO = {
+    borrador: ['Borrador', 'bg-slate-100 text-gray-600'],
+    programada: ['Programada', 'bg-amber-100 text-amber-800'],
+    abierta: ['Abierta', 'bg-adep-greenLight text-adep-green'],
+    cerrada: ['Cerrada', 'bg-slate-200 text-gray-700']
+};
+const badgeEstado = p => { const [t, c] = ESTADO[DB.estado(p)]; return `<span class="text-xs font-bold px-2.5 py-1 rounded-full h-fit whitespace-nowrap ${c}">${t}</span>`; };
+const horario = p => [p.apertura ? `Abre: ${fmt(p.apertura)}` : '', p.cierre ? `Cierra: ${fmt(p.cierre)}` : ''].filter(Boolean).join(' · ');
 
-    toast.innerHTML = `
-        <i class="fa-solid ${isError ? 'fa-circle-xmark text-lg' : 'fa-circle-check text-lg'}"></i>
-        <span class="flex-1">${message}</span>
-        <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-    `;
-
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add('opacity-0', '-translate-y-2');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+// ===== Temporizador (solo en consultas con fecha de apertura o cierre) =====
+function fmtRestante(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    const pad = n => String(n).padStart(2, '0');
+    return (d ? `${d} d ` : '') + `${pad(h)}:${pad(m)}:${pad(sec)}`;
+}
+function timerHtml(p, kind) {
+    const target = kind === 'open' ? p.apertura : p.cierre;
+    const left = new Date(target).getTime() - Date.now();
+    const cls = kind === 'open' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-adep-greenLight border-emerald-200 text-adep-green';
+    return `<div data-countdown="${p.id}" data-kind="${kind}" role="timer" class="flex items-center justify-between gap-2 flex-wrap border-2 rounded-xl p-3 font-bold ${cls}">
+        <span><i class="fa-solid fa-hourglass-half mr-1"></i>${kind === 'open' ? 'La votación abre en:' : 'La votación cierra en:'}</span>
+        <span class="cd-time font-mono text-xl font-black">${fmtRestante(left)}</span>
+    </div>`;
+}
+function tickTimers() {
+    let refrescar = false;
+    document.querySelectorAll('[data-countdown]').forEach(el => {
+        const p = DB.polls().find(x => x.id == el.dataset.countdown);
+        if (!p) { refrescar = true; return; }
+        const kind = el.dataset.kind, est = DB.estado(p);
+        const target = kind === 'open' ? p.apertura : p.cierre;
+        const left = target ? new Date(target).getTime() - Date.now() : 0;
+        const vigente = kind === 'open' ? est === 'programada' : est === 'abierta';
+        if (left <= 0 || !vigente) { refrescar = true; return; }
+        const t = el.querySelector('.cd-time'); if (t) t.textContent = fmtRestante(left);
+    });
+    if (refrescar) { renderPolls(); if (isAdmin) { renderManage(); renderResults(); } }
 }
 
-// Confirmar identidad del votante
-function confirmVoter() {
-    const voterId = document.getElementById('voter-id');
-    const voterName = document.getElementById('voter-name');
-    const voterFilial = document.getElementById('voter-filial');
-    let hasErrors = false;
-
-    if (!voterId.value.trim()) {
-        voterId.classList.add('field-error');
-        document.getElementById('err-voter-id').classList.remove('hidden');
-        hasErrors = true;
-    }
-    if (!voterName.value.trim()) {
-        voterName.classList.add('field-error');
-        document.getElementById('err-voter-name').classList.remove('hidden');
-        hasErrors = true;
-    }
-    if (!voterFilial.value) {
-        voterFilial.classList.add('field-error');
-        document.getElementById('err-voter-filial').classList.remove('hidden');
-        hasErrors = true;
-    }
-
-    if (hasErrors) {
-        showToast('Complete Cédula, Nombre y Filial para confirmar su identidad.', 'error');
+// ===== Votaciones habilitadas =====
+function renderPolls() {
+    const polls = DB.polls().filter(p => p.publicada);
+    const abiertas = polls.filter(p => DB.estado(p) === 'abierta');
+    $('badge-pendientes').innerText = isAdmin ? abiertas.length : abiertas.filter(p => !DB.hasVoted(p.id, user.cedula)).length;
+    if (!polls.length) {
+        $('polls-list').innerHTML = `<div class="bg-white rounded-2xl p-8 text-center border-2 border-dashed border-gray-200 text-base text-gray-500">${isAdmin ? 'No hay votaciones publicadas. Cree una y publíquela en Gestionar.' : 'No hay votaciones habilitadas por ahora.'}</div>`;
         return;
     }
-
-    // Mostrar el nombre completo en el encabezado (reemplaza "Afiliado No Verificado")
-    const statusLabel = document.getElementById('voter-status-label');
-    if (statusLabel) {
-        statusLabel.innerHTML = `<span class="text-adep-green font-extrabold"><i class="fa-solid fa-user-check mr-1"></i>${voterName.value.trim()}</span>`;
-    }
-
-    // Cambiar el botón a estado confirmado
-    const btn = document.getElementById('btn-confirm-voter');
-    if (btn) {
-        btn.className = 'w-full sm:w-auto bg-emerald-100 text-adep-green font-bold py-2.5 px-5 rounded-xl border border-emerald-300 text-xs sm:text-sm flex items-center justify-center gap-2';
-        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Identidad Confirmada';
-    }
-
-    showToast('Identidad confirmada correctamente.', 'success');
-}
-
-// VALIDACIÓN Y PROCESAMIENTO DE VOTO
-function processVote(pollNum) {
-    let hasErrors = false;
-
-    // 1. Validar Datos del Votante
-    const voterId = document.getElementById('voter-id');
-    const voterName = document.getElementById('voter-name');
-    const voterFilial = document.getElementById('voter-filial');
-
-    if (!voterId.value.trim()) {
-        voterId.classList.add('field-error');
-        document.getElementById('err-voter-id').classList.remove('hidden');
-        hasErrors = true;
-    }
-    if (!voterName.value.trim()) {
-        voterName.classList.add('field-error');
-        document.getElementById('err-voter-name').classList.remove('hidden');
-        hasErrors = true;
-    }
-    if (!voterFilial.value) {
-        voterFilial.classList.add('field-error');
-        document.getElementById('err-voter-filial').classList.remove('hidden');
-        hasErrors = true;
-    }
-
-    if (hasErrors) {
-        const voterCard = document.getElementById('card-voter-info');
-        voterCard.classList.add('animate-shake', 'border-adep-red');
-        setTimeout(() => voterCard.classList.remove('animate-shake'), 400);
-        
-        showToast('Debe completar sus datos de afiliado (Cédula, Nombre y Filial) antes de enviar su voto.', 'error');
-        voterCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-    }
-
-    // 2. Validar Selección de Respuesta para la pregunta específica
-    if (!selectedVotes[pollNum] || !selectedVotes[pollNum].text) {
-        const pollCard = document.getElementById(`poll-card-${pollNum}`);
-        const errSpan = document.getElementById(`err-poll-${pollNum}`);
-        
-        if (errSpan) errSpan.classList.remove('hidden');
-        if (pollCard) {
-            pollCard.classList.add('animate-shake', 'border-adep-red');
-            setTimeout(() => pollCard.classList.remove('animate-shake'), 400);
-            pollCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-
-        showToast(`Por favor seleccione una respuesta para la Consulta #${pollNum} antes de hacer clic en enviar.`, 'error');
-        return;
-    }
-
-    // TODO CORRECTO -> REGISTRAR VOTO
-    completedVotes.add(pollNum);
-    const voteData = selectedVotes[pollNum];
-    const timestamp = new Date().toLocaleString('es-CR');
-    const hashCode = 'ADEP-2027-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.floor(1000 + Math.random() * 9000);
-
-    // Actualizar etiqueta del header manteniendo el nombre completo
-    const statusLabel = document.getElementById('voter-status-label');
-    if (statusLabel) {
-        statusLabel.innerHTML = `<span class="text-adep-green font-extrabold"><i class="fa-solid fa-user-check mr-1"></i>${voterName.value.trim()}</span>`;
-    }
-
-    // Marcar pregunta visualmente como COMPLETADA
-    const card = document.getElementById(`poll-card-${pollNum}`);
-    if (card) {
-        card.classList.remove('border-gray-200');
-        card.classList.add('border-emerald-500', 'bg-emerald-50/20');
-        
-        const btn = document.getElementById(`btn-vote-${pollNum}`);
-        if (btn) {
-            btn.disabled = true;
-            btn.className = 'w-full sm:w-auto bg-emerald-100 text-adep-green font-bold py-2.5 px-5 rounded-xl cursor-not-allowed border border-emerald-300 text-xs sm:text-sm';
-            btn.innerHTML = '<i class="fa-solid fa-circle-check text-adep-green mr-1"></i> Voto Enviado y Guardado';
-        }
-
-        const tag = document.getElementById(`status-tag-${pollNum}`);
-        if (tag) {
-            tag.className = 'text-[11px] bg-emerald-600 text-white font-extrabold px-2.5 py-0.5 rounded-full';
-            tag.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Completada';
-        }
-    }
-
-    // Actualizar contador del badge
-    const pendBadge = document.getElementById('badge-pendientes');
-    const pends = Math.max(0, totalPollsCount - completedVotes.size);
-    pendBadge.innerText = pends;
-
-    // Guardar Comprobante
-    const receipt = {
-        num: pollNum,
-        voter: voterName.value,
-        id: voterId.value,
-        filial: voterFilial.value,
-        option: voteData.text,
-        date: timestamp,
-        hash: hashCode
-    };
-    userReceipts.push(receipt);
-    renderReceipts();
-
-    // Abrir Modal de Éxito
-    document.getElementById('m-voter-name').innerText = voterName.value;
-    document.getElementById('m-poll-num').innerText = `#${pollNum}`;
-    document.getElementById('m-option-val').innerText = voteData.text;
-    document.getElementById('m-timestamp').innerText = timestamp;
-    document.getElementById('m-hash-code').innerText = hashCode;
-    
-    document.getElementById('modal-success').classList.remove('hidden');
-
-    showToast('¡Voto emitido con éxito! Se ha generado su comprobante.', 'success');
-}
-
-// Renderizar Lista de Comprobantes
-function renderReceipts() {
-    const container = document.getElementById('receipts-container');
-    const empty = document.getElementById('receipts-empty');
-    const badge = document.getElementById('badge-comprobantes');
-
-    badge.innerText = userReceipts.length;
-
-    if (userReceipts.length > 0 && empty) {
-        empty.style.display = 'none';
-    }
-
-    // Limpiar ítems previos (salvo empty div)
-    container.querySelectorAll('.receipt-card').forEach(el => el.remove());
-
-    userReceipts.forEach(r => {
-        const item = document.createElement('div');
-        item.className = 'receipt-card bg-white p-4 rounded-2xl border-2 border-emerald-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3';
-        item.innerHTML = `
-            <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-extrabold text-adep-green bg-adep-greenLight px-2 py-0.5 rounded">Consulta #${r.num}</span>
-                    <span class="text-xs text-gray-500 font-medium"><i class="fa-regular fa-clock mr-1"></i>${r.date}</span>
+    $('polls-list').innerHTML = polls.map((p, n) => {
+        const est = DB.estado(p);
+        const voted = !isAdmin && DB.hasVoted(p.id, user.cedula);
+        const canVote = !isAdmin && est === 'abierta' && !voted;
+        const opts = p.opciones.map((o, i) => `
+            <div data-poll="${p.id}" data-opt="${i}" role="radio" aria-checked="false" tabindex="${canVote ? 0 : -1}" class="option-card rounded-xl p-4 flex items-center gap-4 ${canVote ? 'cursor-pointer' : 'opacity-70'}">
+                <input type="radio" name="p${p.id}" tabindex="-1" class="w-6 h-6 accent-adep-green pointer-events-none" ${canVote ? '' : 'disabled'}>
+                <span class="text-base sm:text-lg font-semibold text-gray-800">${esc(o)}</span>
+            </div>`).join('');
+        const action = isAdmin ? '<span class="text-sm text-gray-500">Vista de administrador: los administradores no votan.</span>'
+            : voted ? '<span class="text-base font-bold text-adep-green"><i class="fa-solid fa-circle-check mr-1"></i>Voto enviado y guardado</span>'
+                : est === 'cerrada' ? '<span class="text-base font-bold text-gray-600"><i class="fa-solid fa-lock mr-1"></i>Esta consulta ya cerró</span>'
+                    : est === 'programada' ? '<span class="text-base font-bold text-amber-700"><i class="fa-regular fa-clock mr-1"></i>Todavía no abre. Vuelva en la fecha indicada.</span>'
+                        : `<button data-send="${p.id}" class="w-full sm:w-auto bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 px-7 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-md"><i class="fa-solid fa-paper-plane"></i> Revisar y enviar voto</button>`;
+        const etiqueta = voted ? 'Completada' : est === 'cerrada' ? 'Cerrada' : est === 'programada' ? 'Próximamente' : p.publica ? 'Voto público' : 'Voto secreto';
+        const privacidad = p.publica
+            ? '<i class="fa-solid fa-eye mr-1 text-adep-green"></i> En esta consulta su nombre aparecerá junto a su voto.'
+            : '<i class="fa-solid fa-user-secret mr-1 text-adep-green"></i> Su voto es secreto: nadie podrá saber qué eligió usted.';
+        // Temporizador: solo si la consulta tiene apertura (programada) o cierre establecido
+        const temporizador = (est === 'programada' && p.apertura) ? timerHtml(p, 'open')
+            : (est === 'abierta' && p.cierre) ? timerHtml(p, 'close') : '';
+        return `
+        <div id="poll-card-${p.id}" class="bg-white rounded-2xl shadow-sm border-2 ${voted ? 'border-emerald-500' : 'border-gray-200'} overflow-hidden">
+            <div class="bg-gradient-to-r from-adep-green to-emerald-800 p-4 text-white flex justify-between items-center gap-2">
+                <span class="text-sm font-bold">Consulta #${n + 1} · ${esc(p.categoria)}</span>
+                <span class="text-xs bg-emerald-900/60 font-bold px-2.5 py-1 rounded-full">${etiqueta}</span>
+            </div>
+            <div class="p-4 sm:p-6 space-y-4">
+                <div class="flex flex-col sm:flex-row items-start justify-between gap-3">
+                    ${p.sinPregunta ? '<span class="text-lg font-extrabold text-gray-900">Elija una de las siguientes respuestas:</span>' : `<h3 class="text-lg sm:text-xl font-extrabold text-gray-900">${esc(p.titulo)}</h3>`}
+                    <button data-listen="${p.id}" aria-label="Escuchar la pregunta en voz alta" class="shrink-0 bg-adep-greenLight text-adep-green border-2 border-emerald-200 font-bold text-sm px-3 py-2 rounded-xl flex items-center gap-2">
+                        <i class="fa-solid fa-volume-high"></i><span>Escuchar</span>
+                    </button>
                 </div>
-                <h4 class="font-bold text-gray-900 text-xs sm:text-sm">Selección: ${r.option}</h4>
-                <p class="text-[11px] text-gray-500">Afiliado: <strong>${r.voter}</strong> (${r.filial})</p>
+                ${horario(p) ? `<p class="text-sm text-gray-500"><i class="fa-regular fa-clock mr-1"></i>${horario(p)}</p>` : ''}
+                ${temporizador}
+                <div class="space-y-3" id="options-group-${p.id}" role="radiogroup" aria-label="Opciones de respuesta">${opts}</div>
+                <span id="err-poll-${p.id}" class="hidden block text-sm font-bold text-adep-red bg-adep-redLight p-3 rounded-lg border border-red-200">Debe seleccionar una opción.</span>
+                <p class="text-sm text-gray-600 bg-slate-50 border border-slate-200 rounded-xl p-3">${privacidad}</p>
+                <div class="pt-3 border-t border-gray-100 flex justify-end">${action}</div>
             </div>
-            <div class="text-left sm:text-right w-full sm:w-auto border-t sm:border-0 pt-2 sm:pt-0 border-gray-100">
-                <span class="block text-[10px] font-bold text-gray-400 uppercase">Código Hash</span>
-                <span class="font-mono text-xs font-black text-adep-red bg-adep-redLight px-2.5 py-1 rounded-lg border border-red-200 inline-block mt-0.5">
-                    ${r.hash}
-                </span>
-            </div>
-        `;
-        container.prepend(item);
+        </div>`;
+    }).join('');
+    // restaurar selección visual
+    Object.entries(selectedVotes).forEach(([pid, text]) => {
+        const p = polls.find(x => x.id == pid); if (!p) return;
+        const el = document.querySelector(`[data-poll="${pid}"][data-opt="${p.opciones.indexOf(text)}"]`);
+        if (el) { el.classList.add('selected'); el.setAttribute('aria-checked', 'true'); el.querySelector('input').checked = true; }
     });
 }
 
-function closeModal() {
-    document.getElementById('modal-success').classList.add('hidden');
+$('polls-list').addEventListener('click', e => {
+    const send = e.target.closest('[data-send]');
+    if (send) return startConfirm(+send.dataset.send);
+    const listen = e.target.closest('[data-listen]');
+    if (listen) return readPoll(+listen.dataset.listen);
+    const card = e.target.closest('.option-card');
+    if (!card || isAdmin) return;
+    const pid = +card.dataset.poll, poll = DB.polls().find(p => p.id === pid);
+    if (!poll || DB.hasVoted(pid, user.cedula) || DB.estado(poll) !== 'abierta') return;
+    $(`options-group-${pid}`).querySelectorAll('.option-card').forEach(c => { c.classList.remove('selected'); c.setAttribute('aria-checked', 'false'); });
+    card.classList.add('selected');
+    card.setAttribute('aria-checked', 'true');
+    card.querySelector('input').checked = true;
+    selectedVotes[pid] = poll.opciones[+card.dataset.opt];
+    $(`err-poll-${pid}`).classList.add('hidden');
+});
+// Teclado: Enter o Espacio seleccionan una opción
+$('polls-list').addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('option-card')) { e.preventDefault(); e.target.click(); }
+});
+
+function readPoll(pid) {
+    const p = DB.polls().find(x => x.id === pid); if (!p) return;
+    const texto = `${p.sinPregunta ? '' : p.titulo + '. '}Las opciones son: ${p.opciones.map((o, i) => `Opción ${i + 1}: ${o}`).join('. ')}.`;
+    if (!leer(texto)) showToast('Este navegador no puede leer en voz alta.');
 }
 
-function closeModalAndGoReceipts() {
-    closeModal();
-    switchTab('comprobantes');
+// ===== Confirmación antes de votar =====
+function startConfirm(pid) {
+    const poll = DB.polls().find(p => p.id === pid);
+    if (!selectedVotes[pid]) {
+        $(`err-poll-${pid}`).classList.remove('hidden');
+        return showToast('Seleccione una respuesta antes de enviar su voto.');
+    }
+    pendingPoll = pid;
+    $('c-title').innerText = poll.sinPregunta ? '' : poll.titulo;
+    $('c-option').innerText = selectedVotes[pid];
+    $('c-privacy').innerText = poll.publica ? 'Su nombre aparecerá junto a este voto.' : 'Su voto es secreto: no se guardará junto a su nombre.';
+    $('modal-confirm').classList.remove('hidden');
+    $('c-yes').focus();
+}
+function closeConfirm() { $('modal-confirm').classList.add('hidden'); pendingPoll = null; }
+function confirmVote() { const pid = pendingPoll; closeConfirm(); if (pid) processVote(pid); }
+
+function processVote(pid) {
+    if (isAdmin) return;
+    if (!selectedVotes[pid]) return;
+    const vote = DB.addVote({ pollId: pid, cedula: user.cedula, nombre: user.nombre, provincia: user.provincia, opcion: selectedVotes[pid] });
+    if (vote.error) { renderAll(); return showToast(vote.error); }
+    delete selectedVotes[pid];
+    const poll = DB.polls().find(p => p.id === pid);
+    receiptData[vote.hash] = { nombre: user.nombre, filial: user.provincia, titulo: poll.titulo, opcion: vote.opcion, fecha: vote.fecha, hash: vote.hash, anonimo: !poll.publica };
+    lastHash = vote.hash;
+    $('m-voter-name').innerText = user.nombre;
+    $('m-poll-num').innerText = poll.titulo;
+    $('m-option-val').innerText = vote.opcion;
+    $('m-timestamp').innerText = vote.fecha;
+    $('m-hash-code').innerText = vote.hash;
+    $('m-note').innerText = poll.publica
+        ? 'Guarde este código como prueba de que su voto fue registrado.'
+        : 'Su voto es secreto. Guarde este código: es la única forma de comprobar que su voto fue contado.';
+    $('modal-success').classList.remove('hidden');
+    renderAll();
 }
 
-// Crear nueva consulta (Admin)
-function createNewPoll(e) {
-    e.preventDefault();
-    
-    const title = document.getElementById('new-poll-title');
-    const cat = document.getElementById('new-poll-cat');
-    const options = document.getElementById('new-poll-options');
+// ===== Comprobantes =====
+function renderReceipts() {
+    if (isAdmin) return;
+    const pub = DB.votes().filter(v => v.cedula === user.cedula).map(v => ({ pollId: v.pollId, fecha: v.fecha, opcion: v.opcion, hash: v.hash, nombre: v.nombre }));
+    const anon = DB.voters().filter(r => r.cedula === user.cedula).map(r => ({ pollId: r.pollId, fecha: r.fecha, anonimo: true, codigo: r.codigo || DB.asegurarCodigo(r.pollId, r.cedula) }));
+    const mine = [...pub, ...anon].sort((a, b) => b.pollId - a.pollId);
+    $('badge-comprobantes').innerText = mine.length;
+    $('receipts-empty').style.display = mine.length ? 'none' : '';
+    $('receipts-container').querySelectorAll('.receipt-card').forEach(el => el.remove());
+    mine.forEach(v => {
+        const poll = DB.polls().find(p => p.id === v.pollId);
+        const titulo = poll ? poll.titulo : 'Consulta eliminada';
+        const d = document.createElement('div');
+        d.className = 'receipt-card bg-white p-5 rounded-2xl border-2 border-emerald-200 shadow-sm flex flex-col sm:flex-row justify-between gap-3';
+        if (v.anonimo) {
+            receiptData['anon-' + v.pollId] = { nombre: user.nombre, filial: user.provincia, titulo, fecha: v.fecha, anonimo: true, hash: v.codigo };
+            d.innerHTML = `
+                <div class="space-y-1">
+                    <span class="text-sm text-gray-500"><i class="fa-regular fa-clock mr-1"></i>${esc(v.fecha)}</span>
+                    <h4 class="font-bold text-gray-900 text-base">${esc(titulo)}</h4>
+                    <p class="text-sm text-gray-600"><i class="fa-solid fa-user-secret mr-1 text-adep-green"></i>Voto <strong>secreto</strong> registrado. Su elección no se guarda con su nombre.</p>
+                    ${v.codigo ? `<p class="text-sm text-gray-600">Código de verificación: <span class="font-mono font-black text-adep-red bg-adep-redLight px-2 py-0.5 rounded-lg border border-red-200">${esc(v.codigo)}</span></p>` : '<p class="text-sm text-gray-500">Este voto se emitió antes de la actualización y no tiene código de verificación.</p>'}
+                </div>
+                <div class="sm:text-right space-y-2">
+                    <span class="inline-block text-sm font-bold text-adep-green bg-adep-greenLight px-3 py-2 rounded-xl border border-emerald-200"><i class="fa-solid fa-circle-check mr-1"></i>Contado</span>
+                    <button onclick="receiptPDF('anon-${v.pollId}')" class="block sm:ml-auto bg-adep-green text-white text-sm font-bold px-4 py-2 rounded-xl"><i class="fa-solid fa-file-pdf mr-1"></i> Descargar PDF</button>
+                </div>`;
+        } else {
+            receiptData[v.hash] = { nombre: v.nombre, filial: user.provincia, titulo, opcion: v.opcion, fecha: v.fecha, hash: v.hash, anonimo: false };
+            d.innerHTML = `
+                <div class="space-y-1">
+                    <span class="text-sm text-gray-500"><i class="fa-regular fa-clock mr-1"></i>${esc(v.fecha)}</span>
+                    <h4 class="font-bold text-gray-900 text-base">${esc(titulo)}</h4>
+                    <p class="text-sm text-gray-600">Selección: <strong>${esc(v.opcion)}</strong></p>
+                    <p class="text-sm text-gray-500">Afiliado: <strong>${esc(v.nombre)}</strong>${user.provincia ? ` · Filial: <strong>${esc(user.provincia)}</strong>` : ''}</p>
+                </div>
+                <div class="sm:text-right space-y-2"><span class="block text-xs font-bold text-gray-400 uppercase">Código hash</span>
+                    <span class="font-mono text-sm font-black text-adep-red bg-adep-redLight px-2.5 py-1 rounded-lg border border-red-200 inline-block">${esc(v.hash)}</span>
+                    <button onclick="receiptPDF('${esc(v.hash)}')" class="block sm:ml-auto bg-adep-green text-white text-sm font-bold px-4 py-2 rounded-xl"><i class="fa-solid fa-file-pdf mr-1"></i> Descargar PDF</button></div>`;
+        }
+        $('receipts-container').appendChild(d);
+    });
+}
 
-    let errors = false;
-
-    if (!title.value.trim()) {
-        title.classList.add('field-error');
-        document.getElementById('err-new-poll-title').classList.remove('hidden');
-        errors = true;
+function receiptPDF(key) {
+    const r = receiptData[key]; if (!r) return showToast('Comprobante no disponible.');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(0, 135, 68);
+    doc.text('ADEP - Comprobante de voto', 20, 28);
+    doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+    let y = 42;
+    const line = (k, v) => { const t = doc.splitTextToSize(`${k}: ${v}`, 170); doc.text(t, 20, y); y += t.length * 6 + 3; };
+    line('Afiliado', r.nombre);
+    if (r.filial) line('Filial', r.filial);
+    line('Consulta', r.titulo);
+    if (r.opcion) line('Opcion elegida', r.opcion);
+    line('Fecha y hora', r.fecha);
+    line('Modalidad', r.anonimo ? 'Voto secreto (no se guarda junto a su nombre)' : 'Voto publico');
+    y += 4;
+    if (r.hash) {
+        // Recuadro destacado con el código para verificar
+        doc.setFillColor(232, 245, 238); doc.setDrawColor(0, 135, 68); doc.setLineWidth(0.8);
+        doc.roundedRect(20, y, 170, 46, 3, 3, 'FD');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 107, 53);
+        doc.text('CODIGO DE VERIFICACION', 105, y + 9, { align: 'center' });
+        doc.setFont('courier', 'bold'); doc.setFontSize(24); doc.setTextColor(229, 37, 33);
+        doc.text(r.hash, 105, y + 24, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+        const ins = doc.splitTextToSize('Para verificar su voto: ingrese al portal ADEP Vota, abra "Resultados en Vivo", busque "Verificar un comprobante" y escriba este codigo.', 156);
+        doc.text(ins, 105, y + 33, { align: 'center' });
+        y += 46;
+    } else {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        const t = doc.splitTextToSize('Su voto fue registrado y contado. Por ser un voto secreto, este comprobante no incluye la opcion elegida. Este voto se emitio antes de que el sistema generara codigos de verificacion para votos secretos.', 170);
+        doc.text(t, 20, y + 4); y += t.length * 5 + 4;
     }
-    if (!cat.value.trim()) {
-        cat.classList.add('field-error');
-        document.getElementById('err-new-poll-cat').classList.remove('hidden');
-        errors = true;
-    }
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 135, 68); doc.setLineWidth(1.5); doc.rect(10, 10, 190, y + 10 - 10 + 6);
+    doc.save(`Comprobante_${r.hash || 'voto-secreto-' + String(key).replace('anon-', '')}.pdf`);
+}
 
-    const optionsList = options.value.split('\n').filter(o => o.trim() !== '');
-    if (optionsList.length < 2) {
-        options.classList.add('field-error');
-        document.getElementById('err-new-poll-options').classList.remove('hidden');
-        errors = true;
-    }
+// Quiénes ya votaron y quiénes faltan (solo participación; nunca qué eligió cada uno). Orden alfabético para no revelar el orden de llegada.
+function quienVoto(pollId) {
+    const ids = new Set([
+        ...DB.voters().filter(r => r.pollId === pollId).map(r => r.cedula),
+        ...DB.votes().filter(v => v.pollId === pollId && v.cedula).map(v => v.cedula)
+    ]);
+    const byName = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
+    const todos = DB.afiliados();
+    return {
+        votaron: todos.filter(a => ids.has(a.cedula)).sort(byName),
+        faltan: todos.filter(a => a.activo !== false && !ids.has(a.cedula)).sort(byName)
+    };
+}
+// pollId (opcional): si se indica, cada afiliado muestra el botón "Restaurar" (consulta abierta)
+function listaAfiliados(arr, vacio, pollId = null) {
+    return arr.length
+        ? `<ul class="text-sm space-y-1 max-h-56 overflow-y-auto pr-1">${arr.map(a => `<li class="flex justify-between items-center gap-2 border-b border-gray-100 pb-1">
+            <span class="font-semibold text-gray-800 min-w-0">${esc(a.nombre)}${a.provincia ? `<span class="block text-xs font-normal text-gray-500">Filial: ${esc(a.provincia)}</span>` : ''}</span>
+            <span class="flex items-center gap-2 shrink-0"><span class="text-gray-500">${esc(a.cedula)}</span>${pollId !== null ? `<button data-restore="${pollId}" data-ced="${esc(a.cedula)}" class="px-2 py-1 rounded-lg bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold"><i class="fa-solid fa-rotate-left mr-1"></i>Restaurar</button>` : ''}</span>
+        </li>`).join('')}</ul>`
+        : `<p class="text-sm text-gray-500">${vacio}</p>`;
+}
 
-    if (errors) {
-        showToast('Rellene todos los campos requeridos para publicar la encuesta.', 'error');
-        return;
-    }
-
-    totalPollsCount++;
-    const num = totalPollsCount;
-
-    const optionsHTML = optionsList.map(opt => `
-        <div onclick="selectOption(${num}, '${opt}', this)" class="option-card rounded-xl p-3 flex items-center gap-3 cursor-pointer">
-            <input type="radio" name="p${num}" value="${opt}" class="w-5 h-5 accent-adep-green pointer-events-none">
-            <span class="text-xs sm:text-sm font-semibold text-gray-800">${opt}</span>
-        </div>
-    `).join('');
-
-    const newCard = document.createElement('div');
-    newCard.id = `poll-card-${num}`;
-    newCard.className = 'poll-item bg-white rounded-2xl shadow-sm border-2 border-gray-200 overflow-hidden transition-all duration-300';
-    newCard.innerHTML = `
-        <div class="bg-gradient-to-r from-adep-green to-emerald-800 p-3.5 text-white flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <span class="bg-white/20 text-white font-bold text-[10px] px-2 py-0.5 rounded uppercase">Consulta #${num}</span>
-                <span class="text-xs text-emerald-100 font-semibold">• ${cat.value}</span>
+// ===== Resultados =====
+function renderResults() {
+    const polls = DB.polls().filter(p => isAdmin || p.publicada);
+    if (!polls.length) { $('results-list').innerHTML = '<p class="text-base text-gray-500 text-center py-8">Aún no hay votaciones con resultados.</p>'; return; }
+    // recordar qué listas de participación estaban abiertas para no cerrarlas al refrescar
+    const abiertos = new Set([...document.querySelectorAll('#results-list details[open]')].map(d => d.dataset.det));
+    const padron = DB.padron();
+    $('results-list').innerHTML = polls.map(p => {
+        const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length;
+        const part = padron ? Math.min(100, Math.round(total * 100 / padron)) : 0;
+        let detalle = '';
+        if (isAdmin) {
+            const q = quienVoto(p.id);
+            const puedeRestaurar = DB.estado(p) === 'abierta';
+            detalle = `<details data-det="${p.id}" ${abiertos.has(String(p.id)) ? 'open' : ''} class="bg-white border-2 border-gray-200 rounded-xl p-3">
+                <summary class="cursor-pointer text-sm sm:text-base font-bold text-gray-800"><i class="fa-solid fa-list-check text-adep-green mr-1"></i> Registro de participación <span class="text-gray-500 font-semibold">(${q.votaron.length} han votado · ${q.faltan.length} pendientes)</span></summary>
+                <div class="grid sm:grid-cols-2 gap-4 mt-3">
+                    <div><h4 class="text-sm font-extrabold text-adep-green mb-2"><i class="fa-solid fa-circle-check mr-1"></i> Han emitido su voto (${q.votaron.length})</h4>${listaAfiliados(q.votaron, 'Aún no se registran votos.', puedeRestaurar ? p.id : null)}${puedeRestaurar && q.votaron.length ? '<p class="text-xs text-gray-500 mt-2">«Restaurar» anula el voto registrado por error para que el afiliado pueda votar nuevamente.</p>' : ''}</div>
+                    <div><h4 class="text-sm font-extrabold text-adep-red mb-2"><i class="fa-regular fa-clock mr-1"></i> Pendientes de votar (${q.faltan.length})</h4>${listaAfiliados(q.faltan, 'Todos los afiliados activos han emitido su voto.')}</div>
+                </div>
+            </details>`;
+        }
+        const rows = p.opciones.map(o => {
+            const vs = votes.filter(v => v.opcion === o), pct = total ? Math.round(vs.length * 100 / total) : 0;
+            const conNombre = vs.filter(v => v.nombre);
+            const names = p.publica && conNombre.length ? `<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-users mr-1"></i>${conNombre.map(v => esc(v.nombre)).join(', ')}</p>` : '';
+            return `<div><div class="flex justify-between text-sm sm:text-base font-semibold text-gray-800"><span>${esc(o)}</span><span>${vs.length} (${pct}%)</span></div>
+                <div class="h-4 bg-slate-100 rounded-full overflow-hidden mt-1"><div class="bar-fill h-full bg-adep-green rounded-full transition-all duration-700" style="width:${pct}%"></div></div>${names}</div>`;
+        }).join('');
+        const botones = isAdmin ? `
+            <button onclick="downloadPDF(${p.id})" class="bg-adep-red text-white text-sm font-bold px-3 py-1.5 rounded-lg hover:bg-adep-redDark flex items-center gap-1 shadow-sm"><i class="fa-solid fa-file-pdf"></i> PDF</button>` : '';
+        return `<div class="bg-white rounded-2xl border-2 border-gray-200 p-4 sm:p-6 space-y-4">
+            <div class="flex justify-between items-start gap-2 flex-wrap">
+                <h3 class="font-extrabold text-base sm:text-lg text-gray-900">${esc(p.titulo)}</h3>
+                <div class="flex items-center gap-2 flex-wrap">
+                    ${badgeEstado(p)}
+                    <span class="text-xs font-bold text-adep-green bg-adep-greenLight px-2.5 py-1 rounded-full whitespace-nowrap">${p.publica ? 'Nombres visibles' : 'Voto secreto'}</span>
+                    ${botones}
+                </div>
             </div>
-            <span id="status-tag-${num}" class="text-[11px] bg-emerald-900/60 text-emerald-200 font-bold px-2.5 py-0.5 rounded-full">
-                <i class="fa-regular fa-clock mr-1"></i> Pendiente
-            </span>
-        </div>
-        <div class="p-4 sm:p-5 space-y-4">
-            <h3 class="text-sm sm:text-base font-bold text-gray-900 leading-snug">${title.value}</h3>
-            <div class="space-y-2" id="options-group-${num}">
-                ${optionsHTML}
-            </div>
-            <span id="err-poll-${num}" class="text-xs font-bold text-adep-red hidden block bg-adep-redLight p-2 rounded-lg border border-red-200">
-                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Debe seleccionar una opción.
-            </span>
-            <div class="pt-3 border-t border-gray-100 flex justify-end">
-                <button onclick="processVote(${num})" id="btn-vote-${num}" class="w-full sm:w-auto bg-adep-green hover:bg-adep-greenDark text-white font-bold py-2.5 px-5 rounded-xl transition text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm">
-                    <i class="fa-solid fa-paper-plane"></i> Confirmar y Enviar Voto
-                </button>
-            </div>
-        </div>
-    `;
+            <div class="space-y-4">${rows}</div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div class="flex justify-between text-sm font-bold text-gray-700"><span><i class="fa-solid fa-people-group mr-1"></i>Participación</span><span>${total} de ${padron} afiliados (${part}%)</span></div>
+                <div class="h-3 bg-slate-200 rounded-full overflow-hidden mt-2"><div class="bar-fill h-full bg-amber-500 rounded-full transition-all duration-700" style="width:${part}%"></div></div>
+            </div>${detalle}</div>`;
+    }).join('');
+}
 
-    document.querySelector('#sec-votacion .space-y-5').appendChild(newCard);
+// ===== Administrador: restaurar un voto por equivocación =====
+$('results-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-restore]'); if (!b || !isAdmin) return;
+    startRestore(+b.dataset.restore, b.dataset.ced);
+});
 
-    document.getElementById('form-new-poll').reset();
-    document.getElementById('badge-pendientes').innerText = parseInt(document.getElementById('badge-pendientes').innerText || 0) + 1;
+function startRestore(pid, ced) {
+    const poll = DB.polls().find(p => p.id === pid);
+    if (!poll) return showToast('Consulta no encontrada.');
+    if (DB.estado(poll) !== 'abierta') return showToast('Solo se puede restaurar un voto mientras la consulta está abierta.');
+    const a = DB.afiliados().find(x => x.cedula === ced);
+    const nombre = a ? a.nombre : ced;
+    if (poll.publica) {
+        // Voto público: se sabe qué eligió, se quita directamente
+        if (!confirm(`¿Restaurar el voto de ${nombre}? Podrá votar de nuevo en esta consulta.`)) return;
+        const r = DB.restaurarVoto(pid, ced);
+        if (r.error) return showToast(r.error);
+        showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
+        return renderAll();
+    }
+    // Voto secreto: el afiliado indica qué opción eligió por error
+    pendingRestore = { pid, ced };
+    $('rs-who').innerText = `${nombre} · Cédula ${ced}`;
+    $('rs-opcion').innerHTML = poll.opciones.map((o, i) => `<option value="${i}">${esc(o)}</option>`).join('');
+    $('modal-restore').classList.remove('hidden');
+}
+function closeRestore() { $('modal-restore').classList.add('hidden'); pendingRestore = null; }
 
-    showToast('Nueva consulta creada y agregada a la lista de votaciones.', 'success');
-    switchTab('votacion');
+$('rs-cancel').addEventListener('click', closeRestore);
+$('rs-ok').addEventListener('click', () => {
+    if (!pendingRestore) return;
+    const { pid, ced } = pendingRestore;
+    const poll = DB.polls().find(p => p.id === pid);
+    const opcion = poll ? poll.opciones[+$('rs-opcion').value] : '';
+    const r = DB.restaurarVoto(pid, ced, opcion);
+    closeRestore();
+    if (r.error) return showToast(r.error);
+    showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
+    renderAll();
+});
+
+function downloadPDF(pollId) {
+    const poll = DB.polls().find(p => p.id === pollId);
+    if (!poll) return showToast('Consulta no encontrada.');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const votes = DB.votes().filter(v => v.pollId === poll.id);
+    const total = votes.length, padron = DB.padron();
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('ADEP - Reporte Oficial de Resultados', 14, 20);
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    const enc = [
+        `Consulta: ${poll.titulo}`, `Categoría: ${poll.categoria}`,
+        `Modalidad: ${poll.publica ? 'Pública (Nombres visibles)' : 'Anónima'}`,
+        `Estado: ${ESTADO[DB.estado(poll)][0]}${horario(poll) ? ' · ' + horario(poll) : ''}`,
+        `Fecha y Hora de emisión: ${new Date().toLocaleString('es-CR')}`,
+        `Generado por Administrador: ${user.nombre} (${user.cedula})`
+    ];
+    let y = 28;
+    enc.forEach(t => { const l = doc.splitTextToSize(t, 180); doc.text(l, 14, y); y += l.length * 5 + 1; });
+    doc.setLineWidth(0.5); doc.line(14, y, 196, y); y += 9;
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+    doc.text(`Total de votos: ${total} de ${padron} afiliados (${padron ? Math.round(total * 100 / padron) : 0}% de participación)`, 14, y); y += 10;
+    poll.opciones.forEach(opcion => {
+        const vs = votes.filter(v => v.opcion === opcion);
+        const pct = total ? Math.round(vs.length * 100 / total) : 0;
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+        doc.text(`${opcion}: ${vs.length} voto(s) (${pct}%)`, 14, y); y += 6;
+        const nombres = vs.filter(v => v.nombre).map(v => v.nombre);
+        if (poll.publica && nombres.length) {
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+            const lineas = doc.splitTextToSize(`Afiliados: ${nombres.join(', ')}`, 175);
+            doc.text(lineas, 18, y); y += lineas.length * 5;
+        }
+        y += 4;
+        if (y > 270) { doc.addPage(); y = 20; }
+    });
+    DB.log('Reporte PDF generado', poll.titulo);
+    doc.save(`Resultados_${poll.titulo.substring(0, 15)}_${Date.now()}.pdf`);
 }
 
 function refreshResultsAnimation() {
-    document.querySelectorAll('.bar-fill').forEach(bar => {
-        const w = bar.style.width;
-        bar.style.width = '0%';
-        setTimeout(() => bar.style.width = w, 150);
+    document.querySelectorAll('.bar-fill').forEach(b => { const w = b.style.width; b.style.width = '0%'; setTimeout(() => b.style.width = w, 150); });
+}
+
+// ===== Verificación pública de comprobantes =====
+$('verify-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const box = $('verify-result'), code = $('verify-code').value;
+    if (!code.trim()) return;
+    const r = DB.verify(code);
+    box.classList.remove('hidden');
+    if (r) {
+        box.className = 'text-base font-bold rounded-xl p-4 border-2 bg-adep-greenLight text-adep-green border-emerald-200';
+        box.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Código válido. Fue registrado en la consulta «${esc(r.titulo)}» el ${esc(r.fecha)}. <span class="block text-sm font-semibold mt-1">Por privacidad no se muestra quién votó.</span>`;
+    } else {
+        box.className = 'text-base font-bold rounded-xl p-4 border-2 bg-adep-redLight text-adep-red border-red-200';
+        box.innerHTML = '<i class="fa-solid fa-circle-xmark mr-1"></i> No encontramos ese código. Revise que lo escribió igual que en su comprobante.';
+    }
+});
+
+// ===== Administrador: crear y gestionar consultas =====
+function createNewPoll(e) {
+    e.preventDefault();
+    const title = $('new-poll-title'), cat = $('new-poll-cat'), opts = $('new-poll-options');
+    const sinPreg = $('new-poll-noquestion').checked;
+    const list = opts.value.split('\n').map(o => o.trim()).filter(Boolean);
+    let bad = false;
+    [[title, !sinPreg && !title.value.trim()], [cat, !cat.value.trim()], [opts, list.length < 2]].forEach(([el, fail]) => {
+        if (fail) { el.classList.add('field-error'); $(`err-${el.id}`).classList.remove('hidden'); bad = true; }
     });
+    if (bad) return showToast('Rellene todos los campos requeridos.');
+    const ap = $('new-poll-open').value, ci = $('new-poll-close').value;
+    if (ap && ci && new Date(ci) <= new Date(ap)) return showToast('La fecha de cierre debe ser posterior a la de apertura.');
+    DB.addPoll({
+        titulo: sinPreg ? cat.value.trim() : title.value.trim(), sinPregunta: sinPreg, categoria: cat.value.trim(), opciones: list,
+        publicada: $('new-poll-publish').checked, publica: $('new-poll-public').checked,
+        apertura: ap ? new Date(ap).toISOString() : '', cierre: ci ? new Date(ci).toISOString() : '',
+        creadaPor: user.cedula
+    });
+    $('form-new-poll').reset();
+    showToast('Consulta guardada.', 'success');
+    switchTab('gestionar');
+}
+
+function toggleSinPregunta(on) {
+    const t = $('new-poll-title');
+    t.disabled = on; if (on) { t.value = ''; clearError('new-poll-title'); }
+    t.classList.toggle('opacity-50', on);
+    t.placeholder = on ? 'Esta consulta no lleva pregunta (solo respuestas)' : 'Ej: ¿Aprueba el presupuesto para actividades culturales 2027?';
+}
+
+function renderManage() {
+    const polls = DB.polls();
+    $('manage-list').innerHTML = polls.length ? polls.map(p => {
+        const n = DB.votes().filter(v => v.pollId === p.id).length;
+        const est = DB.estado(p);
+        return `<div class="bg-white rounded-2xl border-2 border-gray-200 p-4 space-y-3">
+            <div class="flex justify-between gap-2"><h3 class="font-bold text-base text-gray-900">${esc(p.titulo)}</h3>${badgeEstado(p)}</div>
+            <p class="text-sm text-gray-500">${esc(p.categoria)} · ${p.opciones.length} opciones · ${n} votos${horario(p) ? ' · ' + horario(p) : ''}</p>
+            <div class="flex flex-wrap gap-2 text-sm font-bold">
+                <button data-act="pub" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-green text-white">${p.publicada ? 'Retirar' : 'Publicar'}</button>
+                ${est === 'abierta' ? `<button data-act="close" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-lock mr-1"></i>Cerrar ahora</button>` : ''}
+                <button data-act="priv" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200 ${n ? 'opacity-60' : ''}"><i class="fa-solid ${n ? 'fa-lock' : p.publica ? 'fa-eye' : 'fa-eye-slash'} mr-1"></i>${p.publica ? 'Votos públicos (con nombre)' : 'Votos anónimos'}</button>
+                <button data-act="res" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">Ver resultados</button>
+                <button data-act="del" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>
+            </div></div>`;
+    }).join('') : '<p class="text-base text-gray-500 text-center py-8">No hay consultas. Cree la primera en "Crear Consulta".</p>';
+}
+
+$('manage-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'res') return switchTab('resultados');
+    const id = +b.dataset.id, p = DB.polls().find(x => x.id === id);
+    if (!p) return;
+    if (act === 'pub') DB.updatePoll(id, { publicada: !p.publicada }, `${p.publicada ? 'Consulta retirada' : 'Consulta publicada'}: ${p.titulo}`);
+    if (act === 'priv') {
+        if (DB.votes().some(v => v.pollId === id)) return showToast('No se puede cambiar la modalidad: la consulta ya tiene votos.');
+        DB.updatePoll(id, { publica: !p.publica }, `Modalidad cambiada a ${p.publica ? 'anónima' : 'pública'}: ${p.titulo}`);
+    }
+    if (act === 'close') {
+        if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;
+        DB.updatePoll(id, { cierre: new Date().toISOString() }, `Consulta cerrada manualmente: ${p.titulo}`);
+    }
+    if (act === 'del') return openDelPoll(id); // pregunta si desea descargar el PDF antes de eliminar
+    renderAll();
+});
+
+// ===== Administrador: eliminar consulta (ofrece descargar el PDF primero) =====
+function openDelPoll(id) {
+    const p = DB.polls().find(x => x.id === id); if (!p) return;
+    pendingDel = id;
+    $('dp-title').innerText = p.titulo;
+    $('modal-delpoll').classList.remove('hidden');
+}
+function closeDelPoll() { $('modal-delpoll').classList.add('hidden'); pendingDel = null; }
+function finishDelete(id) {
+    closeDelPoll();
+    DB.deletePoll(id);
+    showToast('Consulta eliminada.', 'success');
+    renderAll();
+}
+$('dp-pdf').addEventListener('click', () => {
+    const id = pendingDel; if (id === null) return;
+    downloadPDF(id);
+    finishDelete(id);
+});
+$('dp-nopdf').addEventListener('click', () => { const id = pendingDel; if (id !== null) finishDelete(id); });
+$('dp-cancel').addEventListener('click', closeDelPoll);
+
+// ===== Administrador: afiliados =====
+function renderAfiliados() {
+    const q = ($('af-buscar').value || '').toLowerCase().trim();
+    const todos = DB.afiliados();
+    const list = todos.filter(a => !q || a.nombre.toLowerCase().includes(q) || a.cedula.includes(q) || (a.provincia || '').toLowerCase().includes(q));
+    $('afiliados-list').innerHTML = `<p class="text-sm text-gray-500">${todos.length} afiliado(s) registrado(s)${q ? ` · ${list.length} coincidencia(s)` : ''}</p>` + (list.length ? list.map(a => `
+        <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+                <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)}</p>
+                <p class="text-sm text-gray-500 truncate">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}</p>
+                <p class="text-sm text-gray-600 flex items-center gap-2 flex-wrap mt-1"><span><i class="fa-solid fa-location-dot text-adep-green mr-1"></i>Filial:</span>
+                    <select data-af-filial="${esc(a.cedula)}" aria-label="Filial de ${esc(a.nombre)}" class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold bg-white">
+                        <option value="">Sin filial</option>
+                        ${FILIALES.map(f => `<option ${a.provincia === f ? 'selected' : ''}>${f}</option>`).join('')}
+                    </select></p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-sm font-bold">
+                <button data-af="reset" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Nueva clave</button>
+                <button data-af="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
+                <button data-af="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>
+            </div>
+        </div>`).join('') : '<p class="text-base text-gray-500 text-center py-8">No hay afiliados que mostrar.</p>');
+}
+$('af-buscar').addEventListener('input', renderAfiliados);
+
+function showCredentials(cedula, pin, filial) {
+    const box = $('af-nueva');
+    box.classList.remove('hidden');
+    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado (la clave no se vuelve a mostrar):</p>
+        <p>Cédula: <strong class="font-mono text-base">${esc(cedula)}</strong></p>
+        ${filial ? `<p>Filial: <strong>${esc(filial)}</strong></p>` : ''}
+        <p>Clave de 6 números: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>`;
+}
+
+$('form-afiliado').addEventListener('submit', async e => {
+    e.preventDefault();
+    const nombre = $('af-nombre').value.trim(), cedula = $('af-cedula').value.replace(/\D/g, ''), filial = $('af-filial').value;
+    if (!nombre || cedula.length < 9) return showToast('Ingrese el nombre y la cédula (mínimo 9 números).');
+    if (!filial) return showToast('Seleccione la filial (provincia) del afiliado.');
+    const res = await DB.addAfiliado({ nombre, cedula, provincia: filial });
+    if (res.error) return showToast(res.error);
+    $('form-afiliado').reset();
+    showCredentials(res.cedula, res.pass, filial);
+    showToast('Afiliado creado.', 'success');
+    renderAfiliados();
+});
+
+$('afiliados-list').addEventListener('change', e => {
+    const s = e.target.closest('[data-af-filial]'); if (!s) return;
+    if (DB.setFilial(s.dataset.afFilial, s.value)) showToast('Filial actualizada.', 'success');
+});
+
+$('afiliados-list').addEventListener('click', async e => {
+    const b = e.target.closest('[data-af]'); if (!b) return;
+    const id = b.dataset.id;
+    if (b.dataset.af === 'reset') { const pin = await DB.resetPass(id); if (pin) { const a = DB.afiliados().find(x => x.cedula === id); showCredentials(id, pin, a ? a.provincia : ''); } }
+    if (b.dataset.af === 'toggle') { const a = DB.afiliados().find(x => x.cedula === id); DB.setActivo(id, a.activo === false); }
+    if (b.dataset.af === 'del') {
+        if (!confirm('¿Eliminar a este afiliado?')) return;
+        DB.deleteAfiliado(id, user);
+    }
+    renderAfiliados();
+});
+
+// ===== Administrador: administradores =====
+function renderAdmins() {
+    $('admins-list').innerHTML = DB.admins().map(a => {
+        const yo = a.cedula === user.cedula;
+        return `
+        <div class="bg-white rounded-2xl border-2 ${yo ? 'border-emerald-300' : 'border-gray-200'} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+                <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)} ${yo ? '<span class="text-xs bg-adep-greenLight text-adep-green px-2 py-0.5 rounded-full ml-1">Usted</span>' : ''}</p>
+                <p class="text-sm text-gray-500 truncate">${esc(a.correo)} · ${a.activo === false ? 'Desactivado' : 'Activo'}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-sm font-bold">
+                <button data-ad="pass" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Cambiar contraseña</button>
+                ${yo ? '' : `
+                <button data-ad="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
+                <button data-ad="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>`}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function showAdminError(msg) { $('ad-error').textContent = msg; $('ad-error').classList.toggle('hidden', !msg); }
+
+$('form-admin').addEventListener('submit', async e => {
+    e.preventDefault();
+    const nombre = $('ad-nombre').value.trim(), correo = $('ad-correo').value.trim(), pass = $('ad-pass').value;
+    if (!nombre || !correo || !pass) return showAdminError('Complete nombre, correo y contraseña.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showAdminError('Escriba un correo válido.');
+    if (pass.length < 8) return showAdminError('La contraseña debe tener al menos 8 caracteres.');
+    const res = await DB.addAdmin({ nombre, correo, pass });
+    if (res.error) return showAdminError(res.error);
+    showAdminError('');
+    $('form-admin').reset();
+    showToast('Administrador creado.', 'success');
+    renderAdmins();
+});
+
+$('ad-ver').addEventListener('click', () => {
+    const p = $('ad-pass'), ver = p.type === 'password';
+    p.type = ver ? 'text' : 'password';
+    $('ad-ver').innerHTML = `<i class="fa-solid ${ver ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
+});
+
+$('admins-list').addEventListener('click', async e => {
+    const b = e.target.closest('[data-ad]'); if (!b) return;
+    const id = b.dataset.id;
+    if (id === user.cedula && b.dataset.ad !== 'pass') return; // no actuar sobre sí mismo
+    if (b.dataset.ad === 'pass') {
+        const nueva = prompt('Nueva contraseña (mínimo 8 caracteres):');
+        if (nueva === null) return;
+        if (nueva.length < 8) return showToast('La contraseña debe tener al menos 8 caracteres.');
+        await DB.setPass(id, nueva);
+        showToast('Contraseña actualizada.', 'success');
+    }
+    if (b.dataset.ad === 'toggle') { const a = DB.admins().find(x => x.cedula === id); DB.setActivo(id, a.activo === false); }
+    if (b.dataset.ad === 'del') {
+        if (!confirm('¿Eliminar a este administrador?')) return;
+        DB.deleteAdmin(id, user);
+    }
+    renderAdmins();
+});
+
+// ===== Administrador: bitácora de auditoría =====
+function renderAudit() {
+    const l = DB.auditoria().slice(0, 150);
+    $('audit-list').innerHTML = l.length ? `<div class="bg-white rounded-2xl border-2 border-gray-200 divide-y divide-gray-100">${l.map(a => `
+        <div class="p-3 sm:p-4">
+            <div class="flex justify-between gap-2 flex-wrap"><strong class="text-sm sm:text-base text-gray-900">${esc(a.accion)}</strong><span class="text-sm text-gray-500">${fmt(a.fecha)}</span></div>
+            ${a.detalle ? `<p class="text-sm text-gray-600">${esc(a.detalle)}</p>` : ''}
+            <p class="text-xs text-gray-400">Por: ${esc(a.por)}</p>
+        </div>`).join('')}</div>` : '<p class="text-base text-gray-500 text-center py-8">Aún no hay actividad registrada.</p>';
+}
+
+// ===== Modales =====
+function closeModal() { $('modal-success').classList.add('hidden'); }
+function closeModalAndGoReceipts() { closeModal(); switchTab('comprobantes'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeConfirm(); closeModal(); closeDelPoll(); closeRestore(); } });
+
+function renderAll() {
+    renderPolls(); renderReceipts(); renderResults();
+    if (isAdmin) { renderManage(); renderAfiliados(); renderAdmins(); renderAudit(); }
+}
+
+// ===== Inicio =====
+if (user) {
+    $('user-name').innerText = user.nombre;
+    $('user-role').innerText = (!isAdmin && user.provincia) ? `${user.rol} · ${user.provincia}` : user.rol;
+    document.querySelectorAll('[data-rol]').forEach(t => { if (t.dataset.rol !== user.rol) t.remove(); });
+    switchTab('votacion');
+    // Temporizador: se actualiza cada segundo (sin redibujar las tarjetas)
+    setInterval(tickTimers, 1000);
+    // Cierre/apertura automática: se refresca el estado cada 30 s
+    setInterval(() => { renderPolls(); if (isAdmin) renderManage(); }, 30000);
 }

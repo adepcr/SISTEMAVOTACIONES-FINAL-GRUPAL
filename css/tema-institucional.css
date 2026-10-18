@@ -1,0 +1,753 @@
+/* ==========================================================================
+   tema-institucional.css · ADEP Vota · rediseño visual completo
+   Solo CSS: no cambia HTML, JS, ids ni lógica. Cargar al FINAL de los <link>.
+   Los selectores llevan "html body" para ganarle a Tailwind CDN (que se
+   inyecta después). Los colores de tarjetas/encabezado/botones se excluyen
+   del modo alto contraste (html.hc) para no romperlo.
+   ========================================================================== */
+
+:root {
+    --g: #008744;
+    --g-dark: #006b35;
+    --g-deep: #04492a;
+    --g-soft: #e8f5ee;
+    --r: #e52521;
+    --ink: #1c2b25;
+    --ink-soft: #4a5a53;
+    --line: #d5e2da;
+    --shadow: 0 1px 2px rgba(4, 73, 42, .08), 0 14px 32px -16px rgba(4, 73, 42, .35);
+}
+
+/* ---------- Base: lectura cómoda ---------- */
+html body {
+    color: var(--ink);
+    line-height: 1.55;
+}
+
+html body main .text-sm {
+    font-size: 1rem !important;
+    line-height: 1.55rem !important;
+}
+
+html body main .text-xs {
+    font-size: .9375rem !important;
+    line-height: 1.4rem !important;
+}
+
+html body main .text-gray-500 {
+    color: var(--ink-soft);
+}
+
+html body main .text-gray-400 {
+    color: #55635c;
+}
+
+/* ---------- Contenedor ---------- */
+html body .app-canvas {
+    max-width: 1080px;
+    background-color: rgba(255, 255, 255, .97);
+}
+
+@media (min-width: 1024px) {
+    html body .app-canvas {
+        border-radius: 2rem;
+    }
+}
+
+html body .app-canvas main {
+    background-color: #f3f7f5 !important;
+    padding-top: 1.75rem;
+}
+
+/* ---------- ENCABEZADO institucional ---------- */
+html:not(.hc) body header.sticky {
+    background: linear-gradient(135deg, var(--g-deep) 0%, var(--g-dark) 55%, var(--g) 100%);
+    border-bottom: 0;
+    box-shadow: 0 10px 28px -14px rgba(4, 73, 42, .8);
+}
+
+html:not(.hc) body header.sticky>div:first-child {
+    background: rgba(0, 0, 0, .22);
+    border-bottom: 1px solid rgba(255, 255, 255, .1);
+}
+
+html:not(.hc) body header.sticky>div:nth-child(2) {
+    padding: 1rem 1.25rem;
+}
+
+html:not(.hc) body header h1 {
+    color: #fff;
+    font-size: 1.75rem;
+    letter-spacing: -.02em;
+}
+
+html:not(.hc) body header h1 span.text-adep-green {
+    color: #9ff0c4;
+}
+
+html:not(.hc) body header p {
+    color: rgba(255, 255, 255, .85);
+    font-size: .95rem;
+}
+
+html:not(.hc) body header .bg-adep-greenLight {
+    background: rgba(255, 255, 255, .16);
+    color: #fff;
+    border-color: rgba(255, 255, 255, .35);
+}
+
+html body .logo-img {
+    background: #fff;
+    padding: 3px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, .55), 0 6px 14px rgba(0, 0, 0, .3);
+}
+
+html:not(.hc) body header .bg-slate-100 {
+    background: rgba(255, 255, 255, .14);
+    border-color: rgba(255, 255, 255, .3);
+    border-radius: 1rem;
+}
+
+html:not(.hc) body #user-name {
+    color: #fff;
+    font-size: 1rem !important;
+}
+
+html:not(.hc) body #user-role {
+    color: #b8f2d2;
+    font-size: .9rem !important;
+}
+
+html:not(.hc) body header .text-gray-500 {
+    color: #fff;
+}
+
+html:not(.hc) body header button[aria-label="Cerrar sesión"]:hover {
+    background: rgba(255, 255, 255, .2);
+    color: #fff;
+}
+
+/* ---------- NAVEGACIÓN: botones tipo pestaña ---------- */
+html body header nav[aria-label="Secciones"] {
+    background: #fff;
+    border-top: 0;
+    padding: .6rem .75rem;
+    gap: .5rem;
+    box-shadow: inset 0 -1px 0 var(--line);
+}
+
+html body .nav-tab {
+    min-height: 52px;
+    font-size: 1rem !important;
+    border-radius: .875rem;
+    color: var(--ink-soft);
+    background: transparent;
+    flex: 0 0 auto;
+}
+
+html body .nav-tab:hover {
+    background: var(--g-soft);
+    color: var(--g-dark);
+}
+
+html:not(.hc) body .nav-tab.active {
+    background: var(--g);
+    color: #fff;
+    box-shadow: 0 6px 14px -6px rgba(0, 135, 68, .7);
+}
+
+html body .nav-tab.active::after {
+    display: none;
+}
+
+html body .nav-tab.active i {
+    color: #fff !important;
+}
+
+@media (min-width: 700px) {
+    html body header nav[aria-label="Secciones"] {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    html body .nav-tab {
+        flex: 1 1 auto;
+    }
+}
+
+/* ---------- TÍTULOS DE SECCIÓN ---------- */
+html body main section>div:first-child {
+    border-bottom: 0;
+    border-left: 6px solid var(--g);
+    padding: .25rem 0 .25rem 1rem;
+}
+
+html body main section h2 {
+    font-size: 1.75rem;
+    line-height: 1.2;
+    color: var(--g-deep);
+    letter-spacing: -.015em;
+}
+
+/* ---------- TARJETAS ---------- */
+html body main .rounded-2xl.border-2 {
+    border: 1px solid var(--line);
+    border-radius: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+html body [id^="poll-card-"] {
+    border: 1px solid var(--line);
+    border-top: 6px solid var(--g);
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+html body [id^="poll-card-"].border-emerald-500 {
+    border-color: var(--g);
+}
+
+html body [id^="poll-card-"]:hover,
+html body .receipt-card:hover {
+    transform: none;
+    box-shadow: 0 2px 4px rgba(4, 73, 42, .1), 0 20px 38px -16px rgba(4, 73, 42, .45);
+}
+
+html:not(.hc) body [id^="poll-card-"]>div:first-child {
+    background: var(--g-soft);
+    color: var(--g-deep);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+}
+
+html:not(.hc) body [id^="poll-card-"]>div:first-child>span:last-child {
+    background: var(--g-deep);
+    color: #fff;
+    font-size: .9rem;
+}
+
+html body [id^="poll-card-"]>div:nth-child(2) {
+    padding: 1.5rem;
+}
+
+html body [id^="poll-card-"] h3 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+    color: var(--ink);
+}
+
+html body .receipt-card {
+    border: 1px solid var(--line);
+    border-left: 8px solid var(--g);
+    border-radius: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+/* ---------- OPCIONES DE VOTO: mosaicos grandes ---------- */
+html body [id^="options-group-"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+html body .option-card {
+    min-height: 84px;
+    border: 2px solid #c3d3c9;
+    border-radius: 1.125rem;
+    padding: 1.1rem 1.25rem;
+    box-shadow: 0 1px 2px rgba(4, 73, 42, .06);
+}
+
+html body .option-card input[type="radio"] {
+    width: 1.7rem;
+    height: 1.7rem;
+    flex-shrink: 0;
+}
+
+html body .option-card span {
+    font-size: 1.2rem;
+    line-height: 1.35;
+}
+
+html body .option-card.cursor-pointer:hover {
+    transform: none;
+    border-color: var(--g);
+    background: #f4fbf7;
+    box-shadow: 0 8px 18px -10px rgba(0, 135, 68, .55);
+}
+
+html body .option-card:focus-visible {
+    outline: 4px solid var(--r);
+    outline-offset: 3px;
+}
+
+html body .option-card.selected {
+    border-width: 3px;
+    box-shadow: 0 0 0 4px rgba(0, 135, 68, .18), 0 10px 20px -12px rgba(0, 135, 68, .6);
+}
+
+html body .option-card.selected::after {
+    content: "✔ Su elección";
+    margin-left: auto;
+    white-space: nowrap;
+    font-weight: 800;
+    font-size: .9rem;
+    color: #fff;
+    background: var(--g);
+    border-radius: 999px;
+    padding: .25rem .75rem;
+}
+
+/* ---------- BOTONES ---------- */
+html body main button,
+html body #modal-confirm button,
+html body #modal-success button,
+html body #modal-delpoll button,
+html body #modal-restore button {
+    min-height: 48px;
+}
+
+html body button {
+    border-radius: .95rem;
+}
+
+html body button[data-send],
+html body #c-yes,
+html body form button[type="submit"] {
+    min-height: 58px;
+    font-size: 1.15rem;
+}
+
+html:not(.hc) body button.bg-adep-green {
+    background: linear-gradient(180deg, #00a052 0%, var(--g) 100%);
+    color: #fff;
+    box-shadow: 0 8px 16px -8px rgba(0, 135, 68, .8), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+
+html:not(.hc) body button.bg-adep-green:hover {
+    background: linear-gradient(180deg, var(--g), var(--g-dark));
+}
+
+html:not(.hc) body button.bg-adep-red {
+    background: linear-gradient(180deg, #f0403c, var(--r));
+    box-shadow: 0 8px 16px -8px rgba(229, 37, 33, .7);
+}
+
+html:not(.hc) body button.bg-adep-red:hover {
+    background: linear-gradient(180deg, var(--r), #c11c18);
+}
+
+html body button:focus-visible,
+html body a:focus-visible,
+html body input:focus-visible,
+html body select:focus-visible,
+html body textarea:focus-visible,
+html body summary:focus-visible {
+    outline: 3px solid var(--r);
+    outline-offset: 2px;
+}
+
+/* ---------- FORMULARIOS ---------- */
+html body main input[type="text"],
+html body main input[type="email"],
+html body main input[type="password"],
+html body main input[type="search"],
+html body main input[type="datetime-local"],
+html body main select,
+html body main textarea {
+    min-height: 54px;
+    font-size: 1.05rem !important;
+    border: 2px solid #b6c6bc;
+    border-radius: .95rem;
+    background: #fff;
+}
+
+html body main label {
+    color: var(--ink);
+}
+
+html body main input[type="checkbox"] {
+    width: 1.6rem;
+    height: 1.6rem;
+    flex-shrink: 0;
+}
+
+html body main .flex-wrap.gap-2 {
+    gap: .75rem;
+}
+
+/* ---------- ESTADOS (siempre con texto) ---------- */
+html body main .rounded-full.font-bold {
+    font-size: .9rem !important;
+    padding: .3rem .85rem;
+}
+
+/* ---------- RESULTADOS ---------- */
+html body #results-list .h-4 {
+    height: 1.3rem;
+    background: #e3ece7;
+}
+
+html body #results-list .h-3 {
+    height: 1rem;
+}
+
+html body .bar-fill {
+    min-width: 6px;
+}
+
+html body #results-list summary {
+    padding: .4rem 0;
+}
+
+/* ---------- VENTANAS ---------- */
+html body #modal-confirm>div,
+html body #modal-success>div,
+html body #modal-delpoll>div,
+html body #modal-restore>div {
+    border-radius: 1.75rem;
+    animation: modal-in .22s ease-out;
+}
+
+html body #c-option {
+    font-size: 1.8rem;
+}
+
+html body #modal-success .animate-shake {
+    animation: modal-in .22s ease-out;
+}
+
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+html body #toast-container>div {
+    font-size: 1.05rem;
+    border-radius: 1rem;
+}
+
+/* ---------- PIE ---------- */
+html:not(.hc) body .app-canvas footer {
+    background: var(--g-deep);
+    border-top: 4px solid var(--r);
+    padding: 1.1rem 1rem;
+}
+
+html:not(.hc) body .app-canvas footer p {
+    color: #fff;
+    font-size: .95rem;
+}
+
+html:not(.hc) body .app-canvas footer p+p {
+    color: #b8f2d2;
+    font-size: .85rem !important;
+}
+
+/* ---------- INGRESO ---------- */
+html body main.border-adep-red {
+    border-radius: 2rem;
+    border-top-width: 10px;
+    box-shadow: 0 35px 70px -25px rgba(0, 40, 20, .7);
+    max-width: 30rem;
+}
+
+html body main.border-adep-red h1 {
+    font-size: 1.5rem !important;
+    color: var(--g-deep);
+}
+
+html body .big-input {
+    border-color: #b6c6bc;
+}
+
+/* ---------- MÓVIL ---------- */
+@media (max-width: 640px) {
+    html body main section h2 {
+        font-size: 1.4rem;
+    }
+
+    html body [id^="poll-card-"] h3 {
+        font-size: 1.25rem;
+    }
+
+    html body [id^="poll-card-"]>div:nth-child(2) {
+        padding: 1rem;
+    }
+
+    html body .option-card.selected::after {
+        content: "✔";
+        padding: .25rem .6rem;
+    }
+}
+
+/* ---------- ALTO CONTRASTE (respeta el modo existente) ---------- */
+html.hc body .option-card.selected::after {
+    color: #000;
+    background: #fff;
+}
+
+html.hc body main .text-gray-500,
+html.hc body main .text-gray-400 {
+    color: #000 !important;
+}
+
+html.hc body [id^="poll-card-"],
+html.hc body .receipt-card {
+    box-shadow: none;
+    border-color: #000;
+}
+
+/* ---------- MENOS MOVIMIENTO ---------- */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ==========================================================================
+   AJUSTES v2 · calendario de programación · espaciado · celular
+   ========================================================================== */
+
+/* ---------- Programar la votación (Crear consulta) ---------- */
+html body .grid:has(#new-poll-open) {
+    background: linear-gradient(180deg, #f6fcf8, var(--g-soft));
+    border: 2px solid #b4dac4;
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+    gap: 1rem;
+}
+
+html body .grid:has(#new-poll-open)::before {
+    content: "Programar la votación";
+    grid-column: 1 / -1;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 1.3rem;
+    color: var(--g-deep);
+}
+
+html body .grid:has(#new-poll-open)::after {
+    content: "Si no indica apertura, la votación abre al publicarla. Si no indica cierre, se cierra manualmente desde Gestionar.";
+    grid-column: 1 / -1;
+    font-size: .95rem;
+    color: var(--ink-soft);
+}
+
+html body #new-poll-open,
+html body #new-poll-close {
+    border-color: #7fbf9b;
+    font-weight: 700;
+    color: var(--g-deep);
+    box-shadow: 0 2px 6px -3px rgba(0, 135, 68, .4);
+}
+
+html body input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: .4rem;
+    border-radius: .7rem;
+    background-color: var(--g-soft);
+    cursor: pointer;
+}
+
+html body input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+    background-color: #cfe9da;
+}
+
+/* ---------- Horario y cuenta regresiva en la tarjeta de votación ---------- */
+html body [id^="poll-card-"] p:has(> i.fa-clock) {
+    background: #f3f7f5;
+    border: 1px solid var(--line);
+    border-radius: .85rem;
+    padding: .65rem .95rem;
+    color: var(--ink);
+    font-weight: 600;
+}
+
+html body [data-countdown] {
+    border-radius: 1.1rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 6px 16px -10px rgba(4, 73, 42, .5);
+}
+
+html body [data-countdown] .cd-time {
+    background: #fff;
+    border: 2px solid currentColor;
+    border-radius: .85rem;
+    padding: .3rem 1rem;
+    font-size: 1.7rem;
+    letter-spacing: .04em;
+}
+
+/* ---------- Espaciado general entre bloques ---------- */
+html body :is(#polls-list, #manage-list, #afiliados-list, #admins-list, #results-list) {
+    display: grid;
+    gap: 1.5rem;
+}
+
+html body :is(#polls-list, #manage-list, #afiliados-list, #admins-list, #results-list)>* {
+    margin-top: 0 !important;
+}
+
+html body #results-list details {
+    border-radius: 1rem;
+    padding: 1rem;
+}
+
+html body #results-list details li {
+    padding: .5rem 0;
+}
+
+/* ---------- CELULAR ---------- */
+@media (max-width: 640px) {
+    html body main {
+        padding: 1.25rem 1rem 2rem;
+    }
+
+    html body main section {
+        gap: 1.25rem;
+    }
+
+    /* Encabezado más compacto para dejar espacio al contenido */
+    html:not(.hc) body header.sticky>div:first-child {
+        display: none;
+    }
+
+    html:not(.hc) body header.sticky>div:nth-child(2) {
+        padding: .75rem 1rem;
+        gap: .75rem;
+    }
+
+    html body header h1 {
+        font-size: 1.4rem !important;
+    }
+
+    html body header h1+span,
+    html body header p {
+        display: none;
+    }
+
+    html body header .relative.w-12 {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    html body header .max-w-\[55\%\] {
+        max-width: 52%;
+    }
+
+    html body header nav[aria-label="Secciones"] {
+        padding: .5rem .75rem;
+        gap: .5rem;
+    }
+
+    html body .nav-tab {
+        padding: .6rem 1rem;
+        min-height: 50px;
+        font-size: .95rem !important;
+    }
+
+    /* Tarjetas de votación */
+    html body [id^="poll-card-"]>div:first-child {
+        padding: .85rem 1rem;
+    }
+
+    html body [id^="poll-card-"]>div:nth-child(2) {
+        padding: 1.25rem 1rem;
+    }
+
+    html body [id^="poll-card-"]>div:nth-child(2)>*+* {
+        margin-top: 1.1rem;
+    }
+
+    html body [id^="options-group-"] {
+        grid-template-columns: 1fr;
+        gap: .9rem;
+    }
+
+    html body .option-card {
+        padding: 1rem;
+        min-height: 76px;
+    }
+
+    html body [data-listen] {
+        width: 100%;
+        justify-content: center;
+        min-height: 48px;
+    }
+
+    html body [data-countdown] {
+        padding: .9rem 1rem;
+    }
+
+    html body [data-countdown] .cd-time {
+        font-size: 1.45rem;
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Botones de acción en listas: dos por fila, bien separados */
+    html body :is([data-act], [data-af], [data-ad]) {
+        flex: 1 1 calc(50% - .5rem);
+    }
+
+    html body main .flex-wrap.gap-2 {
+        gap: .6rem;
+    }
+
+    /* Tarjetas generales, resultados y comprobantes */
+    html body main .rounded-2xl.border-2 {
+        padding: 1.1rem;
+    }
+
+    html body .receipt-card {
+        padding: 1.1rem;
+    }
+
+    html body .receipt-card .font-mono {
+        word-break: break-all;
+    }
+
+    html body #results-list>div {
+        padding: 1.1rem;
+    }
+
+    html body .grid:has(#new-poll-open) {
+        padding: 1rem;
+    }
+
+    /* Ventanas emergentes: que quepan y se puedan desplazar */
+    html body :is(#modal-confirm, #modal-success, #modal-delpoll, #modal-restore)>div {
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+
+    html body #c-option {
+        font-size: 1.5rem;
+    }
+
+    /* Pie y barra de accesibilidad */
+    html:not(.hc) body .app-canvas footer {
+        padding: 1rem 1rem 1.25rem;
+    }
+
+    html body #toast-container {
+        top: .75rem;
+        right: 0;
+        left: 0;
+    }
+}

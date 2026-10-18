@@ -1,30 +1,31 @@
+<!-- este es el index.html -->
 <!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-200">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Votación Oficial ADEP</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script src="js/tailwind-config.js"></script>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/accesibilidad.css">
+    <link rel="stylesheet" href="css/tema-institucional.css">
+    <script src="js/accesibilidad.js"></script>
+    <script src="js/mejoras.js"></script>
 </head>
 <body class="h-full antialiased selection:bg-adep-green selection:text-white">
 
-    <!-- CONTENEDOR TIPO CANVAS ADAPTABLE -->
     <div class="app-canvas relative">
 
-        <!-- CONTENEDOR DE TOASTS DE NOTIFICACIÓN -->
+        <!-- TOASTS -->
         <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-        <!-- HEADER OFICIAL INSTITUCIONAL ADEP -->
+        <!-- HEADER -->
         <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
-            <!-- Barra Superior con Lema Oficial -->
             <div class="bg-gradient-to-r from-adep-green via-emerald-700 to-adep-greenDark text-white py-1.5 px-4 text-center">
                 <div class="flex items-center justify-center gap-2 text-[11px] sm:text-xs font-bold uppercase tracking-widest text-emerald-100">
                     <span>COMPRENSIÓN</span>
@@ -35,31 +36,11 @@
                 </div>
             </div>
 
-            <!-- Logo e Identidad ADEP -->
             <div class="px-4 py-3 flex items-center justify-between gap-3">
                 <div class="flex items-center space-x-3 cursor-pointer select-none" onclick="switchTab('votacion')">
-                    
-                    <!-- SVG Oficial del Logo ADEP con Escudo -->
                     <div class="relative w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 drop-shadow-sm">
-                        <svg viewBox="0 0 100 100" class="w-full h-full">
-                            <!-- Anillo Exterior Verde -->
-                            <circle cx="50" cy="50" r="48" fill="none" stroke="#008744" stroke-width="5" />
-                            <!-- Fondo Blanco -->
-                            <circle cx="50" cy="50" r="44.5" fill="#FFFFFF" />
-                            <!-- Anillo Interior Rojo -->
-                            <circle cx="50" cy="50" r="42" fill="none" stroke="#E52521" stroke-width="4" />
-                            <!-- Centro Blanco -->
-                            <circle cx="50" cy="50" r="39" fill="#FFFFFF" />
-                            <!-- Texto ADEP -->
-                            <text x="50" y="32" font-family="'Outfit', sans-serif" font-weight="900" font-size="20" fill="#008744" text-anchor="middle">ADEP</text>
-                            <!-- Libro Abierto Interior -->
-                            <g transform="translate(26, 38) scale(0.95)">
-                                <path d="M 25 24 Q 13 18 0 22 L 0 5 Q 13 2 25 8 Q 37 2 50 5 L 50 22 Q 37 18 25 24 Z" fill="#FFFFFF" stroke="#008744" stroke-width="2.2" stroke-linecap="round" />
-                                <line x1="25" y1="8" x2="25" y2="24" stroke="#008744" stroke-width="2" />
-                            </g>
-                        </svg>
+                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEOONBRhmPrMlxu-7KhLL73j9GkvgOf7k4esek3AhPDC2WbUT_r3tladt8&s=10" alt="ADEP Logo" class="logo-img">
                     </div>
-
                     <div>
                         <div class="flex items-center gap-1.5">
                             <h1 class="text-xl sm:text-2xl font-black text-gray-900 leading-none font-heading">
@@ -73,21 +54,25 @@
                     </div>
                 </div>
 
-                <!-- Estado del Afiliado / Indicador -->
-                <div class="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl">
-                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span id="voter-status-label" class="text-xs font-bold text-gray-700">Afiliado No Verificado</span>
+                <!-- Usuario en sesión -->
+                <div class="flex items-center gap-2 bg-slate-100 border border-slate-200 pl-3 pr-1.5 py-1.5 rounded-xl max-w-[55%]">
+                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                    <div class="leading-tight min-w-0">
+                        <div id="user-name" class="text-xs font-bold text-gray-800 truncate">---</div>
+                        <div id="user-role" class="text-[10px] font-semibold text-adep-green">---</div>
+                    </div>
+                    <button onclick="logout()" title="Cerrar sesión" aria-label="Cerrar sesión" class="ml-1 w-10 h-10 rounded-lg text-gray-500 hover:bg-white hover:text-adep-red"><i class="fa-solid fa-right-from-bracket"></i></button>
                 </div>
             </div>
 
-            <!-- PESTAÑAS DE NAVEGACIÓN -->
-            <nav class="bg-white border-t border-gray-200 px-2 flex justify-between overflow-x-auto no-scrollbar">
+            <!-- PESTAÑAS -->
+            <nav class="bg-white border-t border-gray-200 px-2 flex justify-between overflow-x-auto nav-scroll" aria-label="Secciones">
                 <button onclick="switchTab('votacion')" id="tab-votacion" class="nav-tab active flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
                     <i class="fa-solid fa-vote-yea text-base"></i>
-                    <span>Emitir Voto</span>
-                    <span id="badge-pendientes" class="bg-adep-red text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">3</span>
+                    <span>Votaciones</span>
+                    <span id="badge-pendientes" class="bg-adep-red text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">0</span>
                 </button>
-                <button onclick="switchTab('comprobantes')" id="tab-comprobantes" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
+                <button onclick="switchTab('comprobantes')" id="tab-comprobantes" data-rol="Afiliado" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
                     <i class="fa-solid fa-receipt text-base"></i>
                     <span>Mis Comprobantes</span>
                     <span id="badge-comprobantes" class="bg-slate-200 text-gray-700 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">0</span>
@@ -96,85 +81,49 @@
                     <i class="fa-solid fa-chart-pie text-base"></i>
                     <span>Resultados en Vivo</span>
                 </button>
-                <button onclick="switchTab('crear')" id="tab-crear" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
+                <button onclick="switchTab('crear')" id="tab-crear" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
                     <i class="fa-solid fa-circle-plus text-base text-adep-green"></i>
                     <span>Crear Consulta</span>
+                </button>
+                <button onclick="switchTab('gestionar')" id="tab-gestionar" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-sliders text-base"></i>
+                    <span>Gestionar</span>
+                </button>
+                <button onclick="switchTab('afiliados')" id="tab-afiliados" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-users text-base"></i>
+                    <span>Afiliados</span>
+                </button>
+                <button onclick="switchTab('admins')" id="tab-admins" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-shield text-base"></i>
+                    <span>Administradores</span>
+                </button>
+                <button onclick="switchTab('auditoria')" id="tab-auditoria" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-clipboard-list text-base"></i>
+                    <span>Bitácora</span>
                 </button>
             </nav>
         </header>
 
-        <!-- CONTENIDO PRINCIPAL DE LA APP -->
+        <!-- CONTENIDO PRINCIPAL -->
         <main class="flex-grow p-4 sm:p-6 bg-slate-50 space-y-6 overflow-y-auto">
 
-            <!-- ==================== SECCIÓN 1: FORMULARIO Y VOTACIÓN ==================== -->
+            <!-- VOTACIONES HABILITADAS -->
             <section id="sec-votacion" class="space-y-6">
-                
-                <!-- DATOS DEL VOTANTE (CON VALIDACIÓN ESTRICTA) -->
-                <div id="card-voter-info" class="bg-white rounded-2xl p-4 sm:p-5 border-2 border-gray-200 shadow-sm transition-all duration-200">
-                    <div class="flex items-center gap-2 border-b border-gray-100 pb-3 mb-4">
-                        <div class="w-8 h-8 rounded-lg bg-adep-greenLight text-adep-green flex items-center justify-center font-bold text-sm">
-                            <i class="fa-solid fa-id-card"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-sm sm:text-base font-bold text-gray-900 font-heading">Paso 1: Identificación del Afiliado Votante</h2>
-                            <p class="text-xs text-gray-500">Complete sus datos para validar la legitimidad de su voto en ADEP.</p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Cédula o Nº Carné *</label>
-                            <input type="text" id="voter-id" oninput="clearError('voter-id')" placeholder="Ej: 1-0845-0392" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-xs sm:text-sm font-semibold text-gray-800 focus:border-adep-green focus:outline-none transition">
-                            <span id="err-voter-id" class="text-[10px] font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-triangle-exclamation"></i> Ingrese su cédula o carné</span>
-                        </div>
-
-                        <div>
-                            <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nombre Completo *</label>
-                            <input type="text" id="voter-name" oninput="clearError('voter-name')" placeholder="Ej: Prof. María Elena Morales" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-xs sm:text-sm font-semibold text-gray-800 focus:border-adep-green focus:outline-none transition">
-                            <span id="err-voter-name" class="text-[10px] font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-triangle-exclamation"></i> Ingrese su nombre completo</span>
-                        </div>
-
-                        <div>
-                            <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Filial / Provincia *</label>
-                            <select id="voter-filial" onchange="clearError('voter-filial')" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-xs sm:text-sm font-semibold text-gray-800 focus:border-adep-green focus:outline-none transition bg-white">
-                                <option value="">-- Seleccionar Filial --</option>
-                                <option value="San José Central">Filial San José</option>
-                                <option value="Alajuela">Filial Alajuela</option>
-                                <option value="Cartago">Filial Cartago</option>
-                                <option value="Heredia">Filial Heredia</option>
-                                <option value="Guanacaste">Filial Guanacaste</option>
-                                <option value="Puntarenas">Filial Puntarenas</option>
-                                <option value="Limón">Filial Limón</option>
-                            </select>
-                            <span id="err-voter-filial" class="text-[10px] font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-triangle-exclamation"></i> Seleccione su filial</span>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 flex justify-end">
-                        <button onclick="confirmVoter()" id="btn-confirm-voter" class="w-full sm:w-auto bg-adep-green hover:bg-adep-greenDark text-white font-bold py-2.5 px-5 rounded-xl transition text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm">
-                            <i class="fa-solid fa-user-check"></i> Confirmar Identidad
-                        </button>
-                    </div>
+                <div class="flex items-center justify-between border-b border-gray-200 pb-2 gap-2 flex-wrap">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Votaciones Habilitadas</h2>
+                    <span class="text-xs text-adep-green font-bold bg-adep-greenLight px-2.5 py-1 rounded-lg border border-emerald-200">
+                        <i class="fa-solid fa-shield-halved mr-1"></i> Respuestas guardadas
+                    </span>
                 </div>
-
-                <!-- LISTA DE PREGUNTAS HABILITADAS -->
-                <div class="space-y-5">
-                    <div class="flex items-center justify-between border-b border-gray-200 pb-2">
-                        <h2 class="text-base sm:text-lg font-bold text-gray-900 font-heading">Paso 2: Votaciones Habilitadas</h2>
-                        <span class="text-xs text-adep-green font-bold bg-adep-greenLight px-2.5 py-1 rounded-lg border border-emerald-200">
-                            <i class="fa-solid fa-shield-halved mr-1"></i> Voto Secreto y Encriptado
-                        </span>
-                    </div>
-                </div>
-
+                <div id="polls-list" class="space-y-5"></div>
             </section>
 
-            <!-- ==================== SECCIÓN 2: HISTORIAL Y COMPROBANTES ==================== -->
+            <!-- COMPROBANTES -->
             <section id="sec-comprobantes" class="hidden space-y-5">
-                <div class="border-b border-gray-200 pb-3 flex justify-between items-center">
+                <div class="border-b border-gray-200 pb-3 flex justify-between items-center gap-2 flex-wrap">
                     <div>
-                        <h2 class="text-base sm:text-lg font-bold text-gray-900 font-heading">Certificados Digitales Emitidos</h2>
-                        <p class="text-xs text-gray-500">Resumen con respaldo de encriptación y hora de registro.</p>
+                        <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Certificados Digitales Emitidos</h2>
+                        <p class="text-sm text-gray-500">Comprobantes con código de verificación y hora de registro.</p>
                     </div>
                     <span class="text-xs font-bold text-adep-green bg-adep-greenLight px-3 py-1 rounded-xl border border-emerald-200">
                         <i class="fa-solid fa-circle-check mr-1"></i> Verificados
@@ -184,57 +133,165 @@
                 <div id="receipts-container" class="space-y-4">
                     <div id="receipts-empty" class="bg-white rounded-2xl p-8 text-center border-2 border-dashed border-gray-200">
                         <i class="fa-solid fa-receipt text-gray-300 text-5xl mb-3"></i>
-                        <h3 class="font-bold text-gray-800 text-sm">Aún no posee comprobantes de voto</h3>
-                        <p class="text-xs text-gray-500 max-w-sm mx-auto mt-1 mb-4">Complete sus datos y emita su respuesta en la pestaña "Emitir Voto" para generar su comprobante digital.</p>
-                        <button onclick="switchTab('votacion')" class="bg-adep-green text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm">
-                            Ir a la Sección de Votación
+                        <h3 class="font-bold text-gray-800 text-base">Aún no posee comprobantes de voto</h3>
+                        <p class="text-sm text-gray-500 max-w-sm mx-auto mt-1 mb-4">Emita su respuesta en la pestaña "Votaciones" para generar su comprobante digital.</p>
+                        <button onclick="switchTab('votacion')" class="bg-adep-green text-white font-bold text-sm px-5 py-3 rounded-xl shadow-sm">
+                            Ir a Votaciones
                         </button>
                     </div>
                 </div>
             </section>
 
-            <!-- ==================== SECCIÓN 3: RESULTADOS EN VIVO ==================== -->
+            <!-- RESULTADOS -->
             <section id="sec-resultados" class="hidden space-y-5">
-                <div class="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-3 gap-2 flex-wrap">
                     <div>
-                        <h2 class="text-base sm:text-lg font-bold text-gray-900 font-heading">Escrutinio General en Tiempo Real</h2>
-                        <p class="text-xs text-gray-500">Avance porcentualizado de la participación de los afiliados.</p>
+                        <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Escrutinio General en Tiempo Real</h2>
+                        <p class="text-sm text-gray-500">Avance porcentualizado y participación de los afiliados.</p>
                     </div>
-                    <button onclick="refreshResultsAnimation()" class="bg-adep-greenLight text-adep-green hover:bg-emerald-100 font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-200 transition flex items-center gap-1.5">
+                    <button onclick="refreshResultsAnimation()" class="bg-adep-greenLight text-adep-green hover:bg-emerald-100 font-bold text-sm px-4 py-2 rounded-xl border border-emerald-200 transition flex items-center gap-1.5">
                         <i class="fa-solid fa-rotate-right"></i> Actualizar
                     </button>
                 </div>
+                <div id="results-list" class="space-y-5"></div>
+
+                <!-- Verificar comprobante -->
+                <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
+                    <h3 class="font-bold text-base text-gray-900"><i class="fa-solid fa-magnifying-glass-chart text-adep-green mr-1"></i> Verificar un comprobante</h3>
+                    <p class="text-sm text-gray-500">Escriba el código de su comprobante para confirmar que su voto fue contado. No se muestra quién votó.</p>
+                    <form id="verify-form" class="flex flex-col sm:flex-row gap-3" novalidate>
+                        <input id="verify-code" type="text" placeholder="ADEP-XXXX-XXXX" autocomplete="off" aria-label="Código del comprobante"
+                            class="flex-1 border-2 border-gray-200 rounded-xl p-3 text-base font-mono font-bold uppercase focus:border-adep-green focus:outline-none">
+                        <button type="submit" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-base px-6 py-3">Verificar</button>
+                    </form>
+                    <p id="verify-result" role="status" class="hidden"></p>
+                </div>
             </section>
 
-            <!-- ==================== SECCIÓN 4: CREAR CONSULTA (MÓDULO ADMIN) ==================== -->
+            <!-- GESTIONAR (ADMIN) -->
+            <section id="sec-gestionar" class="hidden space-y-5">
+                <div class="border-b border-gray-200 pb-3">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Gestionar votaciones</h2>
+                    <p class="text-sm text-gray-500">Publique cada consulta, ciérrela cuando corresponda y revise su modalidad. La modalidad no se puede cambiar una vez que hay votos.</p>
+                </div>
+                <div id="manage-list" class="space-y-4"></div>
+            </section>
+
+            <!-- AFILIADOS (ADMIN) -->
+            <section id="sec-afiliados" class="hidden space-y-5">
+                <div class="border-b border-gray-200 pb-3">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Afiliados</h2>
+                    <p class="text-sm text-gray-500">Registre afiliados con su cédula y entrégueles la clave de 6 números generada. Solo ellos podrán ingresar.</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
+                    <form id="form-afiliado" class="grid sm:grid-cols-2 gap-3" novalidate>
+                        <input id="af-nombre" type="text" placeholder="Nombre completo" class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                        <input id="af-cedula" type="text" inputmode="numeric" placeholder="Cédula (solo números)" class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                        <select id="af-filial" aria-label="Filial (provincia)" class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none bg-white">
+                            <option value="">Filial (provincia)...</option>
+                            <option>San José</option>
+                            <option>Alajuela</option>
+                            <option>Cartago</option>
+                            <option>Heredia</option>
+                            <option>Guanacaste</option>
+                            <option>Puntarenas</option>
+                            <option>Limón</option>
+                        </select>
+                        <button type="submit" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3"><i class="fa-solid fa-user-plus mr-1"></i> Crear afiliado</button>
+                    </form>
+                    <div id="af-nueva" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm"></div>
+                </div>
+                <input id="af-buscar" type="search" placeholder="Buscar por nombre o cédula..." aria-label="Buscar afiliado"
+                    class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                <div id="afiliados-list" class="space-y-3"></div>
+            </section>
+
+            <!-- ADMINISTRADORES (ADMIN) -->
+            <section id="sec-admins" class="hidden space-y-5">
+                <div class="border-b border-gray-200 pb-3">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Administradores</h2>
+                    <p class="text-sm text-gray-500">Cree cuentas para otros administradores. Ingresan con su correo y contraseña desde "Soy administrador".</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
+                    <form id="form-admin" class="grid sm:grid-cols-2 gap-3" novalidate>
+                        <input id="ad-nombre" type="text" placeholder="Nombre completo" autocomplete="off"
+                            class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                        <input id="ad-correo" type="email" placeholder="Correo electrónico" autocomplete="off"
+                            class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                        <div class="relative">
+                            <input id="ad-pass" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password"
+                                class="w-full border-2 border-gray-200 rounded-xl p-3 pr-12 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                            <button type="button" id="ad-ver" title="Ver contraseña" aria-label="Ver u ocultar contraseña" class="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 text-gray-500 hover:text-adep-green">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                        <button type="submit" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3">
+                            <i class="fa-solid fa-user-shield mr-1"></i> Crear administrador
+                        </button>
+                    </form>
+                    <p id="ad-error" role="alert" class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2"></p>
+                </div>
+                <div id="admins-list" class="space-y-3"></div>
+            </section>
+
+            <!-- BITÁCORA (ADMIN) -->
+            <section id="sec-auditoria" class="hidden space-y-5">
+                <div class="border-b border-gray-200 pb-3">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Bitácora de auditoría</h2>
+                    <p class="text-sm text-gray-500">Registro de quién hizo qué y cuándo (ingresos, consultas, cuentas, reportes). Los votos nunca registran la opción elegida.</p>
+                </div>
+                <div id="audit-list"></div>
+            </section>
+
+            <!-- CREAR CONSULTA (ADMIN) -->
             <section id="sec-crear" class="hidden space-y-5">
                 <div class="border-b border-gray-200 pb-3">
-                    <h2 class="text-base sm:text-lg font-bold text-gray-900 font-heading">Módulo de Administración ADEP</h2>
-                    <p class="text-xs text-gray-500">Publicación de nuevas mociones o consultas para los afiliados.</p>
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Módulo de Administración ADEP</h2>
+                    <p class="text-sm text-gray-500">Publicación de nuevas mociones o consultas para los afiliados.</p>
                 </div>
 
                 <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm max-w-xl mx-auto space-y-4">
                     <form id="form-new-poll" onsubmit="createNewPoll(event)" class="space-y-4">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-slate-50 border border-slate-200 rounded-xl p-3"><input type="checkbox" id="new-poll-noquestion" onchange="toggleSinPregunta(this.checked)" class="w-5 h-5 accent-adep-green"> Consulta sin pregunta (solo se muestran las respuestas)</label>
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Título de la votación / Pregunta *</label>
-                            <input type="text" id="new-poll-title" oninput="clearError('new-poll-title')" placeholder="Ej: ¿Aprueba el presupuesto para actividades culturales 2027?" class="w-full border-2 border-gray-200 rounded-xl p-3 text-xs sm:text-sm font-semibold focus:border-adep-green focus:outline-none transition">
-                            <span id="err-new-poll-title" class="text-[10px] font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Ingrese la pregunta</span>
+                            <label for="new-poll-title" class="block text-sm font-bold text-gray-700 uppercase mb-1">Título de la votación / Pregunta *</label>
+                            <input type="text" id="new-poll-title" oninput="clearError('new-poll-title')" placeholder="Ej: ¿Aprueba el presupuesto para actividades culturales 2027?" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none transition">
+                            <span id="err-new-poll-title" class="text-xs font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Ingrese la pregunta</span>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Categoría / Tema *</label>
-                            <input type="text" id="new-poll-cat" oninput="clearError('new-poll-cat')" placeholder="Ej: Cultura / Finanzas" class="w-full border-2 border-gray-200 rounded-xl p-3 text-xs sm:text-sm font-semibold focus:border-adep-green focus:outline-none transition">
-                            <span id="err-new-poll-cat" class="text-[10px] font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Indique la categoría</span>
+                            <label for="new-poll-cat" class="block text-sm font-bold text-gray-700 uppercase mb-1">Categoría / Tema *</label>
+                            <select id="new-poll-cat" onchange="clearError('new-poll-cat')" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none transition bg-white">
+                                <option value="">Seleccione una categoría...</option>
+                                <option>Presupuesto</option>
+                                <option>Candidato</option>
+                                <option>Propuesta</option>
+                                <option>Retroalimentación</option>
+                            </select>
+                            <span id="err-new-poll-cat" class="text-xs font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Seleccione la categoría</span>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Opciones de Respuesta (Una por línea) *</label>
-                            <textarea id="new-poll-options" oninput="clearError('new-poll-options')" rows="3" placeholder="Opción A&#10;Opción B&#10;En Blanco" class="w-full border-2 border-gray-200 rounded-xl p-3 text-xs sm:text-sm font-semibold focus:border-adep-green focus:outline-none transition"></textarea>
-                            <span id="err-new-poll-options" class="text-[10px] font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Debe redactar al menos dos opciones</span>
+                            <label for="new-poll-options" class="block text-sm font-bold text-gray-700 uppercase mb-1">Opciones de Respuesta (Una por línea) *</label>
+                            <textarea id="new-poll-options" oninput="clearError('new-poll-options')" rows="3" placeholder="Opción A&#10;Opción B&#10;En Blanco" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none transition"></textarea>
+                            <span id="err-new-poll-options" class="text-xs font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Debe redactar al menos dos opciones</span>
                         </div>
 
-                        <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl transition text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm">
-                            <i class="fa-solid fa-circle-plus"></i> Publicar votación Inmediatamente
+                        <div class="grid sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="new-poll-open" class="block text-sm font-bold text-gray-700 uppercase mb-1">Apertura (opcional)</label>
+                                <input type="datetime-local" id="new-poll-open" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="new-poll-close" class="block text-sm font-bold text-gray-700 uppercase mb-1">Cierre automático (opcional)</label>
+                                <input type="datetime-local" id="new-poll-close" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" id="new-poll-public" class="w-5 h-5 accent-adep-green"> Voto público (mostrar el nombre de quien vota). Si no se marca, el voto es secreto.</label>
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" id="new-poll-publish" class="w-5 h-5 accent-adep-green"> Publicar de inmediato (queda visible para los afiliados)</label>
+                        <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-circle-plus"></i> Guardar consulta
                         </button>
                     </form>
                 </div>
@@ -242,64 +299,162 @@
 
         </main>
 
-        <!-- MODAL DE EXITO EN VOTACIÓN -->
-        <div id="modal-success" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-            <div class="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-gray-100 text-center animate-shake">
-                
+        <!-- MODAL DE CONFIRMACIÓN ANTES DE VOTAR -->
+        <div id="modal-confirm" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="c-heading">
+            <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+                <div class="bg-adep-green text-white p-5 text-center">
+                    <h3 id="c-heading" class="text-2xl font-black font-heading">Revise su voto</h3>
+                </div>
+                <div class="p-6 space-y-4 text-center">
+                    <p id="c-title" class="text-base text-gray-600"></p>
+                    <p class="text-sm font-bold text-gray-500 uppercase">Usted eligió:</p>
+                    <p id="c-option" class="text-2xl font-black text-adep-green bg-adep-greenLight border-2 border-emerald-200 rounded-2xl p-4"></p>
+                    <p id="c-privacy" class="text-sm text-gray-600"></p>
+                    <p class="text-xl font-extrabold text-gray-900">¿Es correcto?</p>
+                    <div class="grid gap-3">
+                        <button id="c-yes" onclick="confirmVote()" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md">Sí, enviar mi voto</button>
+                        <button onclick="closeConfirm()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-4 rounded-2xl text-lg">No, quiero cambiarlo</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE ÉXITO EN VOTACIÓN -->
+        <div id="modal-success" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="m-heading">
+            <div class="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-gray-100 text-center animate-shake max-h-full overflow-y-auto">
+
                 <div class="bg-gradient-to-b from-adep-green to-emerald-800 p-6 text-white relative">
                     <div class="w-16 h-16 bg-white text-adep-green rounded-full flex items-center justify-center mx-auto text-3xl font-black shadow-lg mb-2">
                         <i class="fa-solid fa-check"></i>
                     </div>
-                    <h3 class="text-xl font-black font-heading">¡Voto Registrado!</h3>
-                    <p class="text-xs text-emerald-100 mt-1">Su respuesta ha sido guardada con éxito.</p>
+                    <h3 id="m-heading" class="text-xl font-black font-heading">¡Voto Registrado!</h3>
+                    <p class="text-sm text-emerald-100 mt-1">Su respuesta ha sido guardada con éxito.</p>
                 </div>
 
                 <div class="p-5 space-y-4 text-left">
-                    <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs space-y-2">
+                    <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-sm space-y-2">
                         <div class="flex justify-between text-gray-500">
                             <span>Votante:</span>
                             <strong id="m-voter-name" class="text-gray-900 font-bold">---</strong>
                         </div>
-                        <div class="flex justify-between text-gray-500">
+                        <div class="flex justify-between text-gray-500 gap-3">
                             <span>Consulta:</span>
-                            <strong id="m-poll-num" class="text-gray-900 font-bold">#1</strong>
+                            <strong id="m-poll-num" class="text-gray-900 font-bold text-right">#1</strong>
                         </div>
                         <div class="border-t border-slate-200 pt-2">
                             <span class="text-gray-500 block">Opción Registrada:</span>
-                            <span id="m-option-val" class="text-adep-green font-extrabold text-sm block mt-0.5">---</span>
+                            <span id="m-option-val" class="text-adep-green font-extrabold text-base block mt-0.5">---</span>
                         </div>
                         <div class="border-t border-slate-200 pt-2 flex justify-between text-gray-500">
-                            <span>Sello de Fecha/Hora:</span>
+                            <span>Fecha/Hora:</span>
                             <span id="m-timestamp" class="font-mono text-gray-700">--/--/----</span>
                         </div>
                     </div>
 
                     <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-center">
-                        <span class="text-[10px] font-bold text-adep-green uppercase block tracking-wider">Comprobante de Verificación Hash</span>
-                        <span id="m-hash-code" class="font-mono text-xs font-black text-gray-800">ADEP-XXXX-XXXX</span>
+                        <span class="text-xs font-bold text-adep-green uppercase block tracking-wider">Código de verificación</span>
+                        <span id="m-hash-code" class="font-mono text-lg font-black text-gray-800">ADEP-XXXX-XXXX</span>
+                        <p id="m-note" class="text-xs text-gray-600 mt-1"></p>
                     </div>
 
-                    <div class="flex gap-2">
-                        <button onclick="closeModalAndGoReceipts()" class="flex-1 bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl text-xs transition shadow-sm">
-                            Ver Mis Comprobantes
-                        </button>
-                        <button onclick="closeModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-xs transition">
-                            Cerrar
-                        </button>
+                    <div class="grid gap-2">
+                        <button onclick="receiptPDF(lastHash)" class="w-full bg-adep-red hover:bg-adep-redDark text-white font-bold py-3 rounded-xl text-sm transition shadow-sm"><i class="fa-solid fa-file-pdf mr-1"></i> Descargar comprobante PDF</button>
+                        <div class="flex gap-2">
+                            <button onclick="closeModalAndGoReceipts()" class="flex-1 bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl text-sm transition shadow-sm">
+                                Ver Mis Comprobantes
+                            </button>
+                            <button onclick="closeModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-sm transition">
+                                Cerrar
+                            </button>
+                        </div>
                     </div>
                 </div>
 
             </div>
         </div>
 
-        <!-- FOOTER ADEP -->
+        <!-- MODAL: ELIMINAR CONSULTA (pregunta si desea descargar el PDF) -->
+        <div id="modal-delpoll" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="dp-heading">
+            <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+                <div class="bg-adep-red text-white p-5 text-center">
+                    <h3 id="dp-heading" class="text-xl font-black font-heading">Eliminar consulta</h3>
+                </div>
+                <div class="p-6 space-y-4 text-center">
+                    <p id="dp-title" class="font-bold text-gray-900"></p>
+                    <p class="text-sm text-gray-600">Se borrarán la consulta y todos sus votos. ¿Desea descargar el PDF con los resultados antes de eliminarla?</p>
+                    <div class="grid gap-3">
+                        <button id="dp-pdf" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-file-pdf mr-1"></i> Descargar PDF y eliminar</button>
+                        <button id="dp-nopdf" class="w-full bg-adep-redLight text-adep-red border border-red-200 font-bold py-3 rounded-xl">Eliminar sin descargar</button>
+                        <button id="dp-cancel" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: RESTAURAR VOTO SECRETO -->
+        <div id="modal-restore" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="rs-heading">
+            <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+                <div class="bg-amber-500 text-white p-5 text-center">
+                    <h3 id="rs-heading" class="text-xl font-black font-heading">Restaurar voto</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <p id="rs-who" class="font-bold text-gray-900 text-center"></p>
+                    <p class="text-sm text-gray-600">Este voto es secreto. Pregunte al afiliado qué opción eligió por error; se quitará un voto de esa opción y podrá votar de nuevo.</p>
+                    <select id="rs-opcion" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold bg-white"></select>
+                    <div class="grid gap-3">
+                        <button id="rs-ok" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl">Restaurar voto</button>
+                        <button id="rs-cancel" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
         <footer class="bg-white border-t border-gray-200 py-3.5 px-4 text-center text-xs text-gray-500">
             <p class="font-bold text-adep-green">ADEP • Asociación de Educadores Pensionados</p>
-            <p class="text-[10px] text-gray-400 mt-0.5">Plataforma Oficial Electora con Encriptación • Costa Rica</p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Plataforma Oficial Electoral con Encriptación • Costa Rica</p>
         </footer>
 
     </div>
 
-    <script src="js/app.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
+            from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB9SnrUx1hsPT5VmjNWw18xusFlu6l3hjY",
+            authDomain: "proyectoabi-563e6.firebaseapp.com",
+            projectId: "proyectoabi-563e6",
+            storageBucket: "proyectoabi-563e6.firebasestorage.app",
+            messagingSenderId: "227799043670",
+            appId: "1:227799043670:web:0b41ab946a878d56af75f7",
+            measurementId: "G-1HC75JCXD4"
+        };
+
+        window.db = getFirestore(initializeApp(firebaseConfig));
+        window.fs = { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot };
+
+        function cargar(src) {
+            return new Promise((ok, fail) => {
+                const s = document.createElement("script");
+                s.src = src; s.onload = ok; s.onerror = () => fail(new Error("No cargó " + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        try {
+            await cargar("js/db.js");
+            await DB.init();
+            await cargar("js/app.js");
+            await cargar("js/extras.js");
+            await cargar("js/practica.js"); 
+            await cargar("js/reglas.js");
+            await cargar("js/importar.js"); 
+        } catch (e) {
+            console.error(e);
+            alert("No se pudo conectar con la base de datos. Revise su internet e intente de nuevo.");
+        }
+    </script>
 </body>
 </html>

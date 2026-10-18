@@ -1,0 +1,64 @@
+/* este es accesibilidad.css */
+/* ===== Accesibilidad para adultos mayores ===== */
+
+/* Tamaño base más grande por defecto + 2 niveles que elige el usuario */
+html { font-size: 112.5%; }
+html.fs-1 { font-size: 125%; }
+html.fs-2 { font-size: 143.75%; }
+
+/* Ningún texto debe quedar diminuto */
+.text-xs { font-size: .875rem !important; line-height: 1.35rem !important; }
+.text-\[11px\], .text-\[10px\], .text-\[9px\] { font-size: .8rem !important; }
+
+/* Áreas táctiles mínimas de 44px */
+main button { min-height: 44px; }
+
+body { padding-bottom: 64px; }
+
+/* Barra flotante A- / A+ / contraste (compacta, con px para que no crezca con la letra) */
+#a11y-bar {
+    position: fixed; left: 8px; bottom: 8px; z-index: 60;
+    display: flex; gap: 4px; align-items: center;
+    background: #fff; border: 2px solid #008744; border-radius: 12px;
+    padding: 4px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+#a11y-bar button {
+    min-width: 40px; height: 40px; padding: 0 8px; border: 0; border-radius: 8px;
+    font-weight: 800; font-size: 15px; cursor: pointer;
+    background: #e6f4ec; color: #006b36;
+}
+#a11y-bar button:hover { background: #cfe9da; }
+#a11y-bar button[aria-pressed="true"] { background: #008744; color: #fff; }
+#a11y-bar button:focus-visible { outline: 3px solid #E52521; outline-offset: 2px; }
+
+/* En celulares: "Contraste" queda solo con el ícono */
+@media (max-width: 640px) {
+    #a11y-bar button#a11y-hc { font-size: 0; }
+    #a11y-bar button#a11y-hc i { font-size: 16px; }
+}
+
+/* ===== Modo alto contraste ===== */
+html.hc body, html.hc .bg-slate-50, html.hc .bg-slate-100, html.hc .bg-slate-200,
+html.hc .bg-white, html.hc .bg-white\/95 { background: #fff !important; color: #000 !important; }
+html.hc .text-gray-400, html.hc .text-gray-500, html.hc .text-gray-600,
+html.hc .text-gray-700, html.hc .text-gray-800, html.hc .text-gray-900 { color: #000 !important; }
+html.hc .border-gray-200, html.hc .border-gray-300, html.hc .border-slate-200 { border-color: #000 !important; }
+html.hc .text-adep-green { color: #005a2b !important; }
+html.hc .bg-adep-green { background: #005a2b !important; color: #fff !important; }
+html.hc .login-bg { background: #fff !important; }
+html.hc .option-card { border: 3px solid #000 !important; background: #fff !important; }
+html.hc .option-card.selected { background: #000 !important; }
+html.hc .option-card.selected * { color: #fff !important; }
+html.hc a, html.hc button { text-decoration: underline; }
+html.hc *:focus-visible { outline: 4px solid #E52521 !important; outline-offset: 2px; }
+
+/* Logo */
+.logo-img { width: 100%; height: 100%; object-fit: contain; border-radius: 9999px; }
+
+/* Barra de deslizamiento delgada para las pestañas */
+.nav-scroll { scrollbar-width: thin; scrollbar-color: #008744 #e6f4ec; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.nav-scroll::-webkit-scrollbar { height: 8px; display: block; }
+.nav-scroll::-webkit-scrollbar-track { background: #e6f4ec; border-radius: 9999px; }
+.nav-scroll::-webkit-scrollbar-thumb { background: #008744; border-radius: 9999px; }
+.nav-scroll::-webkit-scrollbar-thumb:hover { background: #006b36; }
+.nav-scroll .nav-tab { flex-shrink: 0; }

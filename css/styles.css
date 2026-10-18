@@ -1,3 +1,4 @@
+/* este es styles.css */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
@@ -11,9 +12,17 @@
   --adep-bg: #f8fafc;
 }
 
+/* ---------- Fondo general: foto de ADEP con tinte verde ---------- */
+/* (el !important es necesario porque el <html> trae bg-slate-200 de Tailwind) */
+html {
+  background:
+    linear-gradient(135deg, rgba(0, 150, 75, 0.45), rgba(0, 175, 95, 0.30)),
+    url('../img/fondo-adep.jpg') center / cover no-repeat fixed !important;
+}
+
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #cbd5e1;
+  background: transparent;
 }
 
 h1,
@@ -24,6 +33,12 @@ h4,
   font-family: 'Outfit', sans-serif;
 }
 
+::selection {
+  background: var(--adep-green);
+  color: #fff;
+}
+
+/* ---------- Contenedor principal tipo cristal ---------- */
 .app-canvas {
   width: 100%;
   max-width: 980px;
@@ -31,8 +46,10 @@ h4,
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #ffffff;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  background-color: rgba(255, 255, 255, 0.93);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 25px 60px -15px rgba(0, 60, 30, 0.55);
 }
 
 @media (min-width: 1024px) {
@@ -43,19 +60,30 @@ h4,
     min-height: calc(100vh - 3rem);
     border-radius: 1.5rem;
     overflow: hidden;
-    border: 1px solid #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.6);
   }
 }
 
+/* Zona de contenido: blanco suave para que la foto asome sin molestar */
+.app-canvas main {
+  background-color: rgba(248, 250, 252, 0.75) !important;
+}
+
+/* ---------- Pestañas de navegación ---------- */
 .nav-tab {
   position: relative;
   transition: all 0.2s ease;
 }
 
+.nav-tab:hover {
+  color: var(--adep-green);
+  background-color: var(--adep-green-light);
+}
+
 .nav-tab.active {
-  color: #008744;
+  color: var(--adep-green);
   font-weight: 800;
-  background-color: #e8f5ee;
+  background-color: var(--adep-green-light);
 }
 
 .nav-tab.active::after {
@@ -65,32 +93,80 @@ h4,
   left: 0;
   right: 0;
   height: 3.5px;
-  background-color: #008744;
+  background-color: var(--adep-green);
   border-radius: 4px 4px 0 0;
 }
 
+/* ---------- Tarjetas de consulta y comprobantes ---------- */
+[id^="poll-card-"],
+.receipt-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[id^="poll-card-"]:hover,
+.receipt-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -10px rgba(0, 110, 55, 0.35);
+}
+
+/* ---------- Opciones de respuesta ---------- */
 .option-card {
+  background-color: #fff;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 2px solid #e2e8f0;
 }
 
-.option-card:hover {
-  border-color: #008744;
+.option-card.cursor-pointer:hover {
+  border-color: var(--adep-green);
   background-color: #f4fbf7;
-  transform: translateY(-1px);
+  transform: translateX(3px);
 }
 
 .option-card.selected {
-  border-color: #008744 !important;
-  background-color: #e8f5ee !important;
-  box-shadow: 0 4px 12px rgba(0, 135, 68, 0.15);
+  border-color: var(--adep-green) !important;
+  background-color: var(--adep-green-light) !important;
+  box-shadow: 0 0 0 3px rgba(0, 135, 68, 0.18);
+}
+
+/* ---------- Formularios ---------- */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--adep-green) !important;
+  box-shadow: 0 0 0 3px rgba(0, 135, 68, 0.15);
+  outline: none;
 }
 
 .field-error {
-  border-color: #e52521 !important;
-  background-color: #fdf0f0 !important;
+  border-color: var(--adep-red) !important;
+  background-color: var(--adep-red-light) !important;
 }
 
+/* ---------- Botones ---------- */
+button {
+  transition: transform 0.12s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+button.bg-adep-green:hover {
+  box-shadow: 0 8px 18px -6px rgba(0, 135, 68, 0.6);
+}
+
+/* ---------- Barras de resultados ---------- */
+.bar-fill {
+  background: linear-gradient(90deg, var(--adep-green), #34d399) !important;
+}
+
+/* ---------- Pie de página con la línea roja institucional ---------- */
+.app-canvas footer {
+  background-color: #fff;
+  border-top: 3px solid var(--adep-red);
+}
+
+/* ---------- Animaciones ---------- */
 @keyframes shake {
   0%, 100% {
     transform: translateX(0);
@@ -107,6 +183,16 @@ h4,
   animation: shake 0.4s ease-in-out;
 }
 
+#toast-container > div {
+  animation: slide-in 0.3s ease-out;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ---------- Scroll ---------- */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -114,4 +200,13 @@ h4,
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+main::-webkit-scrollbar {
+  width: 8px;
+}
+
+main::-webkit-scrollbar-thumb {
+  background: rgba(0, 135, 68, 0.4);
+  border-radius: 8px;
 }
