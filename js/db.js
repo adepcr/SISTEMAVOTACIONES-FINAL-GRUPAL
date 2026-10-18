@@ -31,7 +31,12 @@ const DB = {
     _ms(iso) { return iso ? new Date(iso).getTime() : 0; },
     _falla(e, msg) {
         console.error(e);
-        if (typeof showToast === 'function') showToast(msg || 'No se pudo guardar el cambio. Revise su conexión e intente de nuevo.');
+        const c = (e && e.code) || '';
+        let causa = '';
+        if (c.includes('permission-denied')) causa = ' (Sin permiso: revise que las reglas de seguridad publicadas en Firebase sean las más recientes.)';
+        else if (c.includes('unavailable') || c.includes('network')) causa = ' (Sin conexión a internet.)';
+        else if (e && e.message) causa = ` (Detalle: ${e.message.slice(0, 120)})`;
+        if (typeof showToast === 'function') showToast((msg || 'No se pudo guardar el cambio. Revise su conexión e intente de nuevo.') + causa);
     },
     // Firebase pide contraseñas más largas: la clave de 6 números se completa siempre igual
     _claveAuth(pin) { return 'ADEP#' + pin + '#Vota'; },
@@ -48,8 +53,40 @@ const DB = {
     _limpiarCodigo(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); },
     // Huella SHA-256 del código (base64 "url", la misma que calculan las reglas de seguridad)
     async _huella(ced, codigo) {
-        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ced + ':' + this._limpiarCodigo(codigo)));
-        return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_');
+        const datos = new TextEncoder().encode(ced + ':' + this._limpiarCodigo(codigo));
+        // crypto.subtle solo existe en https o localhost; si la página se abre por http se usa el cálculo propio
+        const bytes = (window.crypto && crypto.subtle) ? new Uint8Array(await crypto.subtle.digest('SHA-256', datos)) : this._sha256(datos);
+        return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_');
+    },
+    // SHA-256 de respaldo (mismo resultado que crypto.subtle)
+    _sha256(m) {
+        const K = [], H = [], r = (x, n) => (x >>> n) | (x << (32 - n));
+        for (let c = 2, n = 0; n < 64; c++) {
+            if ([2, 3, 5, 7, 11, 13].some(p => p < c && c % p === 0) || ![...Array(Math.floor(Math.sqrt(c)) + 1).keys()].slice(2).every(p => c % p)) continue;
+            if (n < 8) H[n] = (Math.pow(c, 1 / 2) % 1) * 2 ** 32 | 0;
+            K[n++] = (Math.pow(c, 1 / 3) % 1) * 2 ** 32 | 0;
+        }
+        const l = m.length, t = new Uint8Array(((l + 9 + 63) >> 6) << 6);
+        t.set(m); t[l] = 0x80;
+        const dv = new DataView(t.buffer); dv.setUint32(t.length - 4, l * 8);
+        const w = new Array(64);
+        for (let i = 0; i < t.length; i += 64) {
+            for (let j = 0; j < 16; j++) w[j] = dv.getUint32(i + j * 4);
+            for (let j = 16; j < 64; j++) {
+                const s0 = r(w[j - 15], 7) ^ r(w[j - 15], 18) ^ (w[j - 15] >>> 3), s1 = r(w[j - 2], 17) ^ r(w[j - 2], 19) ^ (w[j - 2] >>> 10);
+                w[j] = (w[j - 16] + s0 + w[j - 7] + s1) | 0;
+            }
+            let [a, b, c, d, e, f, g, h] = H;
+            for (let j = 0; j < 64; j++) {
+                const t1 = (h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[j] + w[j]) | 0;
+                const t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+                h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+            }
+            [a, b, c, d, e, f, g, h].forEach((x, k) => { H[k] = (H[k] + x) | 0; });
+        }
+        const out = new Uint8Array(32), od = new DataView(out.buffer);
+        H.forEach((x, k) => od.setUint32(k * 4, x));
+        return out;
     },
     _errAuth(e) {
         const c = (e && e.code) || '';
