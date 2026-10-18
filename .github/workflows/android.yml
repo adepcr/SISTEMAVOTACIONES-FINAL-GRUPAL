@@ -15,18 +15,18 @@ jobs:
     env:
       FB_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
       - run: npm ci
       - run: npm run copiar && npx cap sync android
       - run: chmod +x android/gradlew && cd android && ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ADEP-Vota-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -37,5 +37,12 @@ jobs:
         run: |
           echo "$FB_SA" > "$RUNNER_TEMP/cuenta.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/cuenta.json"
-          npx -y firebase-tools@14 deploy --only hosting --project adep-vota --non-interactive
+          set +e
+          npx -y firebase-tools@14 deploy --only hosting --project adep-vota --non-interactive 2>&1 | tee "$RUNNER_TEMP/salida.txt"
+          estado=${PIPESTATUS[0]}
           rm -f "$RUNNER_TEMP/cuenta.json"
+          if [ "$estado" != "0" ]; then
+            # Muestra el motivo en el resumen de la ejecución
+            grep -iE "error|denied|permission|not found|enable|403|404" "$RUNNER_TEMP/salida.txt" | tail -8 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
