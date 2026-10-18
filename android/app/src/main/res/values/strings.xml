@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ADEP Vota</string>
+    <string name="title_activity_main">ADEP Vota</string>
+    <string name="package_name">cr.adep.vota</string>
+    <string name="custom_url_scheme">cr.adep.vota</string>
+</resources>

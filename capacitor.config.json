@@ -1,0 +1,14 @@
+{
+  "appId": "cr.adep.vota",
+  "appName": "ADEP Vota",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}
