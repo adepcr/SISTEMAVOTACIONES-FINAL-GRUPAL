@@ -144,9 +144,9 @@
                     </div>
                     <div>
                         <label for="a-codigo" class="block text-base font-bold text-gray-800 mb-1">Código de ingreso que le dio ADEP</label>
-                        <input id="a-codigo" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXXXX"
-                            class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none uppercase">
-                        <p class="text-sm text-gray-500 mt-1">Son 6 letras y números. Solo se pide la primera vez: después, este celular queda recordado.</p>
+                        <input id="a-codigo" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="••••••"
+                            class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none">
+                        <p class="text-sm text-gray-500 mt-1">Son 6 números. Solo se pide la primera vez: después, este celular queda recordado.</p>
                     </div>
                     <button type="button" id="a-tengo-act" class="text-base font-bold text-gray-600 underline py-1">Tengo un código personal de activación</button>
                 </div>
@@ -364,6 +364,11 @@
         function pintarPuntos() {
             document.querySelectorAll('#dots .dot').forEach((d, i) => d.classList.toggle('on', i < pin.value.length));
         }
+        // Código de ingreso que viene en el enlace de WhatsApp (login.html?codigo=123456): se escribe solo
+        let codigoEnlace = '';
+        try { codigoEnlace = (new URLSearchParams(location.search).get('codigo') || sessionStorage.getItem('adep_codigo') || '').replace(/\D/g, '').slice(0, 6); } catch { }
+        if (codigoEnlace.length !== 6) codigoEnlace = '';
+        else try { sessionStorage.setItem('adep_codigo', codigoEnlace); history.replaceState(null, '', location.pathname); } catch { }
         // Pasos: 1 cédula · 2 clave · 3 código de ingreso · 4 esperando aprobación
         function irPaso(n) {
             paso = n;
@@ -379,7 +384,7 @@
             showErr('a-error', '');
             if (n === 1) cedula.focus();
             if (n === 2) { $('a-cedula-ver').textContent = cedula.value; pin.value = ''; pintarPuntos(); pin.focus(); }
-            if (n === 3) { $('a-cedula-ver2').textContent = cedula.value; $('a-codigo').value = ''; $('a-codigo').focus(); }
+            if (n === 3) { $('a-cedula-ver2').textContent = cedula.value; $('a-codigo').value = codigoEnlace; $('a-codigo').focus(); }
         }
         // Ya dentro: entra, o espera la aprobación del administrador si está encendida
         let finEspera = null;
@@ -414,7 +419,7 @@
             irPaso(3);
         }
         $('a-codigo').addEventListener('input', e => {
-            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
             showErr('a-error', '');
         });
         $('a-tengo-act').addEventListener('click', () => {
@@ -467,7 +472,7 @@
                 if (paso === 1) return revisarCedula();
                 if (paso === 3) {
                     const ced = soloNumeros(cedula.value), cod = $('a-codigo').value;
-                    if (cod.length !== 6) { $('a-codigo').focus(); return showErr('a-error', 'El código de ingreso tiene 6 letras y números.'); }
+                    if (cod.length !== 6) { $('a-codigo').focus(); return showErr('a-error', 'El código de ingreso tiene 6 números.'); }
                     showErr('a-error', 'Ingresando…');
                     const r = await DB.ingresarConCodigo(ced, cod);
                     if (r.error) { $('a-codigo').focus(); return showErr('a-error', r.error); }

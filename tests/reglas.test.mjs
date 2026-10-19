@@ -115,7 +115,7 @@ await prueba("Admin puede restaurar (borrar) una participación", () => assertSu
 await prueba("Admin crea afiliados nuevos y el código general", async () => { const b = writeBatch(A);
   b.set(doc(A, "afiliados/303330333"), { nombre: "Ana", cedula: "303330333", activo: true, uid: null, activado: false });
   b.set(doc(A, "afiliados/404440444"), { nombre: "Luis", cedula: "404440444", activo: true, uid: null, activado: false });
-  b.set(doc(A, "config/ingreso"), { codigo: "K7P2QX", activo: true, venceMs: ahora + 3600e3, aprobacion: false });
+  b.set(doc(A, "config/ingreso"), { codigo: "482913", activo: true, venceMs: ahora + 3600e3, aprobacion: false });
   await assertSucceeds(b.commit()); });
 function ingresar(uid, ced, codigo, pendiente = false) {
   const email = uid + "@afiliados.adepvota.cr", d = db(uid, email), b = writeBatch(d);
@@ -129,11 +129,11 @@ await prueba("Afiliado NO puede leer el código general", () => assertFails(getD
 await prueba("Una cuenta nueva NO puede leer el código general", () => assertFails(getDoc(doc(db("curioso"), "config/ingreso"))));
 await prueba("Una cuenta nueva NO puede listar la configuración", () => assertFails(getDocs(collection(db("curioso"), "config"))));
 await prueba("Ingreso con código general INCORRECTO es rechazado", () => assertFails(ingresar("ana_mal", "303330333", "AAAAAA")));
-await prueba("Ingreso con código general correcto funciona", () => assertSucceeds(ingresar("ana_cel", "303330333", "K7P2QX")));
+await prueba("Ingreso con código general correcto funciona", () => assertSucceeds(ingresar("ana_cel", "303330333", "482913")));
 const AN = db("ana_cel", "ana_cel@afiliados.adepvota.cr");
 await prueba("Ana (con código general) ve votaciones", () => assertSucceeds(getDoc(doc(AN, "polls/1"))));
-await prueba("OTRO celular con la cédula de Ana es rechazado", () => assertFails(ingresar("impostor", "303330333", "K7P2QX")));
-await prueba("Con el código NO se puede tomar una cédula activada con clave", () => assertFails(ingresar("impostor2", "202220222", "K7P2QX")));
+await prueba("OTRO celular con la cédula de Ana es rechazado", () => assertFails(ingresar("impostor", "303330333", "482913")));
+await prueba("Con el código NO se puede tomar una cédula activada con clave", () => assertFails(ingresar("impostor2", "202220222", "482913")));
 await prueba("Sin conectar: se puede avisar de un intento bloqueado", () => assertSucceeds(addDoc(collection(anon, "alertas"), { cedula: "303330333", fecha: serverTimestamp() })));
 await prueba("El aviso NO acepta datos extra", () => assertFails(addDoc(collection(anon, "alertas"), { cedula: "303330333", fecha: serverTimestamp(), x: 1 })));
 await prueba("Afiliada NO lee los avisos", () => assertFails(getDocs(collection(M, "alertas"))));
@@ -143,10 +143,10 @@ await prueba("Admin libera la cédula de Ana", async () => { const b = writeBatc
   b.delete(doc(A, "cuentas/ana_cel")); b.delete(doc(A, "ingresos/303330333")); b.delete(doc(A, "acceso/303330333"));
   await assertSucceeds(b.commit()); });
 await prueba("El celular anterior de Ana ya NO ve votaciones", () => assertFails(getDoc(doc(AN, "polls/1"))));
-await prueba("Ana entra desde un celular nuevo", () => assertSucceeds(ingresar("ana_nuevo", "303330333", "K7P2QX")));
+await prueba("Ana entra desde un celular nuevo", () => assertSucceeds(ingresar("ana_nuevo", "303330333", "482913")));
 await prueba("Admin enciende la aprobación manual", () => assertSucceeds(updateDoc(doc(A, "config/ingreso"), { aprobacion: true })));
-await prueba("Con aprobación manual, entrar ya aprobado es rechazado", () => assertFails(ingresar("luis_cel", "404440444", "K7P2QX", false)));
-await prueba("Con aprobación manual, entra como pendiente", () => assertSucceeds(ingresar("luis_cel", "404440444", "K7P2QX", true)));
+await prueba("Con aprobación manual, entrar ya aprobado es rechazado", () => assertFails(ingresar("luis_cel", "404440444", "482913", false)));
+await prueba("Con aprobación manual, entra como pendiente", () => assertSucceeds(ingresar("luis_cel", "404440444", "482913", true)));
 const LU = db("luis_cel", "luis_cel@afiliados.adepvota.cr");
 await prueba("Pendiente: puede ver su propio perfil (para saber cuándo lo aprueban)", () => assertSucceeds(getDoc(doc(LU, "afiliados/404440444"))));
 await prueba("Pendiente: NO ve votaciones", () => assertFails(getDoc(doc(LU, "polls/1"))));
@@ -155,9 +155,9 @@ await prueba("Admin aprueba a Luis", () => assertSucceeds(updateDoc(doc(A, "afil
 await prueba("Luis aprobado ve votaciones", () => assertSucceeds(getDoc(doc(LU, "polls/1"))));
 await prueba("Admin apaga el código", () => assertSucceeds(updateDoc(doc(A, "config/ingreso"), { activo: false, aprobacion: false })));
 await prueba("Código apagado: nadie nuevo entra", async () => { await assertSucceeds(updateDoc(doc(A, "afiliados/303330333"), { uid: null })); await assertSucceeds(deleteDoc(doc(A, "ingresos/303330333")));
-  await assertFails(ingresar("ana_otro", "303330333", "K7P2QX")); });
+  await assertFails(ingresar("ana_otro", "303330333", "482913")); });
 await prueba("Código vencido: nadie nuevo entra", async () => { await assertSucceeds(updateDoc(doc(A, "config/ingreso"), { activo: true, venceMs: ahora - 1000 }));
-  await assertFails(ingresar("ana_otro2", "303330333", "K7P2QX")); });
+  await assertFails(ingresar("ana_otro2", "303330333", "482913")); });
 
 console.log(`\n${ok} pasaron, ${mal} fallaron`);
 await env.cleanup(); process.exit(mal ? 1 : 0);

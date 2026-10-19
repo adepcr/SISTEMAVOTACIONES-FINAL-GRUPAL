@@ -1,5 +1,5 @@
 /* ingreso.js · ADEP Vota · CÓDIGO DE INGRESO GENERAL (solo administrador)
-   - El administrador genera un código de 6 letras y números, el mismo para todos, que vence solo.
+   - El administrador genera un código de 6 números, el mismo para todos, que vence solo.
    - El afiliado entra con su cédula + ese código; su cédula queda amarrada a ese celular (una cédula, un celular).
    - Si otra persona intenta entrar con una cédula que ya está en otro celular, se bloquea y aparece aquí como aviso.
    - Opcional: aprobar a mano cada ingreso nuevo.
@@ -37,7 +37,7 @@
         const nombre = ced => { const a = DB.afiliados().find(x => x.cedula === ced); return a ? a.nombre : "Cédula no registrada"; };
         caja.innerHTML = `
             <h3 class="font-bold text-base text-gray-900"><i class="fa-solid fa-key text-adep-green mr-1"></i> Código de ingreso para afiliados</h3>
-            <p class="text-sm text-gray-500">Es el mismo para todos. El afiliado escribe su cédula y este código, y su cédula queda amarrada a su celular: nadie más puede entrar con ella desde otro aparato.</p>
+            <p class="text-sm text-gray-500">Son 6 números, el mismo para todos. El afiliado escribe su cédula y este código, y su cédula queda amarrada a su celular: nadie más puede entrar con ella desde otro aparato.</p>
             ${ok ? `
                 <div class="rounded-2xl p-4 text-center" style="background:#e8f5ee;border:2px solid #a7dcbf">
                     <p class="text-sm font-bold text-gray-600">Código vigente</p>
@@ -45,6 +45,7 @@
                     <p class="text-sm text-gray-600">Vence: <strong>${E(fecha(new Date(g.venceMs).toISOString()))}</strong></p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <button type="button" id="xg-copiar-cod" class="${btnS}"><i class="fa-regular fa-copy mr-1"></i> Copiar código</button>
                     <button type="button" id="xg-copiar" class="${btnS}"><i class="fa-regular fa-copy mr-1"></i> Copiar mensaje</button>
                     <a id="xg-wa" target="_blank" rel="noopener" class="${btnS}"><i class="fa-brands fa-whatsapp mr-1"></i> Compartir por WhatsApp</a>
                     <button type="button" id="xg-apagar" class="${btnG}"><i class="fa-solid fa-power-off mr-1"></i> Apagar código</button>
@@ -91,9 +92,10 @@
         if (ok) q("xg-wa").href = "https://wa.me/?text=" + encodeURIComponent(mensaje(g));
     }
 
+    // El código va solo en su línea (fácil de copiar) y también dentro del enlace, que lo escribe solo
     function mensaje(g) {
-        const url = new URL("login.html", location.href).href;
-        return `ADEP Vota · Código de ingreso: ${g.codigo}\n\nEntre aquí: ${url}\nEscriba su número de cédula, toque «Continuar» y escriba este código. Solo se pide la primera vez: después su celular queda recordado.\n\nVálido hasta: ${fecha(new Date(g.venceMs).toISOString())}. Cada cédula solo puede entrar desde un celular.`;
+        const url = new URL("login.html?codigo=" + g.codigo, location.href).href;
+        return `ADEP Vota · Su código de ingreso es:\n\n${g.codigo}\n\nToque este enlace para entrar (el código ya va incluido):\n${url}\n\nEscriba su número de cédula y toque «Continuar». Solo se pide la primera vez: después su celular queda recordado.\n\nVálido hasta: ${fecha(new Date(g.venceMs).toISOString())}. Cada cédula solo puede entrar desde un celular.`;
     }
 
     caja.addEventListener("click", async e => {
@@ -110,6 +112,10 @@
                 if (!confirm("¿Apagar el código? Nadie nuevo podrá entrar hasta que genere otro.")) return;
                 await DB.setIngreso({ activo: false }, "Código de ingreso apagado");
                 showToast("Código apagado.", "success");
+            }
+            if (b.id === "xg-copiar-cod") {
+                await navigator.clipboard.writeText(g.codigo);
+                showToast("Código copiado.", "success");
             }
             if (b.id === "xg-copiar") {
                 await navigator.clipboard.writeText(mensaje(g));

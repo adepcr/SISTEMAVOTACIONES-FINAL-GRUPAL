@@ -358,6 +358,7 @@ function renderResults() {
                 </div>
             </div>
             <div class="space-y-4">${rows}</div>
+            ${DB.estado(p) === 'cerrada' ? `<div class="flex justify-between gap-2 text-sm sm:text-base font-semibold text-gray-500 border-t border-dashed border-gray-200 pt-3"><span><i class="fa-solid fa-ban mr-1"></i>Nulos (no votaron) <span class="block sm:inline text-xs font-normal">No se cuentan en el resultado</span></span><span>${Math.max(0, padron - total)}</span></div>` : ''}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <div class="flex justify-between text-sm font-bold text-gray-700"><span><i class="fa-solid fa-people-group mr-1"></i>Participación</span><span>${total} de ${padron} afiliados (${part}%)</span></div>
                 <div class="h-3 bg-slate-200 rounded-full overflow-hidden mt-2"><div class="bar-fill h-full bg-amber-500 rounded-full transition-all duration-700" style="width:${part}%"></div></div>
@@ -643,8 +644,8 @@ $('form-afiliado').addEventListener('submit', async e => {
     const res = await DB.addAfiliado({ nombre, cedula, provincia: filial, telefono });
     if (res.error) return showToast(res.error);
     $('form-afiliado').reset();
-    showCredentials(res.cedula, res.pass, filial);
-    showToast('Afiliado creado.', 'success');
+    $('af-nueva').classList.add('hidden');
+    showToast('Afiliado creado. Entra con su cédula y el código de ingreso.', 'success');
     renderAfiliados();
 });
 

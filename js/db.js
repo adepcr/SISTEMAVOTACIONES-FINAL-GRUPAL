@@ -248,8 +248,8 @@ const DB = {
         return FB.addDoc(this._col('alertas'), { cedula: this._norm(cedula).slice(0, 15), fecha: FB.serverTimestamp() }).catch(e => console.error(e));
     },
     async ingresarConCodigo(cedula, codigo) {
-        const ced = this._norm(cedula), cod = this._limpiarCodigo(codigo);
-        if (cod.length !== 6) return { error: 'El código de ingreso tiene 6 letras y números.' };
+        const ced = this._norm(cedula), cod = String(codigo || '').replace(/\D/g, '');
+        if (cod.length !== 6) return { error: 'El código de ingreso tiene 6 números.' };
         const llave = { email: `${ced}.${this._azar(8, 'abcdefghijkmnpqrstuvwxyz23456789')}@${this.DOMINIO}`, pass: this._azar(24, 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789') };
         let cred;
         try { cred = await FB.createUserWithEmailAndPassword(FB.auth, llave.email, llave.pass); }
@@ -285,7 +285,7 @@ const DB = {
     // ---- Administrador ----
     ingreso() { return this._ingreso; },
     alertas() { return this._alertas; },
-    genCodigoIngreso() { return this._azar(6, 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'); },
+    genCodigoIngreso() { return this._azar(6, '0123456789'); },
     async setIngreso(cambios, accion, detalle) {
         await FB.setDoc(this._ref('config', 'ingreso'), cambios, { merge: true });
         if (accion) this.log(accion, detalle || '');
@@ -434,17 +434,22 @@ const DB = {
     async addAfiliado({ nombre, cedula, provincia, telefono }) {
         const key = this._norm(cedula);
         if (this._afiliados[key]) return { error: 'Ya existe un afiliado con esa cédula.' };
-        const [r] = await this.crearAfiliados([{ nombre, cedula: key, provincia, telefono }]);
+        await this.crearAfiliados([{ nombre, cedula: key, provincia, telefono }], false);
         this.log('Afiliado creado', `${nombre} (${key})${provincia ? ' · ' + provincia : ''}`);
-        return { cedula: key, pass: r.codigo };
+        return { cedula: key };
     },
-    // Crea muchos afiliados con su código de activación. Devuelve [{...afiliado, codigo}]
-    async crearAfiliados(lista) {
+    // Crea muchos afiliados. Con conCodigo, cada uno con su código de activación personal. Devuelve [{...afiliado, codigo}]
+    async crearAfiliados(lista, conCodigo = true) {
         const ahora = new Date().toISOString(), out = [], ops = [];
         for (const a of lista) {
-            const ced = this._norm(a.cedula), codigo = this.genActivacion(), hash = await this._huella(ced, codigo);
+            const ced = this._norm(a.cedula);
             ops.push(b => b.set(this._ref('afiliados', ced), { nombre: a.nombre, cedula: ced, provincia: a.provincia || '', telefono: a.telefono || '', activo: true, activado: false, uid: null, creada: ahora }));
-            ops.push(b => b.set(this._ref('activaciones', ced), { hash, usada: false, creada: ahora }));
+            let codigo = '';
+            if (conCodigo) {
+                codigo = this.genActivacion();
+                const hash = await this._huella(ced, codigo);
+                ops.push(b => b.set(this._ref('activaciones', ced), { hash, usada: false, creada: ahora }));
+            }
             out.push({ ...a, cedula: ced, codigo });
         }
         await this._enTandas(ops);

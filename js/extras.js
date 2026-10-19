@@ -362,6 +362,7 @@
         if (y > 225) { doc.addPage(); marco(); y = 24; }
         doc.setFont("helvetica", "bold"); doc.setFontSize(11);
         doc.text(`Total de votos emitidos: ${total}`, 20, y); y += 6;
+        if (DB.estado(p) === "cerrada") { doc.text(`Votos nulos (no votaron): ${Math.max(0, padron - total)} - no se cuentan en el resultado`, 20, y); y += 6; }
         doc.text(`Participación: ${total} de ${padron} afiliados activos (${padron ? Math.min(100, Math.round(total * 100 / padron)) : 0}%)`, 20, y); y += 7;
         const lid = p.opciones.filter(o => max > 0 && votes.filter(v => v.opcion === o).length === max);
         doc.setTextColor(0, 107, 53);
