@@ -369,6 +369,7 @@
                     "Escriba las opciones, una por línea (mínimo dos).",
                     "Si desea programarla, elija la fecha de apertura y de cierre en el calendario.",
                     "Marque «Publicar de inmediato» o publíquela después en «Gestionar».",
+                    "Si tiene fecha de apertura y no marca «Publicar de inmediato», aparecerá sola a esa hora.",
                 ],
             ],
         },

@@ -82,7 +82,7 @@
 
     function decorarResultados() {
         const cont = q("results-list"); if (!cont) return;
-        const polls = DB.polls().filter(p => admin || p.publicada);
+        const polls = DB.polls().filter(p => admin || DB.visible(p));
         const cards = [...cont.children];
         if (!polls.length || cards.length !== polls.length) return;
         polls.forEach((p, i) => {

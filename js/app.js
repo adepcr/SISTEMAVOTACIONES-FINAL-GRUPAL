@@ -88,7 +88,7 @@ function tickTimers() {
 
 // ===== Votaciones habilitadas =====
 function renderPolls() {
-    const polls = DB.polls().filter(p => p.publicada);
+    const polls = DB.polls().filter(p => isAdmin ? p.publicada : DB.visible(p));
     const abiertas = polls.filter(p => DB.estado(p) === 'abierta');
     $('badge-pendientes').innerText = isAdmin ? abiertas.length : abiertas.filter(p => !DB.hasVoted(p.id, user.cedula)).length;
     if (!polls.length) {
@@ -322,7 +322,7 @@ function listaAfiliados(arr, vacio, pollId = null) {
 
 // ===== Resultados =====
 function renderResults() {
-    const polls = DB.polls().filter(p => isAdmin || p.publicada);
+    const polls = DB.polls().filter(p => isAdmin || DB.visible(p));
     if (!polls.length) { $('results-list').innerHTML = '<p class="text-base text-gray-500 text-center py-8">Aún no hay votaciones con resultados.</p>'; return; }
     // recordar qué listas de participación estaban abiertas para no cerrarlas al refrescar
     const abiertos = new Set([...document.querySelectorAll('#results-list details[open]')].map(d => d.dataset.det));
@@ -443,7 +443,9 @@ function createNewPoll(e) {
     if (ap && ci && new Date(ci) <= new Date(ap)) return showToast('La fecha de cierre debe ser posterior a la de apertura.');
     DB.addPoll({
         titulo: sinPreg ? cat.value.trim() : title.value.trim(), sinPregunta: sinPreg, categoria: cat.value.trim(), opciones: list,
-        publicada: $('new-poll-publish').checked, publica: $('new-poll-public').checked,
+        // Con fecha de apertura queda publicada aunque no se marque «Publicar de inmediato»: se muestra sola a esa hora
+        publicada: $('new-poll-publish').checked || !!ap, ocultaHastaApertura: !!ap && !$('new-poll-publish').checked,
+        publica: $('new-poll-public').checked,
         apertura: ap ? new Date(ap).toISOString() : '', cierre: ci ? new Date(ci).toISOString() : '',
         creadaPor: user.cedula
     });
@@ -467,6 +469,7 @@ function renderManage() {
         return `<div class="bg-white rounded-2xl border-2 border-gray-200 p-4 space-y-3">
             <div class="flex justify-between gap-2"><h3 class="font-bold text-base text-gray-900">${esc(p.titulo)}</h3>${badgeEstado(p)}</div>
             <p class="text-sm text-gray-500">${esc(p.categoria)} · ${p.opciones.length} opciones · ${n} votos${horario(p) ? ' · ' + horario(p) : ''}</p>
+            ${p.ocultaHastaApertura && est === 'programada' ? '<p class="text-sm font-semibold text-amber-700"><i class="fa-regular fa-clock mr-1"></i>Se mostrará a los afiliados automáticamente a la hora de apertura.</p>' : ''}
             <div class="flex flex-wrap gap-2 text-sm font-bold">
                 <button data-act="pub" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-green text-white">${p.publicada ? 'Retirar' : 'Publicar'}</button>
                 ${est === 'abierta' ? `<button data-act="close" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-lock mr-1"></i>Cerrar ahora</button>` : ''}
@@ -483,7 +486,7 @@ $('manage-list').addEventListener('click', e => {
     if (act === 'res') return switchTab('resultados');
     const id = +b.dataset.id, p = DB.polls().find(x => x.id === id);
     if (!p) return;
-    if (act === 'pub') DB.updatePoll(id, { publicada: !p.publicada }, `${p.publicada ? 'Consulta retirada' : 'Consulta publicada'}: ${p.titulo}`);
+    if (act === 'pub') DB.updatePoll(id, { publicada: !p.publicada, ocultaHastaApertura: false }, `${p.publicada ? 'Consulta retirada' : 'Consulta publicada'}: ${p.titulo}`);
     if (act === 'priv') {
         if (DB.votes().some(v => v.pollId === id)) return showToast('No se puede cambiar la modalidad: la consulta ya tiene votos.');
         DB.updatePoll(id, { publica: !p.publica }, `Modalidad cambiada a ${p.publica ? 'anónima' : 'pública'}: ${p.titulo}`);

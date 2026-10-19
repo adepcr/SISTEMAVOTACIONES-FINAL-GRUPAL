@@ -453,6 +453,10 @@ const DB = {
         if (p.cierre && now >= new Date(p.cierre).getTime()) return 'cerrada';
         return 'abierta';
     },
+    // Visible para los afiliados. Una consulta programada sin «Publicar de inmediato» aparece sola a la hora de apertura.
+    visible(p) {
+        return !!p.publicada && !(p.ocultaHastaApertura && this.estado(p) === 'programada');
+    },
     addPoll(p) {
         if ((p.opciones || []).length > this.MAX_OPCIONES) { this._falla(null, `Máximo ${this.MAX_OPCIONES} opciones por consulta.`); return null; }
         const poll = { id: Date.now(), publicada: false, publica: false, apertura: '', cierre: '', ...p, creada: new Date().toISOString() };
