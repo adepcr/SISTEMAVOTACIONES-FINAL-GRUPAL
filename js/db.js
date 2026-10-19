@@ -6,7 +6,9 @@
      admins/{uid}            administradores
      afiliados/{cédula}      padrón (uid = cuenta de Firebase enlazada al activarse)
      activaciones/{cédula}   huella SHA-256 del código de activación (nunca el código)
-     acceso/{cédula}         correo interno de la cuenta, para poder ingresar con la cédula
+     acceso/{cédula}         correo interno de la cuenta, para poder ingresar con la cédula (tipo 'dispositivo': entró con el código general)
+     ingresos/{cédula}       celular (cuenta) que entró con el código general: una cédula, un celular
+     alertas/{auto}          intentos de entrar con una cédula que ya está en otro celular
      cuentas/{uid}           cuenta de Firebase → cédula
      polls/{id}              consultas
      conteos/{id}            votos por opción (c0..c9, total). El voto secreto vive SOLO aquí.
@@ -15,13 +17,14 @@
      codigos/{código}        códigos de verificación de comprobantes
      auditoria/{auto}        bitácora
      config/general          ajustes (práctica, cantidad de afiliados activos)
+     config/ingreso          código general de ingreso para afiliados (solo administradores)
      config/instalado        existe cuando ya se creó el primer administrador */
 const DB = {
     DOMINIO: 'afiliados.adepvota.cr',   // correos internos de las cuentas de afiliados (no reciben correo)
     MAX_OPCIONES: 10,
 
     yo: null,
-    _polls: [], _conteos: {}, _part: [], _votos: [], _afiliados: {}, _admins: {}, _audit: [], _config: {},
+    _polls: [], _conteos: {}, _part: [], _votos: [], _afiliados: {}, _admins: {}, _audit: [], _config: {}, _ingreso: null, _alertas: [],
     _votesCache: null,
 
     // ================= Utilidades =================
@@ -120,7 +123,7 @@ const DB = {
         if (!a || !a.exists()) return null;
         const d = a.data();
         if (d.uid !== u.uid || d.activo === false) return null;
-        return { uid: u.uid, rol: 'Afiliado', nombre: d.nombre, cedula: ced, provincia: d.provincia || '', telefono: d.telefono || '' };
+        return { uid: u.uid, rol: 'Afiliado', nombre: d.nombre, cedula: ced, provincia: d.provincia || '', telefono: d.telefono || '', pendiente: d.pendiente === true };
     },
     // Sesión guardada en este equipo (para la pantalla de ingreso)
     async revisarSesion() {
@@ -130,9 +133,10 @@ const DB = {
         if (!this.yo) await FB.signOut(FB.auth);
         return this.yo;
     },
-    // Carga inicial de index.html: false si no hay una sesión válida
+    // Carga inicial de index.html: false si no hay una sesión válida (o si espera la aprobación del administrador)
     async init() {
-        if (!(await this.revisarSesion())) return false;
+        const yo = await this.revisarSesion();
+        if (!yo || yo.pendiente) return false;
         await this._escuchar();
         return true;
     },
@@ -175,10 +179,11 @@ const DB = {
         await this.log('Ingreso al sistema', 'Administrador');
         return p;
     },
-    // ¿Esta cédula ya activó su cuenta? → 'activa' | 'sin-activar' (no revela nada más)
+    // ¿Cómo entra esta cédula? → 'activa' (con clave) | 'dispositivo' (ya está en un celular) | 'sin-activar'
     async estadoCedula(cedula) {
         const s = await FB.getDoc(this._ref('acceso', this._norm(cedula)));
-        return s.exists() ? 'activa' : 'sin-activar';
+        if (!s.exists()) return 'sin-activar';
+        return s.data().tipo === 'dispositivo' ? 'dispositivo' : 'activa';
     },
     // Ajustes que se ven antes de iniciar sesión (WhatsApp de ayuda de ADEP)
     async ajustesPublicos() {
@@ -209,6 +214,100 @@ const DB = {
         await this.log('Ingreso al sistema', 'Afiliado');
         return p;
     },
+    // ================= Ingreso con el código general =================
+    // La primera vez se crea una cuenta propia de este celular (con datos al azar que quedan guardados aquí);
+    // las reglas solo la enlazan a la cédula si el código está vigente y la cédula no está en otro celular.
+    _llave(ced) { try { return JSON.parse(localStorage.getItem('adep_llave_' + ced)); } catch { return null; } },
+    _dispositivo() {
+        const ua = navigator.userAgent;
+        const so = /Android/i.test(ua) ? 'Android' : /iPhone|iPad|iPod/i.test(ua) ? 'iPhone' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'Mac' : 'Otro';
+        const app = window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+        const nav = app ? 'app ADEP Vota' : /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'navegador';
+        return `${so} · ${nav}`;
+    },
+    // Este celular ya tiene la cédula: entra sin pedir nada
+    async entrarDispositivo(cedula) {
+        const ced = this._norm(cedula), k = this._llave(ced);
+        if (!k) return null;
+        try { await FB.signInWithEmailAndPassword(FB.auth, k.email, k.pass); }
+        catch (e) {
+            if (!String(e.code || '').includes('network')) localStorage.removeItem('adep_llave_' + ced);
+            return null;
+        }
+        const p = await this._perfil(FB.auth.currentUser);
+        if (!p) { localStorage.removeItem('adep_llave_' + ced); await FB.signOut(FB.auth); return null; }
+        this.yo = p;
+        if (!p.pendiente) {
+            await FB.updateDoc(this._ref('afiliados', ced), { ultimoIngreso: new Date().toISOString() }).catch(() => { });
+            await this.log('Ingreso al sistema', 'Afiliado (celular reconocido)');
+        }
+        return p;
+    },
+    // Aviso al administrador: alguien intentó entrar con una cédula que ya está en otro celular
+    avisarIntento(cedula) {
+        return FB.addDoc(this._col('alertas'), { cedula: this._norm(cedula).slice(0, 15), fecha: FB.serverTimestamp() }).catch(e => console.error(e));
+    },
+    async ingresarConCodigo(cedula, codigo) {
+        const ced = this._norm(cedula), cod = this._limpiarCodigo(codigo);
+        if (cod.length !== 6) return { error: 'El código de ingreso tiene 6 letras y números.' };
+        const llave = { email: `${ced}.${this._azar(8, 'abcdefghijkmnpqrstuvwxyz23456789')}@${this.DOMINIO}`, pass: this._azar(24, 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789') };
+        let cred;
+        try { cred = await FB.createUserWithEmailAndPassword(FB.auth, llave.email, llave.pass); }
+        catch (e) { return { error: this._errAuth(e) }; }
+        const u = cred.user;
+        // Si el administrador pide aprobar cada ingreso, se prueba primero como pendiente
+        for (const pendiente of [false, true]) {
+            const b = FB.writeBatch(FB.db);
+            b.set(this._ref('ingresos', ced), { uid: u.uid, codigo: cod, fecha: FB.serverTimestamp() });
+            b.update(this._ref('afiliados', ced), { uid: u.uid, activado: true, authEmail: llave.email, ultimoIngreso: new Date().toISOString(), pendiente, dispositivo: this._dispositivo() });
+            b.set(this._ref('cuentas', u.uid), { cedula: ced });
+            b.set(this._ref('acceso', ced), { email: llave.email, tipo: 'dispositivo' });
+            try {
+                await b.commit();
+                localStorage.setItem('adep_llave_' + ced, JSON.stringify(llave));
+                this.yo = await this._perfil(u);
+                if (this.yo && !this.yo.pendiente) await this.log('Ingreso con código general', this.yo.nombre);
+                return this.yo || { error: 'No se pudo completar. Intente de nuevo.' };
+            } catch (e) { if (!String(e.code || '').includes('permission')) { console.error(e); break; } }
+        }
+        await FB.deleteUser(u).catch(() => FB.signOut(FB.auth));
+        // ¿Otro celular se adelantó con esta cédula?
+        if ((await this.estadoCedula(ced).catch(() => '')) === 'dispositivo') { this.avisarIntento(ced); return { error: 'Esta cédula ya se está usando en otro celular. Si no fue usted, comuníquese con ADEP.', enUso: true }; }
+        return { error: 'El código de ingreso no es correcto o ya venció. Revíselo o pídalo de nuevo a ADEP. Si su cédula no está registrada, comuníquese con ADEP.' };
+    },
+    // Esperando la aprobación del administrador: avisa cuando lo aprueban (true) o lo rechazan (false)
+    esperarAprobacion(fn) {
+        return FB.onSnapshot(this._ref('afiliados', this.yo.cedula), s => {
+            const d = s.exists() ? s.data() : null;
+            if (d && d.uid === this.yo.uid && d.activo !== false && d.pendiente !== true) fn(true);
+        }, () => fn(false));
+    },
+    // ---- Administrador ----
+    ingreso() { return this._ingreso; },
+    alertas() { return this._alertas; },
+    genCodigoIngreso() { return this._azar(6, 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'); },
+    async setIngreso(cambios, accion, detalle) {
+        await FB.setDoc(this._ref('config', 'ingreso'), cambios, { merge: true });
+        if (accion) this.log(accion, detalle || '');
+    },
+    aprobarIngreso(cedula) {
+        const a = this._afiliados[cedula]; if (!a) return false;
+        return this._cambiarAfiliado(cedula, { pendiente: false }, 'Ingreso aprobado', `${a.nombre} (${cedula})`);
+    },
+    // Quita la cédula del celular donde está: ese celular queda fuera y la cédula puede entrar de nuevo
+    async liberarCedula(cedula, motivo) {
+        const a = this._afiliados[cedula]; if (!a) return false;
+        const b = FB.writeBatch(FB.db);
+        b.update(this._ref('afiliados', cedula), { uid: null, activado: false, pendiente: false, dispositivo: '' });
+        if (a.uid) b.delete(this._ref('cuentas', a.uid));
+        b.delete(this._ref('ingresos', cedula));
+        b.delete(this._ref('acceso', cedula));
+        try { await b.commit(); } catch (e) { this._falla(e); return false; }
+        this.log(motivo || 'Cédula liberada', `${a.nombre} (${cedula})`);
+        return true;
+    },
+    async borrarAlerta(id) { await FB.deleteDoc(this._ref('alertas', id)).catch(e => this._falla(e)); },
+
     // Primera vez: con el código de activación, el afiliado crea su propia clave de 6 números
     async activar(cedula, codigo, pin) {
         const ced = this._norm(cedula), cod = this._limpiarCodigo(codigo);
@@ -270,6 +369,10 @@ const DB = {
                 // Cantidad de afiliados activos, para que los afiliados vean el % de participación
                 const n = this.padron();
                 if (this._config.padron !== n) FB.setDoc(this._ref('config', 'general'), { padron: n }, { merge: true }).catch(() => { });
+            }),
+            this._escuchar1(this._ref('config', 'ingreso'), s => { this._ingreso = s.exists() ? s.data() : null; }),
+            this._escuchar1(FB.query(this._col('alertas'), FB.orderBy('fecha', 'desc'), FB.limit(50)), s => {
+                this._alertas = this._docs(s).map(a => ({ ...a, fecha: a.fecha && a.fecha.toDate ? a.fecha.toDate().toISOString() : '' }));
             }),
             this._escuchar1(this._col('admins'), s => {
                 this._admins = {}; this._docs(s).forEach(a => { this._admins[a.id] = { ...a, cedula: a.id }; });
@@ -353,8 +456,9 @@ const DB = {
         for (const ced of cedulas) {
             const codigo = this.genActivacion(), hash = await this._huella(ced, codigo);
             ops.push(b => b.set(this._ref('activaciones', ced), { hash, usada: false, creada: ahora }));
-            ops.push(b => b.update(this._ref('afiliados', ced), { uid: null, activado: false }));
+            ops.push(b => b.update(this._ref('afiliados', ced), { uid: null, activado: false, pendiente: false, dispositivo: '' }));
             ops.push(b => b.delete(this._ref('acceso', ced)));
+            ops.push(b => b.delete(this._ref('ingresos', ced)));
             out[ced] = codigo;
         }
         await this._enTandas(ops);
@@ -402,7 +506,7 @@ const DB = {
             tipo: 'Afiliado', datos: sinCuenta, fecha: new Date().toLocaleString('es-CR'),
             eliminadoPor: adminUser ? adminUser.nombre : 'Administrador'
         });
-        ['afiliados', 'activaciones', 'acceso'].forEach(c => b.delete(this._ref(c, cedula)));
+        ['afiliados', 'activaciones', 'acceso', 'ingresos'].forEach(c => b.delete(this._ref(c, cedula)));
         b.commit().catch(e => this._falla(e));
         this.log('Afiliado eliminado', `${a.nombre} (${cedula})`);
     },

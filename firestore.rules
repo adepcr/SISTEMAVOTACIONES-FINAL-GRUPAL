@@ -7,6 +7,7 @@ rules_version = '2';
 // Quién es quién:
 //   - Administrador: tiene un documento activo en /admins/{uid}
 //   - Afiliado: /cuentas/{uid} dice su cédula y /afiliados/{cédula}.uid es esa misma cuenta
+//     (si el administrador aprueba cada ingreso, además debe estar aprobado: pendiente != true)
 // Nadie puede leer ni escribir nada que no esté permitido aquí.
 // ============================================================================
 service cloud.firestore {
@@ -29,7 +30,14 @@ service cloud.firestore {
     function esAfiliado() {
       return conectado() && miCedula() != ''
         && get(/databases/$(database)/documents/afiliados/$(miCedula())).data.uid == request.auth.uid
-        && get(/databases/$(database)/documents/afiliados/$(miCedula())).data.activo == true;
+        && get(/databases/$(database)/documents/afiliados/$(miCedula())).data.activo == true
+        && get(/databases/$(database)/documents/afiliados/$(miCedula())).data.get('pendiente', false) != true;
+    }
+
+    // Código de ingreso general (config/ingreso): encendido, igual al escrito y sin vencer
+    function codigoVigente(c) {
+      let g = get(/databases/$(database)/documents/config/ingreso).data;
+      return g.activo == true && c == g.codigo && request.time.toMillis() < g.venceMs;
     }
 
     function miembro() { return esAdmin() || esAfiliado(); }
@@ -51,9 +59,10 @@ service cloud.firestore {
 
     // ---------------- Configuración ----------------
     match /config/{doc} {
-      // 'instalado' y 'publico' (WhatsApp de ayuda) se leen antes de iniciar sesión
-      allow get: if doc == 'instalado' || doc == 'publico' || conectado();
-      allow list: if conectado();
+      // 'instalado' y 'publico' (WhatsApp de ayuda) se leen antes de iniciar sesión.
+      // 'ingreso' (código general de ingreso) solo lo ve el administrador.
+      allow get: if doc == 'instalado' || doc == 'publico' || esAdmin() || (conectado() && doc != 'ingreso');
+      allow list: if esAdmin();
       // Primera instalación: el primer administrador se crea a sí mismo, una sola vez
       allow create: if esAdmin()
         || (doc == 'instalado' && conectado()
@@ -87,6 +96,15 @@ service cloud.firestore {
             && getAfter(/databases/$(database)/documents/activaciones/$(ced)).data.usada == true
             && getAfter(/databases/$(database)/documents/activaciones/$(ced)).data.uid == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'activado', 'authEmail', 'ultimoIngreso']))
+        // Ingreso con el código general: la cédula queda amarrada a este celular (una cédula, un celular)
+        || (conectado()
+            && resource.data.activo == true
+            && resource.data.get('uid', null) == null
+            && request.resource.data.uid == request.auth.uid
+            && !exists(/databases/$(database)/documents/ingresos/$(ced))
+            && getAfter(/databases/$(database)/documents/ingresos/$(ced)).data.uid == request.auth.uid
+            && request.resource.data.pendiente == (get(/databases/$(database)/documents/config/ingreso).data.aprobacion == true)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'activado', 'authEmail', 'ultimoIngreso', 'pendiente', 'dispositivo']))
         // El propio afiliado solo puede anotar su último ingreso
         || (conectado() && resource.data.uid == request.auth.uid && resource.data.activo == true
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoIngreso']));
@@ -105,6 +123,27 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usada', 'uid', 'codigo', 'usadaEn']));
     }
 
+    // Ingreso con el código general: qué cuenta (celular) tiene cada cédula. Solo se crea una vez;
+    // para cambiar de celular el administrador «libera» la cédula (borra este documento).
+    match /ingresos/{ced} {
+      allow read, update, delete: if esAdmin();
+      allow create: if conectado()
+        && request.resource.data.keys().hasOnly(['uid', 'codigo', 'fecha'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.fecha == request.time
+        && codigoVigente(request.resource.data.codigo)
+        && getAfter(/databases/$(database)/documents/afiliados/$(ced)).data.uid == request.auth.uid;
+    }
+
+    // Avisos para el administrador: alguien intentó entrar con una cédula que ya está en otro celular
+    match /alertas/{id} {
+      allow read, delete: if esAdmin();
+      allow create: if request.resource.data.keys().hasOnly(['cedula', 'fecha'])
+        && request.resource.data.fecha == request.time
+        && request.resource.data.cedula is string && request.resource.data.cedula.size() <= 15;
+      allow update: if false;
+    }
+
     // Cédula → correo interno de la cuenta (lo necesita la pantalla de ingreso)
     match /acceso/{ced} {
       allow get: if true;
@@ -113,7 +152,7 @@ service cloud.firestore {
         || (conectado()
             && getAfter(/databases/$(database)/documents/afiliados/$(ced)).data.uid == request.auth.uid
             && request.resource.data.email == request.auth.token.email
-            && request.resource.data.keys().hasOnly(['email']));
+            && request.resource.data.keys().hasOnly(['email', 'tipo']));
     }
 
     // Cuenta de Firebase → cédula

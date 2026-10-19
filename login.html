@@ -99,7 +99,7 @@
             <!-- ============ AFILIADOS (por defecto) ============ -->
             <form id="form-afiliado" class="space-y-5" novalidate>
 
-                <!-- Paso 1: la cédula. El sistema decide si pide la clave o si es la primera vez. -->
+                <!-- Paso 1: la cédula. El sistema decide si pide la clave, el código de ingreso o si ya está en este celular. -->
                 <div id="paso-cedula">
                     <label for="a-cedula" class="block text-base font-bold text-gray-800 mb-1">Su número de cédula</label>
                     <input id="a-cedula" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12"
@@ -134,6 +134,29 @@
                         <input type="checkbox" id="a-recordar" class="w-6 h-6 accent-adep-green" checked>
                         Recordar mi cédula en este equipo
                     </label>
+                </div>
+
+                <!-- Paso 3: código de ingreso general (el mismo para todos, lo da ADEP) -->
+                <div id="paso-codigo" class="hidden space-y-4">
+                    <div class="flex items-center justify-between gap-3 rounded-2xl p-3" style="background:#e8f5ee;border:2px solid #a7dcbf">
+                        <p class="text-base font-bold text-gray-800"><i class="fa-solid fa-id-card text-adep-green mr-1"></i> Cédula <span id="a-cedula-ver2" class="font-mono"></span></p>
+                        <button type="button" data-cambiar class="text-base font-bold text-adep-green underline py-2 px-1">Cambiar</button>
+                    </div>
+                    <div>
+                        <label for="a-codigo" class="block text-base font-bold text-gray-800 mb-1">Código de ingreso que le dio ADEP</label>
+                        <input id="a-codigo" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXXXX"
+                            class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none uppercase">
+                        <p class="text-sm text-gray-500 mt-1">Son 6 letras y números. Solo se pide la primera vez: después, este celular queda recordado.</p>
+                    </div>
+                    <button type="button" id="a-tengo-act" class="text-base font-bold text-gray-600 underline py-1">Tengo un código personal de activación</button>
+                </div>
+
+                <!-- Paso 4: esperando que el administrador apruebe el ingreso -->
+                <div id="paso-espera" class="hidden rounded-2xl p-5 text-center space-y-3" style="background:#fffbeb;border:2px solid #fcd34d">
+                    <i class="fa-solid fa-hourglass-half text-4xl" style="color:#b45309"></i>
+                    <p class="text-lg font-extrabold" style="color:#78350f">Esperando la aprobación de ADEP</p>
+                    <p class="text-base text-gray-800">Hola <strong id="espera-nombre"></strong>. Un administrador debe aprobar su ingreso. Deje esta pantalla abierta: entrará solo en cuanto lo aprueben.</p>
+                    <button type="button" id="espera-cancelar" class="text-base font-bold text-gray-600 underline py-2">Cancelar</button>
                 </div>
 
                 <p id="a-error" role="alert" aria-live="assertive"
@@ -329,10 +352,10 @@
             alert("No se pudo conectar con la base de datos. Revise su internet e intente de nuevo.");
             throw e;
         }
-        if (sesion) { entrar(); await new Promise(() => { }); }   // ya tenía la sesión abierta
+        if (sesion && !sesion.pendiente) { entrar(); await new Promise(() => { }); }   // ya tenía la sesión abierta
         window.dbListo = true;
 
-        // ---------- Afiliados: ingreso en dos pasos (cédula → clave o primera vez) ----------
+        // ---------- Afiliados: cédula → clave, código de ingreso, o directo si este celular ya la tiene ----------
         const pin = $('a-pin'), cedula = $('a-cedula');
         let paso = 1;
         const ajustes = DB.ajustesPublicos();   // WhatsApp de ayuda y enlace de la app (se cargan mientras tanto)
@@ -341,19 +364,38 @@
         function pintarPuntos() {
             document.querySelectorAll('#dots .dot').forEach((d, i) => d.classList.toggle('on', i < pin.value.length));
         }
+        // Pasos: 1 cédula · 2 clave · 3 código de ingreso · 4 esperando aprobación
         function irPaso(n) {
             paso = n;
             $('paso-cedula').classList.toggle('hidden', n !== 1);
             $('paso-clave').classList.toggle('hidden', n !== 2);
+            $('paso-codigo').classList.toggle('hidden', n !== 3);
+            $('paso-espera').classList.toggle('hidden', n !== 4);
+            $('a-boton').classList.toggle('hidden', n === 4);
             $('a-olvide').classList.toggle('hidden', n !== 2);
             $('ayuda-olvido').classList.add('hidden');
             $('a-boton').querySelector('span').textContent = n === 1 ? 'Continuar' : 'Ingresar';
             $('a-boton').querySelector('i').className = n === 1 ? 'fa-solid fa-arrow-right' : 'fa-solid fa-arrow-right-to-bracket';
             showErr('a-error', '');
             if (n === 1) cedula.focus();
-            else { $('a-cedula-ver').textContent = cedula.value; pin.value = ''; pintarPuntos(); pin.focus(); }
+            if (n === 2) { $('a-cedula-ver').textContent = cedula.value; pin.value = ''; pintarPuntos(); pin.focus(); }
+            if (n === 3) { $('a-cedula-ver2').textContent = cedula.value; $('a-codigo').value = ''; $('a-codigo').focus(); }
         }
-        // Paso 1: según la cédula, pide la clave o lleva a «primera vez»
+        // Ya dentro: entra, o espera la aprobación del administrador si está encendida
+        let finEspera = null;
+        function dentro(p) {
+            if (!p.pendiente) return entrar();
+            irPaso(4);
+            $('espera-nombre').textContent = p.nombre.split(' ')[0];
+            finEspera = DB.esperarAprobacion(ok => {
+                if (ok) return entrar();
+                finEspera && finEspera();
+                FB.signOut(FB.auth).catch(() => { });
+                irPaso(1);
+                showErr('a-error', 'ADEP no aprobó este ingreso. Si cree que es un error, comuníquese con ADEP.');
+            });
+        }
+        // Paso 1: según la cédula, pide la clave, el código de ingreso, o entra si este celular ya la tiene
         async function revisarCedula() {
             const ced = soloNumeros(cedula.value);
             if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
@@ -362,10 +404,30 @@
             try { estado = await DB.estadoCedula(ced); }
             catch (e) { console.error(e); return showErr('a-error', 'No hay conexión. Revise su internet e intente de nuevo.'); }
             if (estado === 'activa') return irPaso(2);
-            $('act-cedula').value = ced;
+            if (estado === 'dispositivo') {
+                const p = await DB.entrarDispositivo(ced);
+                if (p) { DB._set('recordar', ced); return dentro(p); }
+                DB.avisarIntento(ced);
+                localStorage.removeItem('adep_recordar');
+                return showErr('a-error', 'Esta cédula ya se está usando en otro celular. Si no fue usted, o si cambió de celular, comuníquese con ADEP.');
+            }
+            irPaso(3);
+        }
+        $('a-codigo').addEventListener('input', e => {
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            showErr('a-error', '');
+        });
+        $('a-tengo-act').addEventListener('click', () => {
+            $('act-cedula').value = soloNumeros(cedula.value);
             mostrar('form-activar');
             $('act-codigo').focus();
-        }
+        });
+        document.querySelector('[data-cambiar]').addEventListener('click', () => { localStorage.removeItem('adep_recordar'); irPaso(1); });
+        $('espera-cancelar').addEventListener('click', async () => {
+            finEspera && finEspera();
+            await FB.signOut(FB.auth).catch(() => { });
+            irPaso(1);
+        });
 
         cedula.addEventListener('input', () => { cedula.value = soloNumeros(cedula.value); showErr('a-error', ''); });
         pin.addEventListener('input', () => {
@@ -393,15 +455,25 @@
             $('a-olvide').classList.add('hidden');
         });
 
-        // Cédula recordada en este equipo: pasa directo a pedir la clave
+        // Esperando aprobación desde antes, o cédula recordada en este equipo
         const guardada = DB._get('recordar', '');
-        if (guardada) { cedula.value = guardada; revisarCedula(); }
+        if (sesion && sesion.pendiente) { cedula.value = sesion.cedula; dentro(sesion); }
+        else if (guardada) { cedula.value = guardada; revisarCedula(); }
         else cedula.focus();
 
         $('form-afiliado').addEventListener('submit', e => {
             e.preventDefault();
             ocupado(e.target, async () => {
                 if (paso === 1) return revisarCedula();
+                if (paso === 3) {
+                    const ced = soloNumeros(cedula.value), cod = $('a-codigo').value;
+                    if (cod.length !== 6) { $('a-codigo').focus(); return showErr('a-error', 'El código de ingreso tiene 6 letras y números.'); }
+                    showErr('a-error', 'Ingresando…');
+                    const r = await DB.ingresarConCodigo(ced, cod);
+                    if (r.error) { $('a-codigo').focus(); return showErr('a-error', r.error); }
+                    DB._set('recordar', ced);
+                    return dentro(r);
+                }
                 const ced = soloNumeros(cedula.value), clave = soloNumeros(pin.value);
                 if (clave.length < 6) { pin.focus(); return showErr('a-error', `Su clave tiene 6 números. Le faltan ${6 - clave.length}.`); }
                 showErr('a-error', '');

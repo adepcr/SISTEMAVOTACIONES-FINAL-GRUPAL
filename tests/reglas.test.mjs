@@ -111,5 +111,53 @@ await prueba("Admin desactiva a José", () => assertSucceeds(updateDoc(doc(A, "a
 await prueba("José desactivado ya NO puede leer votaciones", () => assertFails(getDoc(doc(J, "polls/1"))));
 await prueba("Admin puede restaurar (borrar) una participación", () => assertSucceeds(deleteDoc(doc(A, "participacion/1_101110111"))));
 
+// ---------- Ingreso con código general (una cédula, un celular) ----------
+await prueba("Admin crea afiliados nuevos y el código general", async () => { const b = writeBatch(A);
+  b.set(doc(A, "afiliados/303330333"), { nombre: "Ana", cedula: "303330333", activo: true, uid: null, activado: false });
+  b.set(doc(A, "afiliados/404440444"), { nombre: "Luis", cedula: "404440444", activo: true, uid: null, activado: false });
+  b.set(doc(A, "config/ingreso"), { codigo: "K7P2QX", activo: true, venceMs: ahora + 3600e3, aprobacion: false });
+  await assertSucceeds(b.commit()); });
+function ingresar(uid, ced, codigo, pendiente = false) {
+  const email = uid + "@afiliados.adepvota.cr", d = db(uid, email), b = writeBatch(d);
+  b.set(doc(d, "ingresos/" + ced), { uid, codigo, fecha: serverTimestamp() });
+  b.update(doc(d, "afiliados/" + ced), { uid, activado: true, authEmail: email, ultimoIngreso: "hoy", pendiente, dispositivo: "Android · Chrome" });
+  b.set(doc(d, "cuentas/" + uid), { cedula: ced });
+  b.set(doc(d, "acceso/" + ced), { email, tipo: "dispositivo" });
+  return b.commit();
+}
+await prueba("Afiliado NO puede leer el código general", () => assertFails(getDoc(doc(M, "config/ingreso"))));
+await prueba("Una cuenta nueva NO puede leer el código general", () => assertFails(getDoc(doc(db("curioso"), "config/ingreso"))));
+await prueba("Una cuenta nueva NO puede listar la configuración", () => assertFails(getDocs(collection(db("curioso"), "config"))));
+await prueba("Ingreso con código general INCORRECTO es rechazado", () => assertFails(ingresar("ana_mal", "303330333", "AAAAAA")));
+await prueba("Ingreso con código general correcto funciona", () => assertSucceeds(ingresar("ana_cel", "303330333", "K7P2QX")));
+const AN = db("ana_cel", "ana_cel@afiliados.adepvota.cr");
+await prueba("Ana (con código general) ve votaciones", () => assertSucceeds(getDoc(doc(AN, "polls/1"))));
+await prueba("OTRO celular con la cédula de Ana es rechazado", () => assertFails(ingresar("impostor", "303330333", "K7P2QX")));
+await prueba("Con el código NO se puede tomar una cédula activada con clave", () => assertFails(ingresar("impostor2", "202220222", "K7P2QX")));
+await prueba("Sin conectar: se puede avisar de un intento bloqueado", () => assertSucceeds(addDoc(collection(anon, "alertas"), { cedula: "303330333", fecha: serverTimestamp() })));
+await prueba("El aviso NO acepta datos extra", () => assertFails(addDoc(collection(anon, "alertas"), { cedula: "303330333", fecha: serverTimestamp(), x: 1 })));
+await prueba("Afiliada NO lee los avisos", () => assertFails(getDocs(collection(M, "alertas"))));
+await prueba("Admin lee los avisos", () => assertSucceeds(getDocs(collection(A, "alertas"))));
+await prueba("Admin libera la cédula de Ana", async () => { const b = writeBatch(A);
+  b.update(doc(A, "afiliados/303330333"), { uid: null, activado: false, pendiente: false, dispositivo: "" });
+  b.delete(doc(A, "cuentas/ana_cel")); b.delete(doc(A, "ingresos/303330333")); b.delete(doc(A, "acceso/303330333"));
+  await assertSucceeds(b.commit()); });
+await prueba("El celular anterior de Ana ya NO ve votaciones", () => assertFails(getDoc(doc(AN, "polls/1"))));
+await prueba("Ana entra desde un celular nuevo", () => assertSucceeds(ingresar("ana_nuevo", "303330333", "K7P2QX")));
+await prueba("Admin enciende la aprobación manual", () => assertSucceeds(updateDoc(doc(A, "config/ingreso"), { aprobacion: true })));
+await prueba("Con aprobación manual, entrar ya aprobado es rechazado", () => assertFails(ingresar("luis_cel", "404440444", "K7P2QX", false)));
+await prueba("Con aprobación manual, entra como pendiente", () => assertSucceeds(ingresar("luis_cel", "404440444", "K7P2QX", true)));
+const LU = db("luis_cel", "luis_cel@afiliados.adepvota.cr");
+await prueba("Pendiente: puede ver su propio perfil (para saber cuándo lo aprueban)", () => assertSucceeds(getDoc(doc(LU, "afiliados/404440444"))));
+await prueba("Pendiente: NO ve votaciones", () => assertFails(getDoc(doc(LU, "polls/1"))));
+await prueba("Pendiente: NO puede aprobarse a sí mismo", () => assertFails(updateDoc(doc(LU, "afiliados/404440444"), { pendiente: false })));
+await prueba("Admin aprueba a Luis", () => assertSucceeds(updateDoc(doc(A, "afiliados/404440444"), { pendiente: false })));
+await prueba("Luis aprobado ve votaciones", () => assertSucceeds(getDoc(doc(LU, "polls/1"))));
+await prueba("Admin apaga el código", () => assertSucceeds(updateDoc(doc(A, "config/ingreso"), { activo: false, aprobacion: false })));
+await prueba("Código apagado: nadie nuevo entra", async () => { await assertSucceeds(updateDoc(doc(A, "afiliados/303330333"), { uid: null })); await assertSucceeds(deleteDoc(doc(A, "ingresos/303330333")));
+  await assertFails(ingresar("ana_otro", "303330333", "K7P2QX")); });
+await prueba("Código vencido: nadie nuevo entra", async () => { await assertSucceeds(updateDoc(doc(A, "config/ingreso"), { activo: true, venceMs: ahora - 1000 }));
+  await assertFails(ingresar("ana_otro2", "303330333", "K7P2QX")); });
+
 console.log(`\n${ok} pasaron, ${mal} fallaron`);
 await env.cleanup(); process.exit(mal ? 1 : 0);

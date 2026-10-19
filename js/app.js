@@ -600,7 +600,8 @@ function renderAfiliados() {
         <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
                 <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)}</p>
-                <p class="text-sm text-gray-500 truncate">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}${a.activado ? '' : ' · <span class="text-amber-700 font-semibold">Cuenta sin activar</span>'}</p>
+                <p class="text-sm text-gray-500 truncate">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}${a.activado ? '' : ' · <span class="text-amber-700 font-semibold">Todavía no ha entrado</span>'}${a.pendiente && a.uid ? ' · <span class="text-amber-700 font-semibold">Esperando aprobación</span>' : ''}</p>
+                ${a.uid && a.dispositivo ? `<p class="text-sm text-gray-600 mt-1"><i class="fa-solid fa-mobile-screen text-adep-green mr-1"></i>Entra desde: ${esc(a.dispositivo)}</p>` : ''}
                 <p class="text-sm text-gray-600 flex items-center gap-2 flex-wrap mt-1"><span><i class="fa-solid fa-location-dot text-adep-green mr-1"></i>Filial:</span>
                     <select data-af-filial="${esc(a.cedula)}" aria-label="Filial de ${esc(a.nombre)}" class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold bg-white">
                         <option value="">Sin filial</option>
@@ -610,7 +611,8 @@ function renderAfiliados() {
             </div>
             <div class="flex flex-wrap gap-2 text-sm font-bold">
                 <button data-af="tel" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700"><i class="fa-solid fa-phone mr-1"></i>Teléfono</button>
-                <button data-af="reset" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Nuevo código</button>
+                ${a.uid ? `<button data-af="liberar" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200" title="Saca la cédula del celular donde está, para que pueda entrar desde otro"><i class="fa-solid fa-unlock mr-1"></i>Liberar cédula</button>` : ''}
+                <button data-af="reset" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200">Código personal</button>
                 <button data-af="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
                 <button data-af="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>
             </div>
@@ -655,6 +657,11 @@ $('afiliados-list').addEventListener('click', async e => {
     const b = e.target.closest('[data-af]'); if (!b) return;
     const id = b.dataset.id;
     if (b.dataset.af === 'reset') { const pin = await DB.resetPass(id); if (pin) { const a = DB.afiliados().find(x => x.cedula === id); showCredentials(id, pin, a ? a.provincia : ''); } }
+    if (b.dataset.af === 'liberar') {
+        const a = DB.afiliados().find(x => x.cedula === id); if (!a) return;
+        if (!confirm(`¿Liberar la cédula de ${a.nombre}? El celular donde está quedará fuera y podrá entrar de nuevo (por ejemplo, desde un celular nuevo) con el código de ingreso.`)) return;
+        if (await DB.liberarCedula(id)) showToast('Cédula liberada.', 'success');
+    }
     if (b.dataset.af === 'toggle') { const a = DB.afiliados().find(x => x.cedula === id); DB.setActivo(id, a.activo === false); }
     if (b.dataset.af === 'tel') {
         const a = DB.afiliados().find(x => x.cedula === id); if (!a) return;
