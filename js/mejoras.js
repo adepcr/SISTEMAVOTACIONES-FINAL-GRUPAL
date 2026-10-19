@@ -366,7 +366,7 @@
                 "Crear una consulta",
                 [
                     "Escriba la pregunta y elija la categoría.",
-                    "Escriba las opciones, una por línea (mínimo dos).",
+                    "Escriba cada opción en su propio espacio (mínimo dos). Use «Agregar opción» para sumar más.",
                     "Si desea programarla, elija la fecha de apertura y de cierre en el calendario.",
                     "Marque «Publicar de inmediato» o publíquela después en «Gestionar».",
                     "Si tiene fecha de apertura y no marca «Publicar de inmediato», aparecerá sola a esa hora.",

@@ -433,7 +433,7 @@ function createNewPoll(e) {
     e.preventDefault();
     const title = $('new-poll-title'), cat = $('new-poll-cat'), opts = $('new-poll-options');
     const sinPreg = $('new-poll-noquestion').checked;
-    const list = opts.value.split('\n').map(o => o.trim()).filter(Boolean);
+    const list = leerOpciones();
     let bad = false;
     [[title, !sinPreg && !title.value.trim()], [cat, !cat.value.trim()], [opts, list.length < 2 || list.length > DB.MAX_OPCIONES]].forEach(([el, fail]) => {
         if (fail) { el.classList.add('field-error'); $(`err-${el.id}`).classList.remove('hidden'); bad = true; }
@@ -450,9 +450,54 @@ function createNewPoll(e) {
         creadaPor: user.cedula
     });
     $('form-new-poll').reset();
+    pintarOpciones(['', '']);
     showToast('Consulta guardada.', 'success');
     switchTab('gestionar');
 }
+
+// ===== Opciones de respuesta: un espacio por cada opción =====
+const leerOpciones = () => [...document.querySelectorAll('#new-poll-options input')].map(i => i.value.trim()).filter(Boolean);
+function pintarOpciones(valores) {
+    $('new-poll-options').innerHTML = valores.map((v, i) => `
+        <div class="flex items-center gap-2">
+            <span class="w-7 h-7 shrink-0 rounded-full bg-adep-greenLight text-adep-green text-sm font-bold flex items-center justify-center">${i + 1}</span>
+            <input type="text" value="${esc(v)}" maxlength="200" aria-label="Opción ${i + 1}" placeholder="${['Ej: Sí', 'Ej: No', 'Ej: En blanco'][i] || 'Opción ' + (i + 1)}" class="flex-1 min-w-0 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none transition">
+            <button type="button" data-quitar="${i}" aria-label="Quitar opción ${i + 1}" class="w-10 h-10 shrink-0 rounded-xl bg-adep-redLight text-adep-red border border-red-200 ${valores.length <= 2 ? 'invisible' : ''}"><i class="fa-solid fa-xmark"></i></button>
+        </div>`).join('');
+    $('new-poll-add-opt').classList.toggle('hidden', valores.length >= DB.MAX_OPCIONES);
+}
+const valoresOpciones = () => [...document.querySelectorAll('#new-poll-options input')].map(i => i.value);
+function agregarOpcion() {
+    const v = valoresOpciones();
+    if (v.length >= DB.MAX_OPCIONES) return showToast(`Máximo ${DB.MAX_OPCIONES} opciones por consulta.`);
+    pintarOpciones([...v, '']);
+    const ins = document.querySelectorAll('#new-poll-options input');
+    ins[ins.length - 1].focus();
+}
+$('new-poll-add-opt').addEventListener('click', agregarOpcion);
+$('new-poll-options').addEventListener('input', () => clearError('new-poll-options'));
+$('new-poll-options').addEventListener('click', e => {
+    const b = e.target.closest('[data-quitar]'); if (!b) return;
+    const v = valoresOpciones(); v.splice(+b.dataset.quitar, 1);
+    pintarOpciones(v);
+});
+$('new-poll-options').addEventListener('keydown', e => {
+    // Enter en la última opción agrega otra (en vez de enviar el formulario)
+    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+    e.preventDefault();
+    const ins = [...document.querySelectorAll('#new-poll-options input')], i = ins.indexOf(e.target);
+    if (i < ins.length - 1) ins[i + 1].focus(); else if (e.target.value.trim()) agregarOpcion();
+});
+$('new-poll-options').addEventListener('paste', e => {
+    // Si se pegan varias líneas, cada una queda en su propio espacio
+    const lineas = (e.clipboardData || window.clipboardData).getData('text').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lineas.length < 2 || e.target.tagName !== 'INPUT') return;
+    e.preventDefault();
+    const v = valoresOpciones(), i = [...document.querySelectorAll('#new-poll-options input')].indexOf(e.target);
+    v.splice(i, 1, ...lineas);
+    pintarOpciones(v.filter((x, k) => x.trim() || k < 2).slice(0, DB.MAX_OPCIONES));
+});
+pintarOpciones(['', '']);
 
 function toggleSinPregunta(on) {
     const t = $('new-poll-title');

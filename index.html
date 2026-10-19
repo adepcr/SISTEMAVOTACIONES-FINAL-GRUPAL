@@ -281,8 +281,9 @@
                         </div>
 
                         <div>
-                            <label for="new-poll-options" class="block text-sm font-bold text-gray-700 uppercase mb-1">Opciones de Respuesta (Una por línea) *</label>
-                            <textarea id="new-poll-options" oninput="clearError('new-poll-options')" rows="3" placeholder="Opción A&#10;Opción B&#10;En Blanco" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none transition"></textarea>
+                            <span class="block text-sm font-bold text-gray-700 uppercase mb-1">Opciones de Respuesta *</span>
+                            <div id="new-poll-options" class="space-y-2 rounded-xl border-2 border-transparent"></div>
+                            <button type="button" id="new-poll-add-opt" class="mt-2 px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200 text-sm font-bold"><i class="fa-solid fa-plus mr-1"></i>Agregar opción</button>
                             <span id="err-new-poll-options" class="text-xs font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Debe redactar al menos dos opciones</span>
                         </div>
 
