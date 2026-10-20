@@ -82,7 +82,7 @@
         }
         return { t, tono, L, ev };
     }
-    window.XR = { describir, evaluar, veredicto }; // lo usa el acta PDF
+    window.XR = { describir, evaluar, veredicto }; // lo usa la minuta PDF
 
     /* ---------- Formulario sencillo (crear y editar) ---------- */
     const inp = "w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none bg-white";

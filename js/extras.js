@@ -3,7 +3,7 @@
    - Participación por filial (provincia)
    - Resultados con gráfico de dona, ganador destacado y aviso de empate (SVG, sin librerías)
    - Exportar a Excel (resultados y bitácora) + filtros de bitácora por fecha y acción + borrar bitácora
-   - Acta oficial en PDF (con logo, resultados, participación y firmas)
+   - Minuta oficial en PDF (con logo, resultados, participación y firmas)
    No modifica app.js ni db.js. Para quitarlo: borrar la línea  await cargar("js/extras.js");  de index.html */
 (function () {
     "use strict";
@@ -95,7 +95,7 @@
             if (card.children[1]) card.insertBefore(box, card.children[1]);
             if (admin) {
                 const zona = card.children[0] && card.children[0].children[1];
-                if (zona) zona.insertAdjacentHTML("beforeend", `<button type="button" data-xt-acta="${p.id}" class="bg-adep-green text-white text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm"><i class="fa-solid fa-stamp"></i> Acta</button>`);
+                if (zona) zona.insertAdjacentHTML("beforeend", `<button type="button" data-xt-acta="${p.id}" class="bg-adep-green text-white text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm"><i class="fa-solid fa-stamp"></i> Minuta</button>`);
             }
         });
     }
@@ -291,7 +291,7 @@
         showToast("Archivo de Excel descargado.", "success");
     }
 
-    /* ---------- Acta oficial en PDF ---------- */
+    /* ---------- Minuta oficial en PDF ---------- */
     let logoActa = null; // imagen del logo en formato dataURL (se carga una vez)
     async function cargarLogo() {
         if (logoActa) return logoActa;
@@ -324,7 +324,7 @@
         }
         doc.setFont("helvetica", "bold"); doc.setTextColor(0, 135, 68);
         doc.setFontSize(12); doc.text("ASOCIACIÓN DE EDUCADORES PENSIONADOS", 105, 56, { align: "center" });
-        doc.setFontSize(17); doc.setTextColor(4, 73, 42); doc.text("ACTA OFICIAL DE RESULTADOS", 105, 67, { align: "center" });
+        doc.setFontSize(17); doc.setTextColor(4, 73, 42); doc.text("MINUTA OFICIAL DE RESULTADOS", 105, 67, { align: "center" });
         doc.setDrawColor(229, 37, 33); doc.setLineWidth(0.8); doc.line(40, 71, 170, 71);
 
         doc.setTextColor(0, 0, 0); doc.setFontSize(10.5);
@@ -380,7 +380,7 @@
         y += 4;
         doc.setTextColor(60, 60, 60); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         const nota = p.publica ? "Esta consulta fue de voto público." : "Esta consulta fue de voto secreto: el sistema no guarda qué eligió cada afiliado.";
-        doc.text(doc.splitTextToSize(nota + " Los resultados corresponden al momento de emisión de esta acta.", 170), 20, y);
+        doc.text(doc.splitTextToSize(nota + " Los resultados corresponden al momento de emisión de esta minuta.", 170), 20, y);
 
         // Firmas
         if (y > 225) { doc.addPage(); marco(); }
@@ -392,8 +392,8 @@
         doc.setFontSize(8); doc.setTextColor(110, 110, 110);
         doc.text(`Documento generado por ${user.nombre} desde ADEP Vota`, 105, 281, { align: "center" });
 
-        DB.log("Acta PDF generada", p.titulo);
-        doc.save(`Acta_${(p.titulo || "consulta").replace(/[^\wÁÉÍÓÚáéíóúñÑ]+/g, "_").slice(0, 25)}_${sello()}.pdf`);
+        DB.log("Minuta PDF generada", p.titulo);
+        doc.save(`Minuta_${(p.titulo || "consulta").replace(/[^\wÁÉÍÓÚáéíóúñÑ]+/g, "_").slice(0, 25)}_${sello()}.pdf`);
     }
 
     window.generarActa = acta; // también la usa "Eliminar consulta" en app.js

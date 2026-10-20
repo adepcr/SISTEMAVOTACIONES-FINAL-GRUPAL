@@ -266,6 +266,8 @@
                             <label for="new-poll-title" class="block text-sm font-bold text-gray-700 uppercase mb-1">Título de la votación / Pregunta *</label>
                             <input type="text" id="new-poll-title" oninput="clearError('new-poll-title')" placeholder="Ej: ¿Aprueba el presupuesto para actividades culturales 2027?" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none transition">
                             <span id="err-new-poll-title" class="text-xs font-bold text-adep-red hidden mt-1"><i class="fa-solid fa-circle-exclamation"></i> Ingrese la pregunta</span>
+                            <!-- Preguntas sugeridas según la categoría (al tocar una, se escribe arriba) -->
+                            <div id="new-poll-sugerencias" class="hidden mt-2 space-y-2"></div>
                         </div>
 
                         <div>
@@ -391,9 +393,9 @@
                 </div>
                 <div class="p-6 space-y-4 text-center">
                     <p id="dp-title" class="font-bold text-gray-900"></p>
-                    <p class="text-sm text-gray-600">Se borrarán la consulta y todos sus votos. ¿Desea descargar el acta con los resultados antes de eliminarla?</p>
+                    <p class="text-sm text-gray-600">Se borrarán la consulta y todos sus votos. ¿Desea descargar la minuta con los resultados antes de eliminarla?</p>
                     <div class="grid gap-3">
-                        <button id="dp-pdf" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-stamp mr-1"></i> Descargar acta y eliminar</button>
+                        <button id="dp-pdf" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-stamp mr-1"></i> Descargar minuta y eliminar</button>
                         <button id="dp-nopdf" class="w-full bg-adep-redLight text-adep-red border border-red-200 font-bold py-3 rounded-xl">Eliminar sin descargar</button>
                         <button id="dp-cancel" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Cancelar</button>
                     </div>

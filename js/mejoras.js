@@ -357,7 +357,7 @@
                 [
                     "Revise los resultados de cada consulta.",
                     "Abra «Registro de participación» para ver quién ya votó y quién está pendiente.",
-                    "El botón «Acta» descarga el acta oficial en PDF, con el logo de ADEP.",
+                    "El botón «Minuta» descarga la minuta oficial en PDF, con el logo de ADEP.",
                 ],
             ],
         },
@@ -365,7 +365,7 @@
             ad: [
                 "Crear una consulta",
                 [
-                    "Escriba la pregunta y elija la categoría.",
+                    "Escriba la pregunta y elija la categoría. Al elegir la categoría aparecen preguntas sugeridas: toque una para usarla.",
                     "Escriba cada opción en su propio espacio (mínimo dos). Use «Agregar opción» para sumar más.",
                     "Si desea programarla, elija la fecha de apertura y de cierre en el calendario.",
                     "Marque «Publicar de inmediato» o publíquela después en «Gestionar».",
@@ -380,7 +380,7 @@
                     "Publique o retire cada consulta.",
                     "«Cerrar ahora» detiene la votación.",
                     "Si ya hay votos, la modalidad (secreta o pública) no se puede cambiar.",
-                    "«Eliminar» le ofrece descargar el acta antes de borrar.",
+                    "«Eliminar» le ofrece descargar la minuta antes de borrar.",
                 ],
             ],
         },

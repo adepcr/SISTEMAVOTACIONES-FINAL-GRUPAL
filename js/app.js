@@ -500,11 +500,50 @@ $('new-poll-options').addEventListener('paste', e => {
 });
 pintarOpciones(['', '']);
 
+// ===== Preguntas sugeridas según la categoría: al tocar una, se escribe en la pregunta =====
+const SUGERENCIAS = {
+    'Presupuesto': [
+        '¿Aprueba el presupuesto anual presentado por la Junta Directiva?',
+        '¿Está de acuerdo con destinar fondos a actividades culturales y recreativas?',
+        '¿Aprueba la modificación al presupuesto vigente?'
+    ],
+    'Candidato': [
+        '¿A quién elige para la Junta Directiva?',
+        '¿Por quién vota para el cargo de Presidencia?',
+        '¿Por quién vota para el cargo de Fiscalía?'
+    ],
+    'Propuesta': [
+        '¿Aprueba la propuesta presentada en la asamblea?',
+        '¿Está de acuerdo con la modificación del reglamento interno?',
+        '¿Apoya la realización de esta actividad para los afiliados?'
+    ],
+    'Retroalimentación': [
+        '¿Cómo califica las actividades realizadas por ADEP este año?',
+        '¿Qué tan satisfecho(a) está con los servicios de ADEP?',
+        '¿Qué tipo de actividad le gustaría que ADEP organice próximamente?'
+    ]
+};
+function pintarSugerencias() {
+    const caja = $('new-poll-sugerencias'), lista = SUGERENCIAS[$('new-poll-cat').value] || [];
+    const ver = lista.length && !$('new-poll-noquestion').checked;
+    caja.classList.toggle('hidden', !ver);
+    caja.innerHTML = ver ? `<p class="text-xs font-bold text-gray-500"><i class="fa-regular fa-lightbulb mr-1 text-amber-500"></i>Preguntas sugeridas (toque una para usarla):</p>`
+        + lista.map(t => `<button type="button" data-sugerencia="${esc(t)}" class="block w-full text-left text-sm font-semibold text-adep-green bg-adep-greenLight border border-emerald-200 hover:bg-emerald-100 rounded-xl px-3 py-2">${esc(t)}</button>`).join('') : '';
+}
+$('new-poll-cat').addEventListener('change', pintarSugerencias);
+$('new-poll-sugerencias').addEventListener('click', e => {
+    const b = e.target.closest('[data-sugerencia]'); if (!b) return;
+    const t = $('new-poll-title');
+    t.value = b.dataset.sugerencia; clearError('new-poll-title'); t.focus();
+});
+$('form-new-poll').addEventListener('reset', () => setTimeout(pintarSugerencias, 0));
+
 function toggleSinPregunta(on) {
     const t = $('new-poll-title');
     t.disabled = on; if (on) { t.value = ''; clearError('new-poll-title'); }
     t.classList.toggle('opacity-50', on);
     t.placeholder = on ? 'Esta consulta no lleva pregunta (solo respuestas)' : 'Ej: ¿Aprueba el presupuesto para actividades culturales 2027?';
+    pintarSugerencias();
 }
 
 function renderManage() {
@@ -541,11 +580,11 @@ $('manage-list').addEventListener('click', e => {
         if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;
         DB.updatePoll(id, { cierre: new Date().toISOString() }, `Consulta cerrada manualmente: ${p.titulo}`);
     }
-    if (act === 'del') return openDelPoll(id); // pregunta si desea descargar el acta antes de eliminar
+    if (act === 'del') return openDelPoll(id); // pregunta si desea descargar la minuta antes de eliminar
     renderAll();
 });
 
-// ===== Administrador: eliminar consulta (ofrece descargar el acta primero) =====
+// ===== Administrador: eliminar consulta (ofrece descargar la minuta primero) =====
 function openDelPoll(id) {
     const p = DB.polls().find(x => x.id === id); if (!p) return;
     pendingDel = id;
