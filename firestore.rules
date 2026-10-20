@@ -187,12 +187,20 @@ service cloud.firestore {
     }
 
     // Conteo de votos: c0..c9 = votos por opción. El voto secreto existe SOLO aquí, sin cédula.
-    // Los afiliados solo lo leen cuando la votación cerró (así nadie ve resultados parciales).
+    // Nadie lo lee hasta que la votación cerró (marca «resultados»): ni los afiliados ni el administrador.
+    // Así, mirando quién acaba de votar y qué conteo subió, no se puede deducir un voto secreto.
+    // (Las votaciones públicas ya muestran los nombres: el administrador las ve en vivo desde «votos».)
     match /conteos/{pollId} {
-      allow read: if esAdmin() || (esAfiliado() && cerrada(pollId));
+      allow read: if miembro() && cerrada(pollId);
       allow create, delete: if esAdmin();
-      allow update: if esAdmin()
+      allow update: if (esAdmin() && sinNegativos())
         || (esAfiliado() && abierta(pollId) && votoNuevo(pollId) && sumaUnVoto());
+    }
+    // Al restaurar un voto, ningún conteo puede quedar en negativo
+    function sinNegativos() {
+      let c = request.resource.data;
+      return c.total >= 0 && c.c0 >= 0 && c.c1 >= 0 && c.c2 >= 0 && c.c3 >= 0 && c.c4 >= 0
+        && c.c5 >= 0 && c.c6 >= 0 && c.c7 >= 0 && c.c8 >= 0 && c.c9 >= 0;
     }
 
     // Exactamente una opción sube en 1 y el total sube en 1
@@ -254,9 +262,15 @@ service cloud.firestore {
     }
 
     // ---------------- Bitácora ----------------
+    // Solo afiliados y administradores escriben, y «por» tiene que ser su nombre real (no se puede firmar como otro)
+    function miNombre() {
+      return esAdmin() ? get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.nombre
+                       : get(/databases/$(database)/documents/afiliados/$(miCedula())).data.nombre;
+    }
     match /auditoria/{id} {
       allow read, delete: if esAdmin();
-      allow create: if conectado()
+      allow create: if miembro()
+        && request.resource.data.por == miNombre()
         && request.resource.data.keys().hasOnly(['fecha', 'accion', 'detalle', 'por', 'uid'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.fecha == request.time

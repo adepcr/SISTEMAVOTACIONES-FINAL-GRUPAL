@@ -97,7 +97,7 @@ await prueba("Voto público con opción que NO coincide es rechazado", () => ass
 const votoF = (d, ced, idx, opcion, filial) => b => b.set(doc(d, "votos/2_" + ced), { pollId: "2", cedula: ced, nombre: "X", filial, opcion, idx, codigo: "ADEP-PUB-" + ced, fecha: "hoy" });
 await prueba("Voto público con filial FALSA es rechazado", () => assertFails(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", "Limón"))));
 await prueba("Voto público con su filial real funciona", () => assertSucceeds(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", ""))));
-const c = (await getDoc(doc(A, "conteos/1"))).data(); await prueba("Conteo final correcto (1 voto a la opción 1)", async () => { if (c.c0 !== 1 || c.total !== 1) throw new Error(JSON.stringify(c)); });
+let c; await env.withSecurityRulesDisabled(async x => { c = (await getDoc(doc(x.firestore(), "conteos/1"))).data(); }); await prueba("Conteo final correcto (1 voto a la opción 1)", async () => { if (c.c0 !== 1 || c.total !== 1) throw new Error(JSON.stringify(c)); });
 
 // ---------- Resultados parciales bloqueados ----------
 await prueba("Afiliado NO lee el conteo de una votación ABIERTA", () => assertFails(getDoc(doc(M, "conteos/1"))));
@@ -109,12 +109,16 @@ await prueba("Afiliado NO puede marcar resultados de una votación ABIERTA", () 
 await prueba("Afiliado NO puede cambiar otra cosa junto con la marca", () => assertFails(updateDoc(doc(M, "polls/3"), { resultados: true, titulo: "Hackeada" })));
 await prueba("Afiliado marca los resultados de una votación que YA cerró", () => assertSucceeds(updateDoc(doc(M, "polls/3"), { resultados: true })));
 await prueba("Afiliado lee el conteo de una votación CERRADA", () => assertSucceeds(getDoc(doc(M, "conteos/3"))));
-await prueba("Admin lee el conteo de una votación abierta", () => assertSucceeds(getDoc(doc(A, "conteos/1"))));
+await prueba("Admin tampoco lee el conteo de una votación secreta ABIERTA (protege el secreto)", () => assertFails(getDoc(doc(A, "conteos/1"))));
+await prueba("Admin NO puede dejar un conteo en negativo", () => assertFails(updateDoc(doc(A, "conteos/1"), { c2: increment(-1), total: increment(-1) })));
 await prueba("Admin cierra la votación pública", () => assertSucceeds(updateDoc(doc(A, "polls/2"), { cierreMs: ahora - 1000, resultados: true })));
 await prueba("Afiliado lista los votos públicos de una votación CERRADA", () => assertSucceeds(getDocs(query(collection(M, "votos"), where("pollId", "==", "2")))));
 
 // ---------- Bitácora ----------
 await prueba("Afiliada registra en la bitácora con su cuenta", () => assertSucceeds(addDoc(collection(M, "auditoria"), { fecha: serverTimestamp(), accion: "Ingreso", detalle: "", por: "María", uid: "maria" })));
+await prueba("NO puede firmar la bitácora con el nombre de otra persona", () => assertFails(addDoc(collection(M, "auditoria"), { fecha: serverTimestamp(), accion: "X", detalle: "", por: "Presidente", uid: "maria" })));
+await prueba("Una cuenta que NO es afiliado ni administrador NO escribe en la bitácora", () => assertFails(addDoc(collection(db("extrano"), "auditoria"), { fecha: serverTimestamp(), accion: "X", detalle: "", por: "X", uid: "extrano" })));
+await prueba("Admin registra en la bitácora con su nombre", () => assertSucceeds(addDoc(collection(A, "auditoria"), { fecha: serverTimestamp(), accion: "X", detalle: "", por: "Admin", uid: "adm1" })));
 await prueba("NO puede registrar a nombre de otra cuenta", () => assertFails(addDoc(collection(M, "auditoria"), { fecha: serverTimestamp(), accion: "X", detalle: "", por: "Admin", uid: "adm1" })));
 await prueba("NO puede inventar la fecha", () => assertFails(addDoc(collection(M, "auditoria"), { fecha: "2020-01-01", accion: "X", detalle: "", por: "María", uid: "maria" })));
 await prueba("Admin lee y borra la bitácora", async () => { const s = await assertSucceeds(getDocs(collection(A, "auditoria"))); await assertSucceeds(deleteDoc(s.docs[0].ref)); });

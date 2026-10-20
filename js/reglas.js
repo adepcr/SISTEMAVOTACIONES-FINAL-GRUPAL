@@ -44,7 +44,7 @@
     function evaluar(p) {
         const r = regla(p);
         if (!r.q && !r.m) return null;
-        const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length, padron = DB.padron();
+        const votes = DB.votes().filter(v => v.pollId === p.id), total = DB.participantes(p.id), padron = DB.padron();
         const ev = { fin: DB.estado(p) === "cerrada", total, padron, part: padron ? total * 100 / padron : 0, quorumOk: true, mayOk: true, ganador: null, pct: 0, empate: false };
         if (r.q) ev.quorumOk = padron > 0 && total * 100 >= r.q * padron;
         if (r.m) {
@@ -216,7 +216,7 @@
         const ed = e.target.closest("[data-xr-edit]");
         if (ed) {
             const id = +ed.dataset.xrEdit, p = DB.polls().find(x => x.id === id); if (!p) return;
-            if (DB.votes().some(v => v.pollId === id)) return showToast("No se pueden cambiar las reglas: la consulta ya tiene votos.");
+            if (DB.participantes(id)) return showToast("No se pueden cambiar las reglas: la consulta ya tiene votos.");
             cerrar();
             const m = document.createElement("div");
             m.id = "xr-modal"; m.dataset.poll = id;
@@ -238,7 +238,7 @@
         const m = q("xr-modal"), id = +m.dataset.poll, p = DB.polls().find(x => x.id === id);
         const r = leer("xe", p && p.mayoriaBase);
         if (r.error) return showToast(r.error);
-        if (!p || DB.votes().some(v => v.pollId === id)) { cerrar(); return showToast("No se pueden cambiar las reglas: la consulta ya tiene votos."); }
+        if (!p || DB.participantes(id)) { cerrar(); return showToast("No se pueden cambiar las reglas: la consulta ya tiene votos."); }
         DB.updatePoll(id, r, `Reglas de la votación actualizadas: ${p.titulo}`);
         cerrar();
         showToast("Reglas guardadas.", "success");

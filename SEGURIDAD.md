@@ -65,7 +65,7 @@ Entre a **https://console.firebase.google.com** → proyecto **ADEP Vota** (`ade
 
 ## Para técnicos: probar las reglas
 
-Las pruebas están en `tests/reglas.test.mjs` (90 casos: votar dos veces, entrar con la cédula de otro, ver resultados antes del cierre, sumar a dos opciones, códigos falsos, leer datos ajenos, etc.). Necesitan Node.js y Java:
+Las pruebas están en `tests/reglas.test.mjs` (94 casos: votar dos veces, entrar con la cédula de otro, ver resultados antes del cierre, firmar la bitácora como otro, sumar a dos opciones, códigos falsos, leer datos ajenos, etc.). Necesitan Node.js y Java:
 
 ```bash
 cd tests

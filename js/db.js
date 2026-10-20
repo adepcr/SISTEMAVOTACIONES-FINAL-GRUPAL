@@ -370,7 +370,8 @@ const DB = {
     },
     _sincronizarCerradas() {
         this._marcarResultados();
-        if (!this.yo || this.yo.rol === 'Administrador') return;
+        if (!this.yo) return;
+        const admin = this.yo.rol === 'Administrador';   // el administrador ya recibe todos los votos públicos
         const cerradas = new Map(this._polls.filter(p => this.estado(p) === 'cerrada' && p.resultados).map(p => [String(p.id), p]));
         let cambio = false;
         Object.keys(this._cerradas).forEach(id => {
@@ -384,13 +385,14 @@ const DB = {
             // Si falla (por ejemplo, sin conexión), se reintenta en la próxima revisión
             const fallo = e => { console.warn('Resultados aún no disponibles', id, e && e.code); (this._cerradas[id] || []).forEach(fin => fin()); delete this._cerradas[id]; };
             const subs = [FB.onSnapshot(this._ref('conteos', id), s => { this._conteos[id] = s.exists() ? s.data() : {}; this._votesCache = null; this._redibujar(); }, fallo)];
-            if (p.publica) subs.push(FB.onSnapshot(FB.query(this._col('votos'), FB.where('pollId', '==', id)), s => {
+            if (p.publica && !admin) subs.push(FB.onSnapshot(FB.query(this._col('votos'), FB.where('pollId', '==', id)), s => {
                 this._votosCerrados[id] = this._docs(s).map(v => ({ ...v, pollId: Number(v.pollId) }));
                 this._unirVotos();
             }, fallo));
             this._cerradas[id] = subs;
         });
-        if (cambio) this._unirVotos();
+        if (cambio && !admin) this._unirVotos();
+        if (cambio && admin) { this._votesCache = null; this._redibujar(); }
     },
     async _escuchar() {
         const admin = this.yo.rol === 'Administrador';
@@ -408,9 +410,7 @@ const DB = {
             }),
             this._escuchar1(this._ref('config', 'general'), s => { this._config = s.exists() ? s.data() : {}; })
         ];
-        if (admin) cargas.push(this._escuchar1(this._col('conteos'), s => {
-            this._conteos = {}; s.docs.forEach(d => { this._conteos[d.id] = d.data(); });
-        }));
+        // Los conteos (de todos, también del administrador) se piden por votación al cerrar: ver _sincronizarCerradas.
         // Una votación puede cerrarse sola por la hora: se revisa cada 30 s
         setInterval(() => this._sincronizarCerradas(), 30000);
         if (admin) cargas.push(
@@ -665,9 +665,17 @@ const DB = {
         return (this._votesCache = out);
     },
     // ¿Ya llegaron los resultados de esta consulta? (el afiliado los recibe solo al cerrar)
+    // Afiliados: al cerrar. Administrador: votación pública en vivo (ya ve los nombres); secreta, al cerrar.
     resultadosListos(p) {
-        if (this.yo && this.yo.rol === 'Administrador') return true;
+        if (this.yo && this.yo.rol === 'Administrador' && p.publica) return true;
         return this.estado(p) === 'cerrada' && !!p.resultados && !!this._conteos[String(p.id)];
+    },
+    // Cuántos afiliados votaron. El administrador lo sabe en vivo por la lista de participación (sin la opción);
+    // el afiliado, por el conteo al cierre.
+    participantes(pollId) {
+        if (this.yo && this.yo.rol === 'Administrador') return this._part.filter(r => r.pollId === pollId).length;
+        const c = this._conteos[String(pollId)];
+        return c ? c.total || 0 : 0;
     },
     // Quién votó en consultas secretas (sin la opción). El afiliado solo ve lo suyo.
     voters() {
@@ -729,15 +737,20 @@ const DB = {
             if (!v) return { error: 'No se encontró el voto de este afiliado.' };
             idx = v.idx;
         } else {
+            // El conteo de una votación secreta abierta no se puede leer: si esa opción no tiene votos, las reglas lo rechazan
             idx = poll.opciones.indexOf(opcion);
-            if (idx < 0 || !((this._conteos[pid] || {})['c' + idx] > 0)) return { error: 'No hay votos registrados con esa opción.' };
+            if (idx < 0) return { error: 'Elija una opción válida.' };
         }
         const b = FB.writeBatch(FB.db);
         b.update(this._ref('conteos', pid), { ['c' + idx]: FB.increment(-1), total: FB.increment(-1) });
         b.delete(this._ref('participacion', id));
         if (poll.publica) b.delete(this._ref('votos', id));
         if (part.codigo) b.delete(this._ref('codigos', part.codigo));
-        try { await b.commit(); } catch (e) { this._falla(e); return { error: 'No se pudo restaurar el voto.' }; }
+        try { await b.commit(); }
+        catch (e) {
+            if (!poll.publica && String(e.code || '').includes('permission')) return { error: 'No se pudo restaurar: la opción elegida no tiene votos. Revise con el afiliado qué opción eligió.' };
+            this._falla(e); return { error: 'No se pudo restaurar el voto.' };
+        }
         const a = this._afiliados[cedula];
         this.log('Voto restaurado', `${poll.titulo} · ${a ? a.nombre : cedula}`.slice(0, 120));
         return { ok: true };

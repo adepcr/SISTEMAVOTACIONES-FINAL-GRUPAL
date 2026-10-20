@@ -133,8 +133,17 @@
                     <select id="xt-f-poll" aria-label="Consulta a analizar" class="border-2 border-gray-300 rounded-xl p-2.5 font-semibold bg-white max-w-full"></select>
                 </div>
                 <div id="xt-filial" class="space-y-4"></div>
+            </div>
+            <div class="xt-box space-y-3">
+                <h3 class="font-extrabold text-lg text-gray-900"><i class="fa-solid fa-shield-halved text-adep-green mr-1"></i> Respaldo de datos</h3>
+                <p class="text-gray-600">Firebase (plan gratuito) no guarda copias automáticas. Descargue un respaldo completo cada semana y después de cada votación, y guárdelo en un lugar seguro (por ejemplo, Google Drive de ADEP). Contiene datos personales de los afiliados: no lo comparta.</p>
+                <button type="button" id="xt-respaldo" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold px-4 py-3 rounded-xl"><i class="fa-solid fa-download mr-1"></i> Descargar respaldo completo</button>
+                <p id="xt-respaldo-info" class="text-sm text-gray-500"></p>
             </div>`;
         main.prepend(sec);
+        q("xt-respaldo").addEventListener("click", descargarRespaldo);
+        const ult = (() => { try { return localStorage.getItem("adep_ultimo_respaldo"); } catch { return null; } })();
+        q("xt-respaldo-info").textContent = ult ? `Último respaldo descargado en este equipo: ${fmtF(ult)}.` : "Todavía no ha descargado un respaldo en este equipo.";
         q("xt-f-poll").addEventListener("change", e => { filialSel = e.target.value; renderFilial(); });
 
         // Resultados: botón de exportar a Excel en el encabezado
@@ -184,7 +193,7 @@
         const abiertas = polls.filter(p => DB.estado(p) === "abierta").length;
         const medibles = polls.filter(p => p.publicada && DB.estado(p) !== "programada");
         const prom = medibles.length && padron
-            ? Math.round(medibles.reduce((s, p) => s + Math.min(100, DB.votes().filter(v => v.pollId === p.id).length * 100 / padron), 0) / medibles.length) + "%"
+            ? Math.round(medibles.reduce((s, p) => s + Math.min(100, DB.participantes(p.id) * 100 / padron), 0) / medibles.length) + "%"
             : "—";
         const hoy = new Date().toLocaleDateString("es-CR");
         const hoyN = DB.voters().filter(r => String(r.fecha).startsWith(hoy)).length
@@ -230,12 +239,55 @@
             + `<p class="text-sm text-gray-500">Mayor participación: <strong>${E(filas[0].f)}</strong> (${filas[0].pct}%).${uno ? "" : " Se promedian todas las consultas abiertas y cerradas."}</p>`;
     }
 
+    /* ---------- Respaldo completo (archivo .json con todas las colecciones) ---------- */
+    async function descargarRespaldo() {
+        const b = q("xt-respaldo"); if (b.disabled) return;
+        b.disabled = true; const txt = b.innerHTML; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Preparando respaldo…';
+        // Fechas de Firestore → texto ISO, para que el archivo se pueda leer y volver a cargar
+        const limpio = v => v && typeof v.toDate === "function" ? v.toDate().toISOString()
+            : Array.isArray(v) ? v.map(limpio)
+            : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, limpio(x)])) : v;
+        const COLS = ["config", "admins", "afiliados", "activaciones", "acceso", "cuentas", "ingresos", "alertas",
+            "polls", "participacion", "votos", "codigos", "auditoria", "eliminados"];
+        const datos = {}, faltan = [];
+        try {
+            for (const c of COLS) {
+                try {
+                    const s = await FB.getDocs(FB.collection(FB.db, c));
+                    datos[c] = Object.fromEntries(s.docs.map(d => [d.id, limpio(d.data())]));
+                } catch (e) { console.error(c, e); faltan.push(c); }
+            }
+            // Conteos: uno por uno (los de votaciones secretas abiertas nadie los puede leer hasta el cierre)
+            datos.conteos = {};
+            for (const p of DB.polls()) {
+                try { const s = await FB.getDoc(FB.doc(FB.db, "conteos", String(p.id))); if (s.exists()) datos.conteos[p.id] = s.data(); }
+                catch { /* votación secreta abierta: su conteo se sabrá al cerrar */ }
+            }
+            const archivo = {
+                sistema: "ADEP Vota", generado: new Date().toISOString(), por: user.nombre,
+                nota: "Respaldo completo de la base de datos. Los conteos de votaciones secretas todavía abiertas no se incluyen (nadie puede leerlos hasta el cierre); la participación sí.",
+                ...(faltan.length ? { incompleto: faltan } : {}), datos
+            };
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(archivo, null, 1)], { type: "application/json" }));
+            a.download = `Respaldo_ADEP_Vota_${sello()}.json`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            try { localStorage.setItem("adep_ultimo_respaldo", archivo.generado); } catch { }
+            q("xt-respaldo-info").textContent = `Último respaldo descargado en este equipo: ${fmtF(archivo.generado)}.`;
+            DB.log("Respaldo completo descargado", faltan.length ? `Incompleto: ${faltan.join(", ")}` : `${Object.values(datos).reduce((n, c) => n + Object.keys(c).length, 0)} registro(s)`);
+            showToast(faltan.length ? "Respaldo descargado, pero faltaron algunas partes. Revise su conexión e intente de nuevo." : "Respaldo descargado. Guárdelo en un lugar seguro.", faltan.length ? "error" : "success");
+        } finally { b.disabled = false; b.innerHTML = txt; }
+    }
+
     /* ---------- Exportar resultados ---------- */
     function exportarResultados() {
         const padron = DB.padron();
         const filas = [["Consulta", "Categoría", "Modalidad", "Estado", "Opción", "Votos", "% de votos", "Total de votos", "Afiliados activos", "% participación"]];
         DB.polls().forEach(p => {
-            const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length;
+            const votes = DB.votes().filter(v => v.pollId === p.id), total = DB.participantes(p.id);
+            // Votación secreta abierta: el conteo por opción todavía no se puede ver
+            if (!DB.resultadosListos(p)) return filas.push([p.titulo, p.categoria, p.publica ? "Pública" : "Secreta", ESTADOS[DB.estado(p)], "(se verá al cerrar)", "", "", total, padron, padron ? Math.min(1, total / padron) : 0]);
             p.opciones.forEach(o => {
                 const n = votes.filter(v => v.opcion === o).length;
                 filas.push([p.titulo, p.categoria, p.publica ? "Pública" : "Secreta", ESTADOS[DB.estado(p)], o, n, total ? n / total : 0, total, padron, padron ? Math.min(1, total / padron) : 0]);
@@ -325,6 +377,7 @@
     async function acta(pollId, conNombres) {
         const p = DB.polls().find(x => x.id === pollId);
         if (!p) { showToast("Consulta no encontrada."); return false; }
+        if (!DB.resultadosListos(p)) { showToast("La minuta de una votación secreta se puede descargar cuando la votación cierre."); return false; }
         if (conNombres === undefined) conNombres = await preguntarNombres(p);
         if (conNombres === null) return false;
         const logo = await cargarLogo();

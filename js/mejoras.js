@@ -312,6 +312,7 @@
                     "Las tarjetas muestran los afiliados activos, las votaciones abiertas, la participación y los votos de hoy.",
                     "Abajo verá la participación de cada filial. Puede elegir una consulta en la lista.",
                     "Use las pestañas de arriba para crear, gestionar y revisar votaciones.",
+                    "Abajo, «Descargar respaldo completo» guarda una copia de todos los datos. Hágalo cada semana y después de cada votación.",
                 ],
             ],
         },
@@ -355,7 +356,7 @@
             ad: [
                 "Resultados y participación",
                 [
-                    "Revise los resultados de cada consulta.",
+                    "Revise los resultados de cada consulta. En las votaciones secretas, el conteo de cada opción se ve al cerrar (así nadie puede deducir qué votó cada persona); la participación se ve en vivo.",
                     "Abra «Registro de participación» para ver quién ya votó y quién está pendiente.",
                     "El botón «Minuta» descarga la minuta oficial en PDF, con el logo de ADEP.",
                 ],
