@@ -330,6 +330,8 @@ function renderResults() {
     $('results-list').innerHTML = polls.map(p => {
         const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length;
         const part = padron ? Math.min(100, Math.round(total * 100 / padron)) : 0;
+        // Los afiliados ven los resultados solo al cerrar la votación (para no influir en quien no ha votado)
+        const oculto = !isAdmin && DB.estado(p) !== 'cerrada';
         let detalle = '';
         if (isAdmin) {
             const q = quienVoto(p.id);
@@ -358,7 +360,11 @@ function renderResults() {
                     <span class="text-xs font-bold text-adep-green bg-adep-greenLight px-2.5 py-1 rounded-full whitespace-nowrap">${p.publica ? 'Nombres visibles' : 'Voto secreto'}</span>
                 </div>
             </div>
-            <div class="space-y-4">${rows}</div>
+            ${oculto ? `<div class="rounded-xl border-2 border-dashed border-gray-300 bg-slate-50 p-4 text-center text-gray-600">
+                <i class="fa-solid fa-lock text-2xl text-gray-400 mb-1"></i>
+                <p class="font-bold text-gray-800">Los resultados se mostrarán cuando cierre la votación.</p>
+                ${p.cierre ? `<p class="text-sm mt-1">Cierra: ${fmt(p.cierre)}</p>` : ''}
+            </div>` : `<div class="space-y-4">${rows}</div>`}
             ${DB.estado(p) === 'cerrada' ? `<div class="flex justify-between gap-2 text-sm sm:text-base font-semibold text-gray-500 border-t border-dashed border-gray-200 pt-3"><span><i class="fa-solid fa-ban mr-1"></i>Nulos (no votaron) <span class="block sm:inline text-xs font-normal">No se cuentan en el resultado</span></span><span>${Math.max(0, padron - total)}</span></div>` : ''}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <div class="flex justify-between text-sm font-bold text-gray-700"><span><i class="fa-solid fa-people-group mr-1"></i>Participación</span><span>${total} de ${padron} afiliados (${part}%)</span></div>

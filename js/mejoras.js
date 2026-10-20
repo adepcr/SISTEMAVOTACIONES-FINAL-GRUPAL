@@ -347,7 +347,7 @@
             a: [
                 "Resultados en vivo",
                 [
-                    "Vea cuántos votos lleva cada opción.",
+                    "Cuando una votación cierra, aquí verá cuántos votos tuvo cada opción. Mientras está abierta, solo se muestra cuántos afiliados ya participaron.",
                     "La barra amarilla muestra cuántos afiliados ya participaron.",
                     "Abajo, en «Verificar un comprobante», escriba su código para confirmar que su voto fue contado.",
                 ],
