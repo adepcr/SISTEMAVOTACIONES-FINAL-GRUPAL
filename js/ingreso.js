@@ -46,7 +46,6 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" id="xg-copiar-cod" class="${btnS}"><i class="fa-regular fa-copy mr-1"></i> Copiar código</button>
-                    <button type="button" id="xg-copiar" class="${btnS}"><i class="fa-regular fa-copy mr-1"></i> Copiar mensaje</button>
                     <a id="xg-wa" target="_blank" rel="noopener" class="${btnS}"><i class="fa-brands fa-whatsapp mr-1"></i> Compartir por WhatsApp</a>
                     <button type="button" id="xg-apagar" class="${btnG}"><i class="fa-solid fa-power-off mr-1"></i> Apagar código</button>
                 </div>` : `
@@ -118,10 +117,6 @@
             if (b.id === "xg-copiar-cod") {
                 await navigator.clipboard.writeText(g.codigo);
                 showToast("Código copiado.", "success");
-            }
-            if (b.id === "xg-copiar") {
-                await navigator.clipboard.writeText(mensaje(g));
-                showToast("Mensaje copiado. Péguelo en WhatsApp o donde quiera.", "success");
             }
         } catch (err) { console.error(err); showToast("No se pudo completar. Revise su conexión e intente de nuevo."); }
         const id = b.dataset.id, a = DB.afiliados().find(x => x.cedula === id);

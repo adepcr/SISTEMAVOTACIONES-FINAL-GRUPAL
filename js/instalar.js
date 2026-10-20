@@ -3,7 +3,8 @@
    queda en la pantalla de inicio, sin descargar el APK ni dar permisos de «origen desconocido».
    En iPhone explica cómo agregarla desde «Compartir».
    - En la pantalla de ingreso aparece en la caja #lg-app.
-   - Dentro del sistema aparece como un aviso que se puede cerrar.
+   - Dentro del sistema aparece como un botón pequeño y centrado, solo al final de «Resumen» (administrador)
+     o de «Votaciones» (afiliado), y se puede cerrar.
    No aparece si ya se abrió como app instalada o dentro de la app de Android (Capacitor). */
 (function () {
     "use strict";
@@ -16,6 +17,7 @@
     const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/i.test(ua), android = /Android/i.test(ua);
     const CERRADO = "adep_instalar_cerrado";
     let aviso = null;   // evento de Chrome para pedir la instalación
+    let intentos = 0;   // espera a que exista la sección donde va el botón
 
     const css = `
   .ins-btn{display:flex;align-items:center;justify-content:center;gap:.7rem;width:100%;min-height:60px;border:0;border-radius:1rem;
@@ -24,9 +26,12 @@
   .ins-sub{font-size:.95rem;color:#4a5a53;font-weight:600;line-height:1.4}
   .ins-pasos{background:#fff8e1;border:2px solid #f2d27a;border-radius:1rem;padding:.75rem 1rem;color:#5c4400;font-weight:700;line-height:1.5;text-align:left}
   .ins-ok{background:#e8f5ee;border:2px solid #a7dcbf;border-radius:1rem;padding:.75rem 1rem;color:#04492a;font-weight:800}
-  #ins-banner{display:flex;flex-direction:column;gap:.6rem;background:#fff;border:2px solid #008744;border-radius:1.25rem;padding:1rem;margin:0 auto 1rem;max-width:72rem;position:relative}
-  #ins-banner .x{position:absolute;top:.4rem;right:.4rem;width:40px;height:40px;border:0;border-radius:.7rem;background:#e8f5ee;color:#006b35;font-size:1.1rem}
-  #ins-banner h3{font-weight:900;color:#04492a;font-size:1.1rem;padding-right:2.5rem}`;
+  #ins-banner{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:1.5rem auto 1rem;padding:0 1rem;max-width:30rem;text-align:center}
+  #ins-banner .fila{display:flex;align-items:center;justify-content:center;gap:.4rem;flex-wrap:wrap}
+  .ins-mini{display:inline-flex;align-items:center;gap:.45rem;min-height:44px;padding:.4rem 1rem;border-radius:999px;background:#e8f5ee;border:2px solid #a7dcbf;color:#006b35;font-weight:800;font-size:.95rem;cursor:pointer}
+  .ins-mini:hover{background:#d6efe1}
+  #ins-banner .x{width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:#6b7c73;font-size:1rem}
+  #ins-banner .ins-pasos,#ins-banner .ins-ok{font-size:.95rem}`;
 
     function contenido() {
         if (aviso) return `<button type="button" class="ins-btn" data-ins="instalar"><i class="fa-solid fa-mobile-screen-button"></i> Instalar la app en este celular</button>
@@ -41,15 +46,21 @@
         // Pantalla de ingreso
         const zona = document.getElementById("lg-instalar");
         if (zona) { zona.innerHTML = html; zona.classList.toggle("hidden", !html); }
-        // Dentro del sistema: aviso que se puede cerrar
-        const main = document.querySelector("main");
-        if (!zona && main && html && (aviso || android || ios)) {
+        // Dentro del sistema: botón pequeño y centrado al final de una sola sección, para no estorbar.
+        // «Resumen» la crea extras.js cuando termina de cargar: si todavía no existe, se reintenta.
+        if (!zona && document.querySelector("main") && html) {
             let cerrado = false; try { cerrado = localStorage.getItem(CERRADO) === "1"; } catch { }
             if (cerrado) return;
+            const sec = document.getElementById("sec-resumen")
+                || (typeof user !== "undefined" && user && user.rol !== "Administrador" ? document.getElementById("sec-votacion") : null);
+            if (!sec) { if ((intentos = (intentos || 0) + 1) < 20) setTimeout(pintar, 1000); return; }
             let b = document.getElementById("ins-banner");
-            if (!b) { b = document.createElement("div"); b.id = "ins-banner"; main.before(b); }
-            b.innerHTML = `<button type="button" class="x" data-ins="cerrar" aria-label="Cerrar aviso">✕</button>
-                <h3><i class="fa-solid fa-mobile-screen-button mr-1"></i> Tenga ADEP Vota como app en su celular</h3>${html}`;
+            if (!b || b.parentElement !== sec) { if (b) b.remove(); b = document.createElement("div"); b.id = "ins-banner"; sec.append(b); }
+            const cerrar = '<button type="button" class="x" data-ins="cerrar" aria-label="No mostrar más" title="No mostrar más">✕</button>';
+            b.innerHTML = aviso
+                ? `<div class="fila"><button type="button" class="ins-mini" data-ins="instalar"><i class="fa-solid fa-mobile-screen-button"></i> Instalar la app</button>${cerrar}</div>`
+                : `<div class="fila"><button type="button" class="ins-mini" data-ins="pasos" aria-expanded="false"><i class="fa-solid fa-mobile-screen-button"></i> ¿Cómo instalar la app?</button>${cerrar}</div>
+                   <div class="hidden" data-ins-pasos>${html}</div>`;
         }
     }
 
@@ -66,6 +77,12 @@
         if (t.dataset.ins === "cerrar") {
             try { localStorage.setItem(CERRADO, "1"); } catch { }
             const b = document.getElementById("ins-banner"); if (b) b.remove();
+            return;
+        }
+        if (t.dataset.ins === "pasos") {
+            const p = document.querySelector("[data-ins-pasos]"); if (!p) return;
+            const ver = p.classList.toggle("hidden") === false;
+            t.setAttribute("aria-expanded", String(ver));
             return;
         }
         if (t.dataset.ins === "instalar" && aviso) {
