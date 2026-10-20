@@ -52,6 +52,7 @@
   .bot-b ol{counter-reset:p;display:grid;gap:.6rem;padding:0;margin:.5rem 0 0;list-style:none}
   .bot-b li{counter-increment:p;display:flex;gap:.7rem;line-height:1.45;animation:rb-aparece .35s ease-out both}
   .bot-b li::before{content:counter(p);flex:0 0 1.9rem;height:1.9rem;border-radius:50%;background:#008744;color:#fff;font-weight:800;display:grid;place-items:center}
+  .bot-hola{font-weight:800;color:#006b35;margin-bottom:.4rem}
   .bot-aviso{background:#fff8e1;border:2px solid #f2d27a;border-radius:.85rem;padding:.6rem .8rem;font-weight:700;color:#6b4e00;margin-bottom:.5rem}
   .bot-f{padding:0 1.1rem 1rem}.bot-f button{min-height:48px;padding:0 1rem;border-radius:.9rem;border:2px solid #cfe3d6;background:#e8f5ee;color:#006b35;font-weight:800}
   #bot-globo{position:relative;max-width:min(17rem,calc(100vw - 24px));background:#fff;border:2px solid #008744;border-radius:1.1rem;padding:.75rem 2.4rem .75rem 1rem;font-weight:700;color:#04492a;line-height:1.4;box-shadow:0 14px 30px -14px rgba(4,73,42,.6);cursor:pointer;animation:rb-aparece .3s ease-out}
@@ -454,7 +455,6 @@
         } catch { }
     };
     const esAdmin = () => !!document.getElementById("tab-crear");
-    const nombre = () => (typeof user !== "undefined" && user && user.nombre ? user.nombre.split(" ")[0] : "");
 
     // ---- Boca: habla un rato, o mientras se lee en voz alta ----
     // En la app de celular, js/app-movil.js define estaLeyendo/dejarDeLeer con la voz del teléfono
@@ -483,6 +483,9 @@
         void bot.offsetWidth; // reinicia la animación
         bot.classList.add("saluda");
     }
+
+    // Así se les dice a los afiliados de ADEP
+    const SALUDO = "¡Hola, Adepinos! 👋 Soy Robi, su asistente.";
 
     // ---- Globo de texto: escribe letra por letra mientras mueve la boca ----
     let escribiendo = null, ocultarGlobo = null;
@@ -525,8 +528,8 @@
             aviso = `<p class="bot-aviso">${n ? `Tiene ${n} ${n === 1 ? "votación pendiente" : "votaciones pendientes"}. ¡Vamos a votar!` : "No tiene votaciones pendientes por ahora."}</p>`;
         }
         panel.querySelector(".bot-b").innerHTML =
-            `<h3>${t}</h3>${aviso}<ol>${pasos.map((p, i) => `<li style="animation-delay:${i * 0.35}s"><span>${p}</span></li>`).join("")}</ol>`;
-        texto = `${t}. ` + pasos.map((p, i) => `Paso ${i + 1}: ${p}`).join(" ");
+            `<p class="bot-hola">${SALUDO}</p><h3>${t}</h3>${aviso}<ol>${pasos.map((p, i) => `<li style="animation-delay:${i * 0.35}s"><span>${p}</span></li>`).join("")}</ol>`;
+        texto = `¡Hola, Adepinos! Soy Robi, su asistente. ${t}. ` + pasos.map((p, i) => `Paso ${i + 1}: ${p}`).join(" ");
     }
     function abrirBot(v) {
         const antes = !panel.hidden;
@@ -541,7 +544,7 @@
             hablar(0);
         }
     }
-    let espera = null;
+    let espera = null, saludado = false;
     function revisar() {
         clearTimeout(espera);
         espera = setTimeout(() => {
@@ -558,7 +561,8 @@
                     else {
                         abrirBot(false);
                         saludar();
-                        decir(`¡Hola${nombre() ? ", " + nombre() : ""}! Toque aquí y le explico «${guia()[0]}».`);
+                        decir(`${SALUDO} Toque aquí y le explico «${guia()[0]}».`);
+                        saludado = true;
                     }
                 } else if (!panel.hidden) pintar();
                 else abrirBot(false);
@@ -600,6 +604,13 @@
             attributeFilter: ["class"],
         });
         revisar();
+        // Saludo al abrir la app (una vez por visita), si no saludó ya con la explicación de la sección
+        setTimeout(() => {
+            let ya = false; try { ya = sessionStorage.getItem("adep_robi_saludo") === "1"; sessionStorage.setItem("adep_robi_saludo", "1"); } catch { }
+            if (ya || saludado || !panel.hidden || !globo.hidden) return;
+            saludar();
+            decir(`${SALUDO} Si necesita ayuda, toque aquí.`);
+        }, 1500);
     }
 
     const iniciar = () => {
