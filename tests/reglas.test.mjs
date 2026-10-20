@@ -99,6 +99,20 @@ await prueba("Voto público con filial FALSA es rechazado", () => assertFails(vo
 await prueba("Voto público con su filial real funciona", () => assertSucceeds(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", ""))));
 const c = (await getDoc(doc(A, "conteos/1"))).data(); await prueba("Conteo final correcto (1 voto a la opción 1)", async () => { if (c.c0 !== 1 || c.total !== 1) throw new Error(JSON.stringify(c)); });
 
+// ---------- Resultados parciales bloqueados ----------
+await prueba("Afiliado NO lee el conteo de una votación ABIERTA", () => assertFails(getDoc(doc(M, "conteos/1"))));
+await prueba("Afiliado NO lista los votos públicos de una votación ABIERTA", () => assertFails(getDocs(query(collection(M, "votos"), where("pollId", "==", "2")))));
+await prueba("Afiliado NO lista todos los votos", () => assertFails(getDocs(collection(M, "votos"))));
+await prueba("Afiliado lee SUS propios votos públicos", () => assertSucceeds(getDocs(query(collection(J, "votos"), where("cedula", "==", "202220222")))));
+await prueba("Votación cerrada SIN marca de resultados: el afiliado todavía NO lee el conteo", () => assertFails(getDoc(doc(M, "conteos/3"))));
+await prueba("Afiliado NO puede marcar resultados de una votación ABIERTA", () => assertFails(updateDoc(doc(M, "polls/1"), { resultados: true })));
+await prueba("Afiliado NO puede cambiar otra cosa junto con la marca", () => assertFails(updateDoc(doc(M, "polls/3"), { resultados: true, titulo: "Hackeada" })));
+await prueba("Afiliado marca los resultados de una votación que YA cerró", () => assertSucceeds(updateDoc(doc(M, "polls/3"), { resultados: true })));
+await prueba("Afiliado lee el conteo de una votación CERRADA", () => assertSucceeds(getDoc(doc(M, "conteos/3"))));
+await prueba("Admin lee el conteo de una votación abierta", () => assertSucceeds(getDoc(doc(A, "conteos/1"))));
+await prueba("Admin cierra la votación pública", () => assertSucceeds(updateDoc(doc(A, "polls/2"), { cierreMs: ahora - 1000, resultados: true })));
+await prueba("Afiliado lista los votos públicos de una votación CERRADA", () => assertSucceeds(getDocs(query(collection(M, "votos"), where("pollId", "==", "2")))));
+
 // ---------- Bitácora ----------
 await prueba("Afiliada registra en la bitácora con su cuenta", () => assertSucceeds(addDoc(collection(M, "auditoria"), { fecha: serverTimestamp(), accion: "Ingreso", detalle: "", por: "María", uid: "maria" })));
 await prueba("NO puede registrar a nombre de otra cuenta", () => assertFails(addDoc(collection(M, "auditoria"), { fecha: serverTimestamp(), accion: "X", detalle: "", por: "Admin", uid: "adm1" })));

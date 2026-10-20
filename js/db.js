@@ -25,6 +25,7 @@ const DB = {
 
     yo: null,
     _polls: [], _conteos: {}, _part: [], _votos: [], _afiliados: {}, _admins: {}, _audit: [], _config: {}, _ingreso: null, _alertas: [],
+    _votosMios: [], _votosCerrados: {}, _cerradas: {},
     _votesCache: null,
 
     // ================= Utilidades =================
@@ -346,23 +347,72 @@ const DB = {
         });
     },
     _docs(s) { return s.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })); },
+    // Afiliados: las reglas solo entregan resultados (conteos y votos públicos) de votaciones cerradas,
+    // así que se piden uno por uno al cerrar cada votación. Su propio voto lo ven siempre.
+    _unirVotos() {
+        const m = new Map();
+        [...this._votosMios, ...Object.values(this._votosCerrados).flat()].forEach(v => m.set(v.id, v));
+        this._votos = [...m.values()];
+        this._votesCache = null;
+        this._redibujar();
+    },
+    // Al cerrar una votación (por la hora o a mano) se marca «resultados»: así las reglas dejan ver sus resultados.
+    // Lo hace la primera app que lo note; las reglas comprueban con la hora del servidor que de verdad cerró.
+    _marcarResultados() {
+        const ahora = Date.now();
+        this._marcando = this._marcando || {};
+        this._polls.filter(p => this.estado(p) === 'cerrada' && !p.resultados).forEach(p => {
+            const id = String(p.id);
+            if (this._marcando[id] > ahora - 15000) return;   // un intento cada 15 s como máximo
+            this._marcando[id] = ahora;
+            FB.updateDoc(this._ref('polls', id), { resultados: true }).catch(e => console.warn('Aún no se puede marcar como cerrada', id, e && e.code));
+        });
+    },
+    _sincronizarCerradas() {
+        this._marcarResultados();
+        if (!this.yo || this.yo.rol === 'Administrador') return;
+        const cerradas = new Map(this._polls.filter(p => this.estado(p) === 'cerrada' && p.resultados).map(p => [String(p.id), p]));
+        let cambio = false;
+        Object.keys(this._cerradas).forEach(id => {
+            if (cerradas.has(id)) return;
+            this._cerradas[id].forEach(fin => fin());
+            delete this._cerradas[id]; delete this._conteos[id]; delete this._votosCerrados[id];
+            cambio = true;
+        });
+        cerradas.forEach((p, id) => {
+            if (this._cerradas[id]) return;
+            // Si falla (por ejemplo, sin conexión), se reintenta en la próxima revisión
+            const fallo = e => { console.warn('Resultados aún no disponibles', id, e && e.code); (this._cerradas[id] || []).forEach(fin => fin()); delete this._cerradas[id]; };
+            const subs = [FB.onSnapshot(this._ref('conteos', id), s => { this._conteos[id] = s.exists() ? s.data() : {}; this._votesCache = null; this._redibujar(); }, fallo)];
+            if (p.publica) subs.push(FB.onSnapshot(FB.query(this._col('votos'), FB.where('pollId', '==', id)), s => {
+                this._votosCerrados[id] = this._docs(s).map(v => ({ ...v, pollId: Number(v.pollId) }));
+                this._unirVotos();
+            }, fallo));
+            this._cerradas[id] = subs;
+        });
+        if (cambio) this._unirVotos();
+    },
     async _escuchar() {
         const admin = this.yo.rol === 'Administrador';
         const cargas = [
             this._escuchar1(admin ? this._col('polls') : FB.query(this._col('polls'), FB.where('publicada', '==', true)), s => {
                 this._polls = this._docs(s).map(p => ({ ...p, id: Number(p.id) })).sort((a, b) => a.id - b.id);
-            }),
-            this._escuchar1(this._col('conteos'), s => {
-                this._conteos = {}; s.docs.forEach(d => { this._conteos[d.id] = d.data(); });
+                this._sincronizarCerradas();
             }),
             this._escuchar1(admin ? this._col('participacion') : FB.query(this._col('participacion'), FB.where('cedula', '==', this.yo.cedula)), s => {
                 this._part = this._docs(s).map(r => ({ ...r, pollId: Number(r.pollId) }));
             }),
-            this._escuchar1(this._col('votos'), s => {
-                this._votos = this._docs(s).map(v => ({ ...v, pollId: Number(v.pollId) }));
+            this._escuchar1(admin ? this._col('votos') : FB.query(this._col('votos'), FB.where('cedula', '==', this.yo.cedula)), s => {
+                const v = this._docs(s).map(v => ({ ...v, pollId: Number(v.pollId) }));
+                if (admin) this._votos = v; else { this._votosMios = v; this._unirVotos(); }
             }),
             this._escuchar1(this._ref('config', 'general'), s => { this._config = s.exists() ? s.data() : {}; })
         ];
+        if (admin) cargas.push(this._escuchar1(this._col('conteos'), s => {
+            this._conteos = {}; s.docs.forEach(d => { this._conteos[d.id] = d.data(); });
+        }));
+        // Una votación puede cerrarse sola por la hora: se revisa cada 30 s
+        setInterval(() => this._sincronizarCerradas(), 30000);
         if (admin) cargas.push(
             this._escuchar1(this._col('afiliados'), s => {
                 this._afiliados = {}; this._docs(s).forEach(a => { this._afiliados[a.id] = { ...a, cedula: a.id }; });
@@ -613,6 +663,11 @@ const DB = {
             p.opciones.forEach((o, i) => { for (let k = 0; k < (c['c' + i] || 0); k++) out.push({ pollId: p.id, opcion: o, publica: false }); });
         });
         return (this._votesCache = out);
+    },
+    // ¿Ya llegaron los resultados de esta consulta? (el afiliado los recibe solo al cerrar)
+    resultadosListos(p) {
+        if (this.yo && this.yo.rol === 'Administrador') return true;
+        return this.estado(p) === 'cerrada' && !!p.resultados && !!this._conteos[String(p.id)];
     },
     // Quién votó en consultas secretas (sin la opción). El afiliado solo ve lo suyo.
     voters() {

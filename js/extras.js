@@ -88,7 +88,7 @@
         polls.forEach((p, i) => {
             const card = cards[i];
             if (card.querySelector(".xt-chart")) return;
-            if (!admin && DB.estado(p) !== "cerrada") return;   // sin gráfico hasta que cierre
+            if (!DB.resultadosListos(p)) return;   // el afiliado no ve el gráfico hasta que cierre
             const votes = DB.votes().filter(v => v.pollId === p.id);
             const box = document.createElement("div");
             box.className = "xt-chart";
