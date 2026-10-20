@@ -75,9 +75,10 @@
                         </div>
                     </div>`).join("")}
                 </div>` : ""}
+            <div class="space-y-2 border-t border-gray-200 pt-3">
+                <p class="text-sm font-bold ${alertas.length ? "text-adep-red" : "text-gray-700"}"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Intentos bloqueados (${alertas.length})</p>
             ${alertas.length ? `
-                <div class="space-y-2">
-                    <p class="text-sm font-bold text-adep-red"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Intentos bloqueados: alguien quiso entrar con una cédula que ya está en otro celular</p>
+                    <p class="text-sm text-gray-600">Alguien quiso entrar con una cédula que ya está en otro celular.</p>
                     ${alertas.map(al => `
                     <div class="rounded-xl border-2 border-red-200 bg-adep-redLight p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div class="min-w-0"><p class="font-bold text-gray-900 truncate">${E(nombre(al.cedula))}</p>
@@ -87,8 +88,9 @@
                             <button type="button" data-xg="descartar" data-al="${E(al.id)}" class="${btnG.replace("px-4 py-3", "px-3 py-2")}">Descartar</button>
                         </div>
                     </div>`).join("")}
-                    <p class="text-xs text-gray-500">«Liberar cédula» saca a quien la esté usando y deja que el afiliado verdadero entre de nuevo con el código. Si esa persona ya votó, use «Restaurar voto» en Resultados.</p>
-                </div>` : ""}`;
+                    <p class="text-xs text-gray-500">«Liberar cédula» saca a quien la esté usando y deja que el afiliado verdadero entre de nuevo con el código. Si esa persona ya votó, use «Restaurar voto» en Resultados.</p>`
+                : `<p class="text-sm text-gray-500">No hay intentos bloqueados. Si alguien intenta entrar con la cédula de un afiliado que ya entró desde otro celular, aparecerá aquí y le saldrá un aviso.</p>`}
+            </div>`;
         if (ok) q("xg-wa").href = "https://wa.me/?text=" + encodeURIComponent(mensaje(g));
     }
 
@@ -139,17 +141,36 @@
         catch (err) { console.error(err); e.target.checked = !on; showToast("No se pudo guardar. Intente de nuevo."); }
     });
 
-    // Aviso cuando llega alguien nuevo esperando aprobación
+    // Numerito rojo en la pestaña Afiliados: intentos bloqueados + ingresos esperando aprobación
+    const tab = q("tab-afiliados");
+    if (tab) tab.insertAdjacentHTML("beforeend", '<span id="badge-afiliados" class="hidden bg-adep-red text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">0</span>');
+    function numerito() {
+        const n = DB.alertas().length + DB.afiliados().filter(a => a.pendiente && a.uid).length, b = q("badge-afiliados");
+        if (!b) return;
+        b.textContent = n; b.classList.toggle("hidden", !n);
+        tab.setAttribute("aria-label", n ? `Afiliados (${n} aviso(s))` : "Afiliados");
+    }
+
+    // Avisos emergentes: alguien espera aprobación, o hubo un intento bloqueado nuevo
     let antes = DB.afiliados().filter(a => a.pendiente && a.uid).length;
+    let vistas = new Set(DB.alertas().map(a => a.id));
     const _ra = window.renderAll;
     window.renderAll = function () {
         _ra();
         pintar();
+        numerito();
         const ahora = DB.afiliados().filter(a => a.pendiente && a.uid).length;
         if (ahora > antes) showToast(`Hay ${ahora} afiliado(s) esperando aprobación en la pestaña Afiliados.`, "success");
         antes = ahora;
+        const nuevas = DB.alertas().filter(a => !vistas.has(a.id));
+        if (nuevas.length) {
+            const a = DB.afiliados().find(x => x.cedula === nuevas[0].cedula);
+            showToast(`⚠ Intento bloqueado: alguien quiso entrar con la cédula ${nuevas[0].cedula}${a ? " (" + a.nombre + ")" : ""} desde otro celular. Revise la pestaña Afiliados.`);
+        }
+        vistas = new Set(DB.alertas().map(a => a.id));
     };
     pintar();
+    numerito();
     // Al vencer el código, la caja se actualiza sola
     setInterval(() => { if (mostrado && !vigente(DB.ingreso())) pintar(); }, 30000);
 })();
