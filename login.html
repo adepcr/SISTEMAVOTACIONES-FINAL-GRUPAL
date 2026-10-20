@@ -401,7 +401,9 @@
             });
         }
         // Paso 1: según la cédula, pide la clave, el código de ingreso, o entra si este celular ya la tiene
-        async function revisarCedula() {
+        // auto: al abrir la página con la cédula recordada. Si este celular la tiene, NO entra solo:
+        // espera «Continuar» (así se puede elegir «Administrador» u otra cédula en ese mismo equipo)
+        async function revisarCedula(auto) {
             const ced = soloNumeros(cedula.value);
             if (ced.length < 9) { cedula.focus(); return showErr('a-error', 'Escriba su número de cédula completo (solo números).'); }
             showErr('a-error', '');
@@ -410,6 +412,7 @@
             catch (e) { console.error(e); return showErr('a-error', 'No hay conexión. Revise su internet e intente de nuevo.'); }
             if (estado === 'activa') return irPaso(2);
             if (estado === 'dispositivo') {
+                if (auto) { $('a-boton').focus(); return; }
                 const p = await DB.entrarDispositivo(ced);
                 if (p) { DB._set('recordar', ced); return dentro(p); }
                 DB.avisarIntento(ced);
@@ -463,7 +466,7 @@
         // Esperando aprobación desde antes, o cédula recordada en este equipo
         const guardada = DB._get('recordar', '');
         if (sesion && sesion.pendiente) { cedula.value = sesion.cedula; dentro(sesion); }
-        else if (guardada) { cedula.value = guardada; revisarCedula(); }
+        else if (guardada) { cedula.value = guardada; revisarCedula(true); }
         else cedula.focus();
 
         $('form-afiliado').addEventListener('submit', e => {
