@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="css/tema-institucional.css">
     <script src="js/accesibilidad.js"></script>
     <script src="js/app-movil.js"></script>
+    <script src="js/instalar.js"></script>
     <style>
         .big-input {
             font-size: 1.5rem;
@@ -270,8 +271,9 @@
             <p class="lg-seguro"><i class="fa-solid fa-lock"></i> Conexión segura · Sus datos están protegidos</p>
             <!-- Descarga de la app (solo en la página publicada, no dentro de la app) -->
             <div id="lg-app" class="hidden lg-app">
-                <a id="lg-apk" class="hidden" href="#" target="_blank" rel="noopener"><i class="fa-brands fa-android"></i> Descargar la app para Android</a>
-                <p id="lg-ios" class="hidden"><i class="fa-brands fa-apple"></i> En iPhone: toque <strong>Compartir</strong> y luego <strong>«Agregar a pantalla de inicio»</strong>.</p>
+                <!-- Botón «Instalar la app en este celular» o instrucciones (js/instalar.js) -->
+                <div id="lg-instalar" class="hidden"></div>
+                <a id="lg-apk" class="hidden lg-apk-sec" href="#" target="_blank" rel="noopener"><i class="fa-brands fa-android"></i> ¿Prefiere descargar el archivo APK?</a>
             </div>
             <script>
                 (() => {
@@ -280,8 +282,7 @@
                     if (app || local) return;
                     const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
                     document.getElementById('lg-app').classList.remove('hidden');
-                    document.getElementById('lg-ios').classList.toggle('hidden', !ios);
-                    // El enlace de descarga (Google Drive) lo configura el administrador; se muestra cuando carga
+                    // Enlace al APK (opcional, lo configura el administrador); lo principal es instalar la página (js/instalar.js)
                     window.mostrarApk = url => {
                         if (ios || !/^https:\/\//.test(url || '')) return;
                         const a = document.getElementById('lg-apk'); a.href = url; a.classList.remove('hidden');

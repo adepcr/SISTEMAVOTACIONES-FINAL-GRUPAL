@@ -35,8 +35,8 @@
         </div>`);
     host.insertAdjacentHTML("beforebegin", `
         <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
-            <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-android text-adep-green mr-1"></i> Enlace de descarga de la app (Android)</h3>
-            <p class="text-sm text-gray-500">Suba el archivo APK a Google Drive, compártalo como «Cualquier persona con el enlace» y pegue aquí el enlace. Aparecerá el botón «Descargar la app para Android» en la pantalla de ingreso.</p>
+            <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-android text-adep-green mr-1"></i> Enlace del archivo APK (opcional)</h3>
+            <p class="text-sm text-gray-500">No hace falta: en la pantalla de ingreso y dentro del sistema, los afiliados ya ven el botón «Instalar la app en este celular», que la instala con un toque sin descargar archivos. Si aun así quiere ofrecer el APK, súbalo a Google Drive, compártalo como «Cualquier persona con el enlace» y pegue aquí el enlace: aparecerá como opción secundaria.</p>
             <div class="flex flex-col sm:flex-row gap-2">
                 <input id="xi-apk" type="url" placeholder="https://drive.google.com/..." class="flex-1 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold">
                 <button type="button" id="xi-apk-ok" class="${btnP}"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar</button>
