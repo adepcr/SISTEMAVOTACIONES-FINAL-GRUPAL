@@ -604,7 +604,7 @@ const DB = {
         this._polls.forEach(p => {
             if (p.publica) {
                 this._votos.filter(v => v.pollId === p.id)
-                    .forEach(v => out.push({ pollId: p.id, opcion: v.opcion, cedula: v.cedula, nombre: v.nombre, fecha: v.fecha, hash: v.codigo, publica: true }));
+                    .forEach(v => out.push({ pollId: p.id, opcion: v.opcion, cedula: v.cedula, nombre: v.nombre, filial: v.filial || (this._afiliados[v.cedula] || {}).provincia || '', fecha: v.fecha, hash: v.codigo, publica: true }));
                 return;
             }
             const c = this._conteos[String(p.id)] || {};
@@ -629,15 +629,26 @@ const DB = {
         if (this.hasVoted(poll.id, this.yo.cedula)) return { error: 'Ya emitió su voto en esta consulta.' };
         const pid = String(poll.id), ced = this.yo.cedula, codigo = this.genCode(), ahora = new Date();
         const fecha = ahora.toLocaleString('es-CR');
-        const b = FB.writeBatch(FB.db);
-        b.update(this._ref('conteos', pid), { ['c' + idx]: FB.increment(1), total: FB.increment(1) });
-        b.set(this._ref('participacion', pid + '_' + ced), { pollId: pid, cedula: ced, fecha, codigo });
-        b.set(this._ref('codigos', codigo), { pollId: pid, fecha: poll.publica ? fecha : ahora.toLocaleDateString('es-CR') });
-        if (poll.publica) b.set(this._ref('votos', pid + '_' + ced), { pollId: pid, cedula: ced, nombre: this.yo.nombre, opcion: v.opcion, idx, codigo, fecha });
-        try { await b.commit(); }
+        const voto = { pollId: pid, cedula: ced, nombre: this.yo.nombre, opcion: v.opcion, idx, codigo, fecha };
+        const armar = conFilial => {
+            const b = FB.writeBatch(FB.db);
+            b.update(this._ref('conteos', pid), { ['c' + idx]: FB.increment(1), total: FB.increment(1) });
+            b.set(this._ref('participacion', pid + '_' + ced), { pollId: pid, cedula: ced, fecha, codigo });
+            b.set(this._ref('codigos', codigo), { pollId: pid, fecha: poll.publica ? fecha : ahora.toLocaleDateString('es-CR') });
+            if (poll.publica) b.set(this._ref('votos', pid + '_' + ced), conFilial ? { ...voto, filial: this.yo.provincia || '' } : voto);
+            return b;
+        };
+        try { await armar(true).commit(); }
         catch (e) {
-            console.error(e);
-            return { error: 'No se pudo registrar el voto. Revise su conexión e intente de nuevo. Recuerde que solo se puede votar una vez.' };
+            // Reglas de seguridad anteriores (sin el campo filial): se intenta una vez sin la filial
+            let error = e;
+            if (poll.publica && String(e.code || '').includes('permission')) {
+                try { await armar(false).commit(); error = null; } catch (e2) { error = e2; }
+            }
+            if (error) {
+                console.error(error);
+                return { error: 'No se pudo registrar el voto. Revise su conexión e intente de nuevo. Recuerde que solo se puede votar una vez.' };
+            }
         }
         this.log('Voto emitido', `Consulta: ${poll.titulo}`.slice(0, 120));
         return { pollId: poll.id, opcion: v.opcion, hash: codigo, fecha };

@@ -210,7 +210,9 @@ service cloud.firestore {
     match /votos/{id} {
       allow read: if miembro();
       allow create: if esAfiliado()
-        && request.resource.data.keys().hasOnly(['pollId', 'cedula', 'nombre', 'opcion', 'idx', 'codigo', 'fecha'])
+        && request.resource.data.keys().hasOnly(['pollId', 'cedula', 'nombre', 'filial', 'opcion', 'idx', 'codigo', 'fecha'])
+        && (!('filial' in request.resource.data)
+            || request.resource.data.filial == get(/databases/$(database)/documents/afiliados/$(miCedula())).data.get('provincia', ''))
         && request.resource.data.cedula == miCedula()
         && id == request.resource.data.pollId + '_' + miCedula()
         && get(/databases/$(database)/documents/polls/$(request.resource.data.pollId)).data.publica == true

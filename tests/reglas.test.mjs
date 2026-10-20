@@ -94,7 +94,9 @@ await prueba("Afiliado NO ve la participación de otra persona", () => assertFai
 await prueba("Cualquier miembro verifica un comprobante por su código", () => assertSucceeds(getDoc(doc(J, "codigos/ADEP-AAAA-0003"))));
 const voto = (d, ced, idx, opcion) => b => b.set(doc(d, "votos/2_" + ced), { pollId: "2", cedula: ced, nombre: "X", opcion, idx, codigo: "ADEP-PUB-" + ced, fecha: "hoy" });
 await prueba("Voto público con opción que NO coincide es rechazado", () => assertFails(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", voto(J, "202220222", 0, "Luis"))));
-await prueba("Voto público válido funciona", () => assertSucceeds(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", voto(J, "202220222", 0, "Ana"))));
+const votoF = (d, ced, idx, opcion, filial) => b => b.set(doc(d, "votos/2_" + ced), { pollId: "2", cedula: ced, nombre: "X", filial, opcion, idx, codigo: "ADEP-PUB-" + ced, fecha: "hoy" });
+await prueba("Voto público con filial FALSA es rechazado", () => assertFails(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", "Limón"))));
+await prueba("Voto público con su filial real funciona", () => assertSucceeds(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", ""))));
 const c = (await getDoc(doc(A, "conteos/1"))).data(); await prueba("Conteo final correcto (1 voto a la opción 1)", async () => { if (c.c0 !== 1 || c.total !== 1) throw new Error(JSON.stringify(c)); });
 
 // ---------- Bitácora ----------

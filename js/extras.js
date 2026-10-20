@@ -303,9 +303,36 @@
         } catch { logoActa = null; }
         return logoActa;
     }
-    async function acta(pollId) {
+    // Pregunta si la minuta lleva los nombres y filiales de quienes votaron → true | false | null (canceló)
+    function preguntarNombres(p) {
+        return new Promise(fin => {
+            const m = document.createElement("div");
+            m.className = "fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4";
+            m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true");
+            m.innerHTML = `<div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+                <div class="bg-adep-green text-white p-5 text-center"><h3 class="text-xl font-black font-heading"><i class="fa-solid fa-stamp mr-1"></i> Descargar minuta</h3></div>
+                <div class="p-5 space-y-4">
+                    <p class="text-base text-gray-700">¿Desea incluir los <strong>nombres y filiales</strong> de quienes votaron?</p>
+                    <p class="text-sm text-gray-500">${p.publica ? "Es una consulta de voto público: se listan los nombres debajo de la opción que eligió cada persona." : "Es una consulta de voto secreto: se listan solo los nombres de quienes votaron, nunca lo que eligieron."}</p>
+                    <div class="grid gap-2">
+                        <button type="button" data-r="si" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-users mr-1"></i> Con nombres y filiales</button>
+                        <button type="button" data-r="no" class="w-full bg-adep-greenLight text-adep-green border border-emerald-200 font-bold py-3 rounded-xl"><i class="fa-solid fa-file-pdf mr-1"></i> Solo resultados (sin nombres)</button>
+                        <button type="button" data-r="x" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Cancelar</button>
+                    </div></div></div>`;
+            const cerrar = r => { m.remove(); document.removeEventListener("keydown", esc); fin(r); };
+            const esc = e => { if (e.key === "Escape") cerrar(null); };
+            m.addEventListener("click", e => { const b = e.target.closest("[data-r]"); if (b) cerrar(b.dataset.r === "x" ? null : b.dataset.r === "si"); });
+            document.addEventListener("keydown", esc);
+            document.body.appendChild(m);
+            m.querySelector("[data-r]").focus();
+        });
+    }
+    // Devuelve false si no se descargó (consulta no encontrada o se canceló)
+    async function acta(pollId, conNombres) {
         const p = DB.polls().find(x => x.id === pollId);
-        if (!p) return showToast("Consulta no encontrada.");
+        if (!p) { showToast("Consulta no encontrada."); return false; }
+        if (conNombres === undefined) conNombres = await preguntarNombres(p);
+        if (conNombres === null) return false;
         const logo = await cargarLogo();
         const { jsPDF } = window.jspdf, doc = new jsPDF();
         const votes = DB.votes().filter(v => v.pollId === p.id), total = votes.length, padron = DB.padron();
@@ -378,6 +405,35 @@
             const tv = doc.splitTextToSize("Veredicto: " + vr.t, 170); doc.text(tv, 20, y); y += tv.length * 5 + 6;
         }
         y += 4;
+
+        // Nombres y filiales (opcional). Voto público: bajo la opción elegida. Voto secreto: solo quién votó.
+        if (conNombres) {
+            const linea = (t, negrita) => {
+                if (y > 250) { doc.addPage(); marco(); y = 24; }
+                doc.setFont("helvetica", negrita ? "bold" : "normal");
+                const tt = doc.splitTextToSize(t, 165); doc.text(tt, negrita ? 20 : 25, y); y += tt.length * 5 + (negrita ? 1 : 0.5);
+            };
+            const persona = a => `${a.nombre}${a.filial ? " - Filial " + a.filial : ""}`;
+            const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, "es");
+            if (y > 235) { doc.addPage(); marco(); y = 24; }
+            doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 107, 53);
+            doc.text(p.publica ? "Votantes por opción" : "Afiliados que votaron", 20, y); y += 7;
+            doc.setTextColor(0, 0, 0); doc.setFontSize(10);
+            if (p.publica) {
+                p.opciones.forEach(o => {
+                    const vs = votes.filter(v => v.opcion === o && v.nombre).sort(porNombre);
+                    linea(`${o} (${vs.length})`, true);
+                    if (!vs.length) linea("Nadie eligió esta opción.");
+                    vs.forEach(v => linea(persona(v)));
+                    y += 2;
+                });
+            } else {
+                const lista = quienVoto(p.id).votaron.map(a => ({ nombre: a.nombre, filial: a.provincia })).sort(porNombre);
+                if (!lista.length) linea("Nadie ha votado todavía.");
+                lista.forEach((a, i) => linea(`${i + 1}. ${persona(a)}`));
+                y += 2;
+            }
+        }
         doc.setTextColor(60, 60, 60); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         const nota = p.publica ? "Esta consulta fue de voto público." : "Esta consulta fue de voto secreto: el sistema no guarda qué eligió cada afiliado.";
         doc.text(doc.splitTextToSize(nota + " Los resultados corresponden al momento de emisión de esta minuta.", 170), 20, y);
@@ -392,8 +448,9 @@
         doc.setFontSize(8); doc.setTextColor(110, 110, 110);
         doc.text(`Documento generado por ${user.nombre} desde ADEP Vota`, 105, 281, { align: "center" });
 
-        DB.log("Minuta PDF generada", p.titulo);
+        DB.log("Minuta PDF generada", p.titulo + (conNombres ? " (con nombres y filiales)" : ""));
         doc.save(`Minuta_${(p.titulo || "consulta").replace(/[^\wÁÉÍÓÚáéíóúñÑ]+/g, "_").slice(0, 25)}_${sello()}.pdf`);
+        return true;
     }
 
     window.generarActa = acta; // también la usa "Eliminar consulta" en app.js

@@ -345,7 +345,8 @@ function renderResults() {
         const rows = p.opciones.map(o => {
             const vs = votes.filter(v => v.opcion === o), pct = total ? Math.round(vs.length * 100 / total) : 0;
             const conNombre = vs.filter(v => v.nombre);
-            const names = p.publica && conNombre.length ? `<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-users mr-1"></i>${conNombre.map(v => esc(v.nombre)).join(', ')}</p>` : '';
+            const names = p.publica && conNombre.length ? `<ul class="mt-2 space-y-1 text-sm max-h-56 overflow-y-auto pr-1">${conNombre.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(v => `
+                <li class="flex items-start gap-2 text-gray-700"><i class="fa-solid fa-user text-gray-400 text-xs mt-1"></i><span><span class="font-semibold">${esc(v.nombre)}</span>${v.filial ? `<span class="text-gray-500"> · Filial ${esc(v.filial)}</span>` : ''}</span></li>`).join('')}</ul>` : '';
             return `<div><div class="flex justify-between text-sm sm:text-base font-semibold text-gray-800"><span>${esc(o)}</span><span>${vs.length} (${pct}%)</span></div>
                 <div class="h-4 bg-slate-100 rounded-full overflow-hidden mt-1"><div class="bar-fill h-full bg-adep-green rounded-full transition-all duration-700" style="width:${pct}%"></div></div>${names}</div>`;
         }).join('');
@@ -600,7 +601,7 @@ function finishDelete(id) {
 }
 $('dp-pdf').addEventListener('click', async () => {
     const id = pendingDel; if (id === null) return;
-    await generarActa(id);
+    if (await generarActa(id) === false) return;   // canceló la descarga: no se elimina
     finishDelete(id);
 });
 $('dp-nopdf').addEventListener('click', () => { const id = pendingDel; if (id !== null) finishDelete(id); });
