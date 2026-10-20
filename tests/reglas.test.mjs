@@ -97,22 +97,15 @@ await prueba("Voto público con opción que NO coincide es rechazado", () => ass
 const votoF = (d, ced, idx, opcion, filial) => b => b.set(doc(d, "votos/2_" + ced), { pollId: "2", cedula: ced, nombre: "X", filial, opcion, idx, codigo: "ADEP-PUB-" + ced, fecha: "hoy" });
 await prueba("Voto público con filial FALSA es rechazado", () => assertFails(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", "Limón"))));
 await prueba("Voto público con su filial real funciona", () => assertSucceeds(votar(J, "202220222", "2", [0], "ADEP-PUB-202220222", votoF(J, "202220222", 0, "Ana", ""))));
-let c; await env.withSecurityRulesDisabled(async x => { c = (await getDoc(doc(x.firestore(), "conteos/1"))).data(); }); await prueba("Conteo final correcto (1 voto a la opción 1)", async () => { if (c.c0 !== 1 || c.total !== 1) throw new Error(JSON.stringify(c)); });
+const c = (await getDoc(doc(A, "conteos/1"))).data(); await prueba("Conteo final correcto (1 voto a la opción 1)", async () => { if (c.c0 !== 1 || c.total !== 1) throw new Error(JSON.stringify(c)); });
 
-// ---------- Resultados parciales bloqueados ----------
-await prueba("Afiliado NO lee el conteo de una votación ABIERTA", () => assertFails(getDoc(doc(M, "conteos/1"))));
-await prueba("Afiliado NO lista los votos públicos de una votación ABIERTA", () => assertFails(getDocs(query(collection(M, "votos"), where("pollId", "==", "2")))));
-await prueba("Afiliado NO lista todos los votos", () => assertFails(getDocs(collection(M, "votos"))));
-await prueba("Afiliado lee SUS propios votos públicos", () => assertSucceeds(getDocs(query(collection(J, "votos"), where("cedula", "==", "202220222")))));
-await prueba("Votación cerrada SIN marca de resultados: el afiliado todavía NO lee el conteo", () => assertFails(getDoc(doc(M, "conteos/3"))));
-await prueba("Afiliado NO puede marcar resultados de una votación ABIERTA", () => assertFails(updateDoc(doc(M, "polls/1"), { resultados: true })));
-await prueba("Afiliado NO puede cambiar otra cosa junto con la marca", () => assertFails(updateDoc(doc(M, "polls/3"), { resultados: true, titulo: "Hackeada" })));
-await prueba("Afiliado marca los resultados de una votación que YA cerró", () => assertSucceeds(updateDoc(doc(M, "polls/3"), { resultados: true })));
-await prueba("Afiliado lee el conteo de una votación CERRADA", () => assertSucceeds(getDoc(doc(M, "conteos/3"))));
-await prueba("Admin tampoco lee el conteo de una votación secreta ABIERTA (protege el secreto)", () => assertFails(getDoc(doc(A, "conteos/1"))));
+// ---------- Resultados en vivo ----------
+await prueba("Afiliado ve el conteo en vivo de una votación abierta", () => assertSucceeds(getDoc(doc(M, "conteos/1"))));
+await prueba("Afiliado ve los votos públicos en vivo", () => assertSucceeds(getDocs(query(collection(M, "votos"), where("pollId", "==", "2")))));
+await prueba("Admin ve el conteo en vivo", () => assertSucceeds(getDoc(doc(A, "conteos/1"))));
+await prueba("Sin conectar: NO ve conteos", () => assertFails(getDoc(doc(anon, "conteos/1"))));
+await prueba("Afiliado NO puede cambiar una votación", () => assertFails(updateDoc(doc(M, "polls/3"), { titulo: "Hackeada" })));
 await prueba("Admin NO puede dejar un conteo en negativo", () => assertFails(updateDoc(doc(A, "conteos/1"), { c2: increment(-1), total: increment(-1) })));
-await prueba("Admin cierra la votación pública", () => assertSucceeds(updateDoc(doc(A, "polls/2"), { cierreMs: ahora - 1000, resultados: true })));
-await prueba("Afiliado lista los votos públicos de una votación CERRADA", () => assertSucceeds(getDocs(query(collection(M, "votos"), where("pollId", "==", "2")))));
 
 // ---------- Bitácora ----------
 await prueba("Afiliada registra en la bitácora con su cuenta", () => assertSucceeds(addDoc(collection(M, "auditoria"), { fecha: serverTimestamp(), accion: "Ingreso", detalle: "", por: "María", uid: "maria" })));

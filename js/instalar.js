@@ -28,7 +28,8 @@
   .ins-ok{background:#e8f5ee;border:2px solid #a7dcbf;border-radius:1rem;padding:.75rem 1rem;color:#04492a;font-weight:800}
   #ins-banner{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin:1.5rem auto 1rem;padding:0 1rem;max-width:30rem;text-align:center}
   #ins-banner .fila{display:flex;align-items:center;justify-content:center;gap:.4rem;flex-wrap:wrap}
-  .ins-mini{display:inline-flex;align-items:center;gap:.45rem;min-height:44px;padding:.4rem 1rem;border-radius:999px;background:#e8f5ee;border:2px solid #a7dcbf;color:#006b35;font-weight:800;font-size:.95rem;cursor:pointer}
+  .ins-mini{display:inline-flex;align-items:center;gap:.55rem;min-height:54px;padding:.6rem 1.5rem;border-radius:999px;background:#e8f5ee;border:2px solid #a7dcbf;color:#006b35;font-weight:800;font-size:1.1rem;cursor:pointer}
+  .ins-mini i{font-size:1.3rem}
   .ins-mini:hover{background:#d6efe1}
   #ins-banner .x{width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:#6b7c73;font-size:1rem}
   #ins-banner .ins-pasos,#ins-banner .ins-ok{font-size:.95rem}`;

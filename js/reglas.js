@@ -154,7 +154,6 @@
         const cards = [...cont.children];
         if (!polls.length || cards.length !== polls.length) return;
         polls.forEach((p, i) => {
-            if (!DB.resultadosListos(p)) return;   // el afiliado no ve el veredicto hasta que cierre
             const v = veredicto(p), card = cards[i];
             if (!v || card.querySelector(".xr-res")) return;
             const c = COL[v.tono], el = document.createElement("div");

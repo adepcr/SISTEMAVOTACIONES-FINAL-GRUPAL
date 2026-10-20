@@ -348,7 +348,7 @@
             a: [
                 "Resultados en vivo",
                 [
-                    "Cuando una votación cierra, aquí verá cuántos votos tuvo cada opción y cuántos afiliados participaron. Mientras está abierta, los resultados están ocultos.",
+                    "Vea en vivo cuántos votos lleva cada opción.",
                     "La barra amarilla muestra cuántos afiliados ya participaron.",
                     "Abajo, en «Verificar un comprobante», escriba su código para confirmar que su voto fue contado.",
                 ],
@@ -356,7 +356,7 @@
             ad: [
                 "Resultados y participación",
                 [
-                    "Revise los resultados de cada consulta. En las votaciones secretas, el conteo de cada opción se ve al cerrar (así nadie puede deducir qué votó cada persona); la participación se ve en vivo.",
+                    "Revise los resultados de cada consulta en vivo.",
                     "Abra «Registro de participación» para ver quién ya votó y quién está pendiente.",
                     "El botón «Minuta» descarga la minuta oficial en PDF, con el logo de ADEP.",
                 ],

@@ -50,12 +50,6 @@ service cloud.firestore {
         && (p.cierreMs == 0 || request.time.toMillis() < p.cierreMs);
     }
 
-    // Los resultados de la votación ya se pueden ver (marca «resultados», que solo se pone después del cierre).
-    // Las lecturas no usan la hora: en una conexión abierta hace rato, request.time puede ser la hora de conexión.
-    function cerrada(pollId) {
-      return get(/databases/$(database)/documents/polls/$(pollId)).data.get('resultados', false) == true;
-    }
-
     // Este afiliado no había votado en esta consulta y su participación se registra en esta misma operación
     function votoNuevo(pollId) {
       let id = pollId + '_' + miCedula();
@@ -175,23 +169,13 @@ service cloud.firestore {
     // ---------------- Votaciones ----------------
     match /polls/{pollId} {
       allow read: if esAdmin() || (esAfiliado() && resource.data.publicada == true);
-      allow create, delete: if esAdmin();
-      // Cualquier afiliado puede poner la marca «resultados» cuando la votación YA cerró (las escrituras sí usan la hora real)
-      allow update: if esAdmin()
-        || (esAfiliado()
-            && resource.data.publicada == true
-            && resource.data.cierreMs != 0
-            && request.time.toMillis() >= resource.data.cierreMs
-            && request.resource.data.resultados == true
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resultados']));
+      allow write: if esAdmin();
     }
 
     // Conteo de votos: c0..c9 = votos por opción. El voto secreto existe SOLO aquí, sin cédula.
-    // Nadie lo lee hasta que la votación cerró (marca «resultados»): ni los afiliados ni el administrador.
-    // Así, mirando quién acaba de votar y qué conteo subió, no se puede deducir un voto secreto.
-    // (Las votaciones públicas ya muestran los nombres: el administrador las ve en vivo desde «votos».)
+    // Resultados en vivo: todos los afiliados y administradores lo leen.
     match /conteos/{pollId} {
-      allow read: if miembro() && cerrada(pollId);
+      allow read: if miembro();
       allow create, delete: if esAdmin();
       allow update: if (esAdmin() && sinNegativos())
         || (esAfiliado() && abierta(pollId) && votoNuevo(pollId) && sumaUnVoto());
@@ -232,10 +216,8 @@ service cloud.firestore {
     }
 
     // Votos públicos (solo en consultas de voto público: nombre y opción visibles)
-    // Cada afiliado ve su propio voto; los de los demás, solo cuando la votación cerró.
     match /votos/{id} {
-      allow read: if esAdmin()
-        || (esAfiliado() && (resource.data.cedula == miCedula() || cerrada(resource.data.pollId)));
+      allow read: if miembro();
       allow create: if esAfiliado()
         && request.resource.data.keys().hasOnly(['pollId', 'cedula', 'nombre', 'filial', 'opcion', 'idx', 'codigo', 'fecha'])
         && (!('filial' in request.resource.data)

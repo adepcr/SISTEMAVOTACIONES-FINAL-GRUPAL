@@ -330,11 +330,6 @@ function renderResults() {
     $('results-list').innerHTML = polls.map(p => {
         const votes = DB.votes().filter(v => v.pollId === p.id), total = DB.participantes(p.id);
         const part = padron ? Math.min(100, Math.round(total * 100 / padron)) : 0;
-        // Los afiliados ven los resultados (y la participación) solo al cerrar la votación, para no influir en quien
-        // no ha votado. En votaciones secretas, tampoco el administrador ve los conteos antes (protege el secreto).
-        // Las reglas de seguridad tampoco los entregan antes.
-        const oculto = !DB.resultadosListos(p), cargando = oculto && DB.estado(p) === 'cerrada' && !!p.resultados;
-        const verParticipacion = !oculto || isAdmin;
         let detalle = '';
         if (isAdmin) {
             const q = quienVoto(p.id);
@@ -363,18 +358,12 @@ function renderResults() {
                     <span class="text-xs font-bold text-adep-green bg-adep-greenLight px-2.5 py-1 rounded-full whitespace-nowrap">${p.publica ? 'Nombres visibles' : 'Voto secreto'}</span>
                 </div>
             </div>
-            ${cargando ? `<p class="text-center text-gray-600 font-semibold py-4"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Cargando los resultados…</p>`
-            : oculto ? `<div class="rounded-xl border-2 border-dashed border-gray-300 bg-slate-50 p-4 text-center text-gray-600">
-                <i class="fa-solid fa-lock text-2xl text-gray-400 mb-1"></i>
-                <p class="font-bold text-gray-800">${isAdmin ? 'Votación secreta: el conteo de cada opción se mostrará cuando cierre.' : 'Los resultados y la participación se mostrarán cuando cierre la votación.'}</p>
-                ${isAdmin ? '<p class="text-sm mt-1">Así nadie puede deducir qué votó cada persona mirando quién acaba de votar. La participación sí se ve en vivo.</p>' : ''}
-                ${p.cierre ? `<p class="text-sm mt-1">Cierra: ${fmt(p.cierre)}</p>` : ''}
-            </div>` : `<div class="space-y-4">${rows}</div>`}
-            ${!verParticipacion ? '' : `${!oculto && DB.estado(p) === 'cerrada' ? `<div class="flex justify-between gap-2 text-sm sm:text-base font-semibold text-gray-500 border-t border-dashed border-gray-200 pt-3"><span><i class="fa-solid fa-ban mr-1"></i>Nulos (no votaron) <span class="block sm:inline text-xs font-normal">No se cuentan en el resultado</span></span><span>${Math.max(0, padron - total)}</span></div>` : ''}
+            <div class="space-y-4">${rows}</div>
+            ${DB.estado(p) === 'cerrada' ? `<div class="flex justify-between gap-2 text-sm sm:text-base font-semibold text-gray-500 border-t border-dashed border-gray-200 pt-3"><span><i class="fa-solid fa-ban mr-1"></i>Nulos (no votaron) <span class="block sm:inline text-xs font-normal">No se cuentan en el resultado</span></span><span>${Math.max(0, padron - total)}</span></div>` : ''}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <div class="flex justify-between text-sm font-bold text-gray-700"><span><i class="fa-solid fa-people-group mr-1"></i>Participación</span><span>${total} de ${padron} afiliados (${part}%)</span></div>
                 <div class="h-3 bg-slate-200 rounded-full overflow-hidden mt-2"><div class="bar-fill h-full bg-amber-500 rounded-full transition-all duration-700" style="width:${part}%"></div></div>
-            </div>`}${detalle}</div>`;
+            </div>${detalle}</div>`;
     }).join('');
 }
 
@@ -596,7 +585,7 @@ $('manage-list').addEventListener('click', e => {
     }
     if (act === 'close') {
         if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;
-        DB.updatePoll(id, { cierre: new Date().toISOString(), resultados: true }, `Consulta cerrada manualmente: ${p.titulo}`);
+        DB.updatePoll(id, { cierre: new Date().toISOString() }, `Consulta cerrada manualmente: ${p.titulo}`);
     }
     if (act === 'del') return openDelPoll(id); // pregunta si desea descargar la minuta antes de eliminar
     renderAll();
