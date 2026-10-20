@@ -137,6 +137,7 @@ await prueba("Ana (con código general) ve votaciones", () => assertSucceeds(get
 await prueba("OTRO celular con la cédula de Ana es rechazado", () => assertFails(ingresar("impostor", "303330333", "482913")));
 await prueba("Con el código NO se puede tomar una cédula activada con clave", () => assertFails(ingresar("impostor2", "202220222", "482913")));
 await prueba("Sin conectar: se puede avisar de un intento bloqueado", () => assertSucceeds(addDoc(collection(anon, "alertas"), { cedula: "303330333", fecha: serverTimestamp() })));
+await prueba("NO se puede inventar un aviso de una cédula que no está en ningún celular", () => assertFails(addDoc(collection(anon, "alertas"), { cedula: "999999999", fecha: serverTimestamp() })));
 await prueba("El aviso NO acepta datos extra", () => assertFails(addDoc(collection(anon, "alertas"), { cedula: "303330333", fecha: serverTimestamp(), x: 1 })));
 await prueba("Afiliada NO lee los avisos", () => assertFails(getDocs(collection(M, "alertas"))));
 await prueba("Admin lee los avisos", () => assertSucceeds(getDocs(collection(A, "alertas"))));

@@ -401,7 +401,7 @@
                 "Administradores",
                 [
                     "Cree cuentas con correo y contraseña de al menos 8 caracteres.",
-                    "Ingresan desde «Soy administrador» en la pantalla de inicio.",
+                    "Ingresan desde la pestaña «Administrador» en la pantalla de inicio.",
                     "A otro administrador puede enviarle un correo para que cambie su contraseña.",
                     "Usted no puede desactivar ni eliminar su propia cuenta.",
                 ],

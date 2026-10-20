@@ -136,16 +136,9 @@
         main.prepend(sec);
         q("xt-f-poll").addEventListener("change", e => { filialSel = e.target.value; renderFilial(); });
 
-        // Resultados: botón de exportar a Excel junto a "Actualizar"
+        // Resultados: botón de exportar a Excel en el encabezado
         const head = q("sec-resultados").firstElementChild;
-        const refresh = head && head.querySelector("button");
-        if (refresh) {
-            const wrap = document.createElement("div");
-            wrap.className = "flex gap-2 flex-wrap";
-            refresh.replaceWith(wrap);
-            wrap.append(refresh);
-            wrap.insertAdjacentHTML("beforeend", '<button type="button" id="xt-res-csv" class="bg-adep-greenLight text-adep-green hover:bg-emerald-100 font-bold text-sm px-4 py-2 rounded-xl border border-emerald-200 transition flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>');
-        }
+        if (head) head.insertAdjacentHTML("beforeend", '<button type="button" id="xt-res-csv" class="bg-adep-greenLight text-adep-green hover:bg-emerald-100 font-bold text-sm px-4 py-2 rounded-xl border border-emerald-200 transition flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>');
 
         // Bitácora: filtros con calendario + exportar + borrar
         q("audit-list").insertAdjacentHTML("beforebegin", `

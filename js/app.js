@@ -17,7 +17,7 @@ const $ = id => document.getElementById(id);
 const fmt = iso => new Date(iso).toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
 
 async function logout() {
-    if (!isAdmin && !confirm('¿Desea cerrar sesión?\n\nSi la cierra, necesitará su clave para volver a entrar. Si este es su propio celular o computadora, puede dejarla abierta.')) return;
+    if (!isAdmin && !confirm('¿Desea cerrar sesión?\n\nSi este es su propio celular o computadora, puede dejarla abierta. Para volver a entrar, escriba su cédula y toque «Continuar».')) return;
     await DB.logout(); location.replace('login.html');
 }
 
@@ -410,10 +410,6 @@ $('rs-ok').addEventListener('click', async () => {
     renderAll();
 });
 
-function refreshResultsAnimation() {
-    document.querySelectorAll('.bar-fill').forEach(b => { const w = b.style.width; b.style.width = '0%'; setTimeout(() => b.style.width = w, 150); });
-}
-
 // ===== Verificación pública de comprobantes =====
 $('verify-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -431,8 +427,10 @@ $('verify-form').addEventListener('submit', async e => {
 });
 
 // ===== Administrador: crear y gestionar consultas =====
-function createNewPoll(e) {
+let guardandoConsulta = false;
+async function createNewPoll(e) {
     e.preventDefault();
+    if (guardandoConsulta) return;
     const title = $('new-poll-title'), cat = $('new-poll-cat'), opts = $('new-poll-options');
     const sinPreg = $('new-poll-noquestion').checked;
     const list = leerOpciones();
@@ -441,9 +439,15 @@ function createNewPoll(e) {
         if (fail) { el.classList.add('field-error'); $(`err-${el.id}`).classList.remove('hidden'); bad = true; }
     });
     if (bad) return showToast(list.length > DB.MAX_OPCIONES ? `Máximo ${DB.MAX_OPCIONES} opciones por consulta.` : 'Rellene todos los campos requeridos.');
+    // Dos opciones iguales se contarían juntas en los resultados
+    const repetida = list.find((o, i) => list.findIndex(x => x.toLowerCase() === o.toLowerCase()) !== i);
+    if (repetida) { opts.classList.add('field-error'); return showToast(`La opción «${repetida}» está repetida. Cada opción debe ser distinta.`); }
     const ap = $('new-poll-open').value, ci = $('new-poll-close').value;
     if (ap && ci && new Date(ci) <= new Date(ap)) return showToast('La fecha de cierre debe ser posterior a la de apertura.');
-    DB.addPoll({
+    if (ci && new Date(ci) <= new Date()) return showToast('La fecha de cierre ya pasó. Elija una fecha y hora futuras.');
+    guardandoConsulta = true;
+    showToast('Guardando la consulta…', 'success');
+    const creada = await DB.addPoll({
         titulo: sinPreg ? cat.value.trim() : title.value.trim(), sinPregunta: sinPreg, categoria: cat.value.trim(), opciones: list,
         // Con fecha de apertura queda publicada aunque no se marque «Publicar de inmediato»: se muestra sola a esa hora
         publicada: $('new-poll-publish').checked || !!ap, ocultaHastaApertura: !!ap && !$('new-poll-publish').checked,
@@ -451,6 +455,8 @@ function createNewPoll(e) {
         apertura: ap ? new Date(ap).toISOString() : '', cierre: ci ? new Date(ci).toISOString() : '',
         creadaPor: user.cedula
     });
+    guardandoConsulta = false;
+    if (!creada) return;   // el error ya se mostró; el formulario queda como estaba
     $('form-new-poll').reset();
     pintarOpciones(['', '']);
     showToast('Consulta guardada.', 'success');
@@ -855,5 +861,5 @@ if (user) {
     // Temporizador: se actualiza cada segundo (sin redibujar las tarjetas)
     setInterval(tickTimers, 1000);
     // Cierre/apertura automática: se refresca el estado cada 30 s
-    setInterval(() => { renderPolls(); if (isAdmin) renderManage(); }, 30000);
+    setInterval(() => { renderPolls(); renderResults(); if (isAdmin) renderManage(); }, 30000);
 }

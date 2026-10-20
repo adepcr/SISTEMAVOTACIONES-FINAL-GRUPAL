@@ -136,11 +136,13 @@ service cloud.firestore {
     }
 
     // Avisos para el administrador: alguien intentó entrar con una cédula que ya está en otro celular
+    // (solo cédulas que de verdad están amarradas a un celular, para que no se puedan inventar avisos)
     match /alertas/{id} {
       allow read, delete: if esAdmin();
       allow create: if request.resource.data.keys().hasOnly(['cedula', 'fecha'])
         && request.resource.data.fecha == request.time
-        && request.resource.data.cedula is string && request.resource.data.cedula.size() <= 15;
+        && request.resource.data.cedula is string && request.resource.data.cedula.size() <= 15
+        && exists(/databases/$(database)/documents/ingresos/$(request.resource.data.cedula));
       allow update: if false;
     }
 

@@ -566,7 +566,8 @@ const DB = {
     visible(p) {
         return !!p.publicada && !(p.ocultaHastaApertura && this.estado(p) === 'programada');
     },
-    addPoll(p) {
+    // Devuelve la consulta cuando quedó guardada en la nube, o null si no se pudo
+    async addPoll(p) {
         if ((p.opciones || []).length > this.MAX_OPCIONES) { this._falla(null, `Máximo ${this.MAX_OPCIONES} opciones por consulta.`); return null; }
         const poll = { id: Date.now(), publicada: false, publica: false, apertura: '', cierre: '', ...p, creada: new Date().toISOString() };
         const { id, ...datos } = poll;
@@ -574,7 +575,8 @@ const DB = {
         const b = FB.writeBatch(FB.db);
         b.set(this._ref('polls', id), { ...datos, aperturaMs: this._ms(poll.apertura), cierreMs: this._ms(poll.cierre) });
         b.set(this._ref('conteos', id), vacio);
-        b.commit().catch(e => this._falla(e, 'No se pudo guardar la consulta.'));
+        try { await b.commit(); }
+        catch (e) { this._falla(e, 'No se pudo guardar la consulta.'); return null; }
         this.log('Consulta creada', poll.titulo);
         return poll;
     },
