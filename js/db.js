@@ -282,6 +282,33 @@ const DB = {
             if (d && d.uid === this.yo.uid && d.activo !== false && d.pendiente !== true) fn(true);
         }, () => fn(false));
     },
+    // Afiliado conectado: avisa (fn) en cuanto el administrador lo borra, lo desactiva o libera su cédula.
+    // Si la cuenta ya no es suya (borrada o liberada) también se olvida la llave de este celular.
+    vigilarCuenta(fn) {
+        if (!this.yo || this.yo.rol !== 'Afiliado') return;
+        const { cedula, uid } = this.yo;
+        let avisado = false;
+        const fuera = olvidar => {
+            if (avisado) return;
+            avisado = true;
+            if (olvidar) try { localStorage.removeItem('adep_llave_' + cedula); } catch { }
+            fn();
+        };
+        FB.onSnapshot(this._ref('afiliados', cedula), s => {
+            const d = s.exists() ? s.data() : null;
+            if (!d || d.uid !== uid) fuera(true);
+            else if (d.activo === false) fuera(false);
+        }, e => {
+            // Las reglas niegan la lectura apenas el documento se borra o deja de ser de esta cuenta
+            if (String(e.code || '').includes('permission')) fuera(true); else console.error(e);
+        });
+    },
+    // Cierre de sesión hecho por el sistema (no deja registro: la cuenta ya no tiene permiso de escribir)
+    async cerrarSesionForzada() {
+        await FB.signOut(FB.auth).catch(() => { });
+        this.yo = null;
+    },
+
     // ---- Administrador ----
     ingreso() { return this._ingreso; },
     alertas() { return this._alertas; },

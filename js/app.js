@@ -21,6 +21,25 @@ async function logout() {
     await DB.logout(); location.replace('login.html');
 }
 
+// Si el administrador borra al afiliado, lo desactiva o libera su cédula, su sesión se cierra en ese momento
+function sesionRetirada() {
+    const v = document.createElement('div');
+    v.setAttribute('role', 'alertdialog');
+    v.setAttribute('aria-modal', 'true');
+    v.setAttribute('aria-live', 'assertive');
+    v.setAttribute('aria-labelledby', 'cs-titulo');
+    v.className = 'fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4';
+    v.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center space-y-3">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-adep-green" aria-hidden="true"></i>
+            <p id="cs-titulo" class="text-2xl font-black text-gray-900 font-heading">Cerrando sesión…</p>
+            <p class="text-sm text-gray-600">ADEP retiró el acceso de esta cuenta en este aparato. Si cree que es un error, comuníquese con ADEP.</p>
+        </div>`;
+    document.body.appendChild(v);
+    setTimeout(async () => { await DB.cerrarSesionForzada(); location.replace('login.html'); }, 3500);
+}
+if (user && !isAdmin) DB.vigilarCuenta(sesionRetirada);
+
 function switchTab(tab) {
     document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
     document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
