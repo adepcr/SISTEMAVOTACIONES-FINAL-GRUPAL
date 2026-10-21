@@ -2,15 +2,18 @@
 
 La página web sigue funcionando igual. Además, ahora se puede usar como app de tres formas:
 
-## 1. PWA (Android e iPhone, sin tiendas)
-Abra el link web en el celular:
+## 1. PWA (Android e iPhone, sin tiendas) — la forma principal
+En la pantalla de ingreso aparece el botón **«Instalar la app en este celular»** (`js/instalar.js`): un toque y queda en la pantalla de inicio.
+Como es la misma página publicada, cada cambio les llega solo a los afiliados, sin reinstalar nada.
+Si el botón no aparece:
 - **Android (Chrome):** menú ⋮ → **Instalar app** / **Agregar a pantalla de inicio**.
 - **iPhone (Safari):** botón **Compartir** → **Agregar a pantalla de inicio**.
 
-## 2. App de Android (.apk)
+## 2. App de Android (.apk, opcional)
 **Sin instalar nada:** cada vez que se sube un cambio a GitHub, se construye el APK solo.
-Entre a la pestaña **Actions** del repositorio → la última ejecución de "App Android" → descargue **ADEP-Vota-android** en "Artifacts".
+Entre a la pestaña **Actions** del repositorio → la última ejecución de "Publicar app y página" → descargue **ADEP-Vota-android** en "Artifacts".
 Dentro del .zip está `app-debug.apk`; páselo al celular e instálelo (permita "instalar apps de origen desconocido").
+⚠️ El APK no se actualiza solo (lleva la página por dentro) y cada uno sale con una firma distinta: para instalar uno nuevo hay que desinstalar el anterior.
 
 **Con Android Studio** (para publicar en Google Play):
 ```bash

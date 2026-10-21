@@ -1,8 +1,8 @@
 # Cada vez que se sube un cambio a main:
 #   1) arma la app de Android (.apk) — queda en "Actions" → la ejecución → "Artifacts"
 #   2) publica la página en Firebase Hosting (https://adep-vota.web.app).
-#      (El plan gratuito no permite poner el APK en la página: se comparte con un enlace de Google Drive,
-#       que el administrador pega en Afiliados → «Enlace de descarga de la app».)
+#      Los afiliados instalan esa página como app con el botón «Instalar la app en este celular» (js/instalar.js),
+#      así que los cambios les llegan solos. El APK es opcional (ver PUBLICAR.md).
 #      El paso 2 necesita el secreto FIREBASE_SERVICE_ACCOUNT (ver PUBLICAR.md); sin él, solo se arma el APK.
 name: Publicar app y página
 
