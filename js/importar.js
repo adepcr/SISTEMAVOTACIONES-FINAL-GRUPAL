@@ -16,6 +16,7 @@
     const clave = s => norm(s).replace(/[^a-z0-9]/g, "");
     const btnP = "bg-adep-green hover:bg-adep-greenDark text-white font-bold px-4 py-3 rounded-xl text-sm";
     const btnG = "bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold px-4 py-3 rounded-xl text-sm";
+    const btnR = "bg-adep-redLight text-adep-red hover:bg-red-100 border border-red-200 font-bold px-4 py-3 rounded-xl text-sm";
 
     /* ---------- Caja en la pestaña Afiliados ---------- */
     host.insertAdjacentHTML("beforebegin", `
@@ -25,6 +26,7 @@
             <div class="flex flex-wrap gap-2">
                 <button type="button" id="xi-imp" class="${btnP}"><i class="fa-solid fa-file-import mr-1"></i> Importar afiliados (Excel)</button>
                 <button type="button" id="xi-tpl" class="${btnG}"><i class="fa-solid fa-file-excel mr-1"></i> Descargar plantilla de Excel</button>
+                <button type="button" id="xi-borrar" class="${btnR}"><i class="fa-solid fa-trash-can mr-1"></i> Borrar todos los afiliados</button>
             </div>
         </div>
         <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
@@ -120,6 +122,46 @@
     /* ---------- Plantilla ---------- */
     q("xi-tpl").addEventListener("click", () => {
         bajarExcel("Plantilla_afiliados_ADEP.xlsx", "Afiliados", [["Nombre", "Cédula", "Filial", "Teléfono"], ["María Fernández Rojas", "102340567", "Barva", "8888-1234"], ["José Mora Vargas", "203450678", "San Ramón", ""]]);
+    });
+
+    /* ---------- Borrar todos los afiliados ---------- */
+    const listaExcel = () => [["Nombre", "Cédula", "Filial", "Teléfono"],
+        ...DB.afiliados().map(a => [a.nombre, a.cedula, a.provincia || "", telefonoTxt(a.telefono || "")])];
+    q("xi-borrar").addEventListener("click", () => {
+        const n = DB.afiliados().length;
+        if (!n) return showToast("No hay afiliados registrados.");
+        const abiertas = DB.polls().filter(p => DB.estado(p) === "abierta").length;
+        abrir("Borrar todos los afiliados", `
+            <p class="text-base font-bold" style="color:#9b1c18"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Se borrarán los ${n} afiliado(s) registrados. Esto no se puede deshacer.</p>
+            ${abiertas ? `<p class="text-sm font-bold rounded-xl p-3" style="background:#fdf0f0;border:2px solid #fecaca;color:#9b1c18">Hay ${abiertas} consulta(s) abierta(s): los afiliados ya no podrán votar en ellas.</p>` : ""}
+            <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                <li>Quien tenga la sesión abierta saldrá en ese momento.</li>
+                <li>Los votos ya emitidos y los resultados <strong>no</strong> se borran.</li>
+                <li>Para volver a cargarlos, use «Importar afiliados».</li>
+            </ul>
+            <button type="button" id="xi-b-xls" class="${btnG} w-full"><i class="fa-solid fa-file-excel mr-1"></i> Descargar la lista en Excel antes de borrar</button>
+            <label for="xi-b-txt" class="block text-sm font-bold text-gray-700">Para confirmar, escriba <span class="font-mono">BORRAR</span>:</label>
+            <input id="xi-b-txt" type="text" autocomplete="off" class="w-full border-2 border-gray-300 rounded-xl p-3 text-base font-bold uppercase">
+            <div class="grid gap-2">
+                <button type="button" id="xi-b-ok" class="bg-adep-red hover:bg-adep-redDark text-white font-bold px-4 py-4 rounded-xl text-base" disabled style="opacity:.45">Borrar los ${n} afiliado(s)</button>
+                <button type="button" id="xi-b-c" class="${btnG}">Cancelar</button>
+            </div>`);
+        const ok = q("xi-b-ok");
+        q("xi-b-c").onclick = () => cerrar();
+        q("xi-b-xls").onclick = () => bajarExcel(`Afiliados_ADEP_${new Date().toISOString().slice(0, 10)}.xlsx`, "Afiliados", listaExcel());
+        q("xi-b-txt").addEventListener("input", e => {
+            ok.disabled = e.target.value.trim().toUpperCase() !== "BORRAR";
+            ok.style.opacity = ok.disabled ? ".45" : "1";
+        });
+        q("xi-b-txt").focus();
+        ok.onclick = async () => {
+            ok.disabled = true; ok.textContent = "Borrando…";
+            try {
+                const total = await DB.borrarTodosAfiliados(user);
+                cerrar(); renderAll();
+                showToast(`Se borraron ${total} afiliado(s).`, "success");
+            } catch (err) { console.error(err); DB._falla(err, "No se pudieron borrar todos los afiliados."); cerrar(); }
+        };
     });
 
     /* ---------- 1) Importar ---------- */

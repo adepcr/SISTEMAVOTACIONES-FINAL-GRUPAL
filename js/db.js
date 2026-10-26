@@ -544,6 +544,21 @@ const DB = {
         this.log('Afiliado eliminado', `${a.nombre} (${cedula})`);
     },
 
+    // Borra a TODOS los afiliados (queda copia de cada uno en «eliminados»). Los votos ya emitidos no se tocan.
+    // Quien tenga la sesión abierta sale en ese momento (ver vigilarCuenta). Devuelve cuántos se borraron.
+    async borrarTodosAfiliados(adminUser) {
+        const lista = this.afiliados(), fecha = new Date().toLocaleString('es-CR'), ops = [];
+        lista.forEach(a => {
+            const { uid, authEmail, ...sinCuenta } = a;
+            ops.push(b => b.set(FB.doc(this._col('eliminados')), { tipo: 'Afiliado', datos: sinCuenta, fecha, eliminadoPor: adminUser ? adminUser.nombre : 'Administrador' }));
+            ['afiliados', 'activaciones', 'acceso', 'ingresos'].forEach(c => ops.push(b => b.delete(this._ref(c, a.cedula))));
+            if (uid) ops.push(b => b.delete(this._ref('cuentas', uid)));
+        });
+        await this._enTandas(ops);
+        this.log('Todos los afiliados eliminados', `${lista.length} afiliado(s)`);
+        return lista.length;
+    },
+
     // ================= Administradores =================
     admins() { return Object.values(this._admins); },
     async addAdmin({ nombre, correo, pass }) {
