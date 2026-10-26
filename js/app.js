@@ -10,7 +10,23 @@ let lastHash = null;        // último comprobante emitido
 let pendingDel = null;      // consulta que se quiere eliminar
 let pendingRestore = null;  // { pid, ced } voto que se quiere restaurar
 
-const FILIALES = ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacaste', 'Puntarenas', 'Limón'];
+// Filiales y núcleos de ADEP (lista de la Junta Directiva Central), en orden alfabético
+const FILIALES = [
+    'San José', 'Santa Ana', 'Moravia', 'Pérez Zeledón', 'Puriscal', 'Tibás', 'Hatillo', 'Mora', 'Escazú', 'Goicoechea',
+    'Desamparados', 'Coronado', 'Curridabat', 'Pavas', 'San Francisco de Dos Ríos', 'Aserrí',
+    'Alajuela', 'Atenas', 'San Ramón', 'Grecia', 'San Carlos', 'Palmares', 'Orotina-San Mateo', 'Naranjo', 'Upala',
+    'Cartago', 'La Unión', 'Turrialba', 'Paraíso', 'Tejar del Guarco',
+    'Heredia', 'Barva', 'Flores', 'San Rafael de Heredia', 'Santo Domingo de Heredia', 'San Pablo de Heredia', 'Santa Bárbara de Heredia',
+    'Nicoya', 'Santa Cruz', 'Liberia', 'Tilarán', 'Carrillo', 'Cañas',
+    'Puntarenas', 'Esparza', 'Sur Sur', 'El Roble', 'Quepos', 'Buenos Aires', 'Montes de Oro-Miramar',
+    'Limón', 'Pococí',
+    'Los Santos', 'Nandayure', 'Poás', 'Alfaro Ruiz-Zarcero', 'Valverde Vega-Sarchí', 'La Suiza', 'Sardinal-Carrillo',
+    'San Antonio de Belén', 'San Isidro de Heredia', 'Bagaces', 'La Cruz', 'Osa (Palmar Norte-Sur)', 'Juntas de Abangares',
+    'Cóbano-Paquera', 'Jicaral', 'Montes de Oca', 'Santa Bárbara (Guanacaste)', 'Sarapiquí', 'Batán', 'San Vito', 'La Uruca', 'Zapote'
+].sort((a, b) => a.localeCompare(b, 'es'));
+// Opciones de filial; si el afiliado tiene una que ya no está en la lista (por ejemplo una provincia), se conserva
+const opcionesFilial = actual => (actual && !FILIALES.includes(actual) ? [actual, ...FILIALES] : FILIALES)
+    .map(f => `<option ${actual === f ? 'selected' : ''}>${esc(f)}</option>`).join('');
 
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = id => document.getElementById(id);
@@ -671,7 +687,7 @@ function renderAfiliados() {
                 <p class="text-sm text-gray-600 flex items-center gap-2 flex-wrap mt-1"><span><i class="fa-solid fa-location-dot text-adep-green mr-1"></i>Filial:</span>
                     <select data-af-filial="${esc(a.cedula)}" aria-label="Filial de ${esc(a.nombre)}" class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold bg-white">
                         <option value="">Sin filial</option>
-                        ${FILIALES.map(f => `<option ${a.provincia === f ? 'selected' : ''}>${f}</option>`).join('')}
+                        ${opcionesFilial(a.provincia)}
                     </select></p>
                 <p class="text-sm text-gray-600 mt-1"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i>${a.telefono ? esc(telefonoTxt(a.telefono)) : '<span class="text-gray-500">Sin teléfono</span>'}</p>
             </div>
@@ -699,12 +715,13 @@ function showCredentials(cedula, pin, filial) {
         <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>La primera vez, el afiliado escribe su cédula, toca «Continuar», escribe este código y crea su propia clave. El código sirve una sola vez.</p>`;
 }
 
+if ($('af-filial')) $('af-filial').insertAdjacentHTML('beforeend', opcionesFilial(''));
 $('form-afiliado').addEventListener('submit', async e => {
     e.preventDefault();
     const nombre = $('af-nombre').value.trim(), cedula = $('af-cedula').value.replace(/\D/g, ''), filial = $('af-filial').value;
     const telTxt = $('af-telefono').value.trim(), telefono = telefonoWA(telTxt);
     if (!nombre || cedula.length < 9) return showToast('Ingrese el nombre y la cédula (mínimo 9 números).');
-    if (!filial) return showToast('Seleccione la filial (provincia) del afiliado.');
+    if (!filial) return showToast('Seleccione la filial del afiliado.');
     if (telTxt && !telefono) return showToast('El teléfono debe tener 8 números (o incluir el código de país).');
     const res = await DB.addAfiliado({ nombre, cedula, provincia: filial, telefono });
     if (res.error) return showToast(res.error);

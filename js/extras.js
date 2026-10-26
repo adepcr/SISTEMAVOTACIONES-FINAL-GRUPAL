@@ -1,6 +1,6 @@
 /* extras.js · ADEP Vota
    - Panel "Resumen" del administrador (tarjetas con datos reales)
-   - Participación por filial (provincia)
+   - Participación por filial
    - Resultados con gráfico de dona, ganador destacado y aviso de empate (SVG, sin librerías)
    - Exportar a Excel (resultados y bitácora) + filtros de bitácora por fecha y acción + borrar bitácora
    - Minuta oficial en PDF (con logo, resultados, participación y firmas)
@@ -217,8 +217,8 @@
 
         const ps = filialSel === "todas" ? vis : vis.filter(p => String(p.id) === filialSel);
         const afs = DB.afiliados().filter(a => a.activo !== false);
-        const nombres = [...FILIALES];
-        if (afs.some(a => !a.provincia)) nombres.push("");
+        // Las filiales de la lista y cualquier otra que tengan los afiliados (por ejemplo, provincias de antes)
+        const nombres = [...new Set([...FILIALES, ...afs.map(a => a.provincia || "")])];
         const voto = new Map(ps.map(p => [p.id, new Set(quienVoto(p.id).votaron.map(a => a.cedula))]));
         const filas = nombres.map(f => {
             const m = afs.filter(a => (a.provincia || "") === f);

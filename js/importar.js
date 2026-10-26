@@ -12,6 +12,8 @@
     const q = id => document.getElementById(id);
     const E = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const norm = s => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    // Para comparar filiales sin importar tildes, mayúsculas, guiones, puntos ni espacios («OROTINA SAN MATEO» = «Orotina-San Mateo»)
+    const clave = s => norm(s).replace(/[^a-z0-9]/g, "");
     const btnP = "bg-adep-green hover:bg-adep-greenDark text-white font-bold px-4 py-3 rounded-xl text-sm";
     const btnG = "bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold px-4 py-3 rounded-xl text-sm";
 
@@ -117,7 +119,7 @@
 
     /* ---------- Plantilla ---------- */
     q("xi-tpl").addEventListener("click", () => {
-        bajarExcel("Plantilla_afiliados_ADEP.xlsx", "Afiliados", [["Nombre", "Cédula", "Filial", "Teléfono"], ["María Fernández Rojas", "102340567", "Heredia", "8888-1234"], ["José Mora Vargas", "203450678", "Alajuela", ""]]);
+        bajarExcel("Plantilla_afiliados_ADEP.xlsx", "Afiliados", [["Nombre", "Cédula", "Filial", "Teléfono"], ["María Fernández Rojas", "102340567", "Barva", "8888-1234"], ["José Mora Vargas", "203450678", "San Ramón", ""]]);
     });
 
     /* ---------- 1) Importar ---------- */
@@ -128,7 +130,8 @@
                 <li>Guarde el archivo como siempre (.xlsx). También se aceptan archivos CSV.</li>
                 <li>Elija el archivo aquí. <strong>Todavía no se crea nada</strong>: primero verá una vista previa.</li>
             </ol>
-            <p class="text-sm text-gray-500">Filiales válidas: ${FILIALES.join(", ")}. Tip: si Excel muestra la cédula como 1,02E+08, formatee esa columna como Texto antes de guardar.</p>
+            <details class="text-sm text-gray-500"><summary class="cursor-pointer font-semibold text-gray-700">Ver las ${FILIALES.length} filiales válidas</summary><p class="mt-1">${FILIALES.map(E).join(" · ")}</p></details>
+            <p class="text-sm text-gray-500">Tip: si Excel muestra la cédula como 1,02E+08, formatee esa columna como Texto antes de guardar.</p>
             <input id="xi-file" type="file" accept=".xlsx,.xls,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" aria-label="Archivo de Excel o CSV" class="w-full border-2 border-gray-300 rounded-xl p-3 text-base">
             <div class="grid gap-2"><button type="button" id="xi-c" class="${btnG}">Cancelar</button></div>`);
         q("xi-c").onclick = () => cerrar(true);
@@ -170,7 +173,7 @@
                 else {
                     vistos.add(key);
                     if (rawF) {
-                        const fil = FILIALES.find(x => norm(x) === norm(rawF));
+                        const fil = FILIALES.find(x => clave(x) === clave(rawF));
                         if (fil) f.filial = fil; else { f.estado = "error"; f.msg = "Filial no válida: «" + rawF + "»."; }
                     }
                     if (f.estado !== "error" && users[key]) {
