@@ -10,23 +10,32 @@ let lastHash = null;        // último comprobante emitido
 let pendingDel = null;      // consulta que se quiere eliminar
 let pendingRestore = null;  // { pid, ced } voto que se quiere restaurar
 
-// Filiales y núcleos de ADEP (lista de la Junta Directiva Central), en orden alfabético
-const FILIALES = [
-    'San José', 'Santa Ana', 'Moravia', 'Pérez Zeledón', 'Puriscal', 'Tibás', 'Hatillo', 'Mora', 'Escazú', 'Goicoechea',
-    'Desamparados', 'Coronado', 'Curridabat', 'Pavas', 'San Francisco de Dos Ríos', 'Aserrí',
-    'Alajuela', 'Atenas', 'San Ramón', 'Grecia', 'San Carlos', 'Palmares', 'Orotina-San Mateo', 'Naranjo', 'Upala',
-    'Cartago', 'La Unión', 'Turrialba', 'Paraíso', 'Tejar del Guarco',
-    'Heredia', 'Barva', 'Flores', 'San Rafael de Heredia', 'Santo Domingo de Heredia', 'San Pablo de Heredia', 'Santa Bárbara de Heredia',
-    'Nicoya', 'Santa Cruz', 'Liberia', 'Tilarán', 'Carrillo', 'Cañas',
-    'Puntarenas', 'Esparza', 'Sur Sur', 'El Roble', 'Quepos', 'Buenos Aires', 'Montes de Oro-Miramar',
-    'Limón', 'Pococí',
-    'Los Santos', 'Nandayure', 'Poás', 'Alfaro Ruiz-Zarcero', 'Valverde Vega-Sarchí', 'La Suiza', 'Sardinal-Carrillo',
-    'San Antonio de Belén', 'San Isidro de Heredia', 'Bagaces', 'La Cruz', 'Osa (Palmar Norte-Sur)', 'Juntas de Abangares',
-    'Cóbano-Paquera', 'Jicaral', 'Montes de Oca', 'Santa Bárbara (Guanacaste)', 'Sarapiquí', 'Batán', 'San Vito', 'La Uruca', 'Zapote'
-].sort((a, b) => a.localeCompare(b, 'es'));
-// Opciones de filial; si el afiliado tiene una que ya no está en la lista (por ejemplo una provincia), se conserva
-const opcionesFilial = actual => (actual && !FILIALES.includes(actual) ? [actual, ...FILIALES] : FILIALES)
-    .map(f => `<option ${actual === f ? 'selected' : ''}>${esc(f)}</option>`).join('');
+// Filiales y núcleos de ADEP (lista de la Junta Directiva Central), agrupados por provincia
+const FILIALES_POR_PROVINCIA = {
+    'San José': ['San José', 'Santa Ana', 'Moravia', 'Pérez Zeledón', 'Puriscal', 'Tibás', 'Hatillo', 'Mora', 'Escazú', 'Goicoechea',
+        'Desamparados', 'Coronado', 'Curridabat', 'Pavas', 'San Francisco de Dos Ríos', 'Aserrí', 'Los Santos', 'Montes de Oca', 'La Uruca', 'Zapote'],
+    'Alajuela': ['Alajuela', 'Atenas', 'San Ramón', 'Grecia', 'San Carlos', 'Palmares', 'Orotina-San Mateo', 'Naranjo', 'Upala',
+        'Poás', 'Alfaro Ruiz-Zarcero', 'Valverde Vega-Sarchí'],
+    'Cartago': ['Cartago', 'La Unión', 'Turrialba', 'Paraíso', 'Tejar del Guarco', 'La Suiza'],
+    'Heredia': ['Heredia', 'Barva', 'Flores', 'San Rafael de Heredia', 'Santo Domingo de Heredia', 'San Pablo de Heredia',
+        'Santa Bárbara de Heredia', 'San Antonio de Belén', 'San Isidro de Heredia', 'Sarapiquí'],
+    'Guanacaste': ['Nicoya', 'Santa Cruz', 'Liberia', 'Tilarán', 'Carrillo', 'Cañas', 'Nandayure', 'Sardinal-Carrillo', 'Bagaces',
+        'La Cruz', 'Juntas de Abangares', 'Santa Bárbara (Guanacaste)'],
+    'Puntarenas': ['Puntarenas', 'Esparza', 'Sur Sur', 'El Roble', 'Quepos', 'Buenos Aires', 'Montes de Oro-Miramar',
+        'Osa (Palmar Norte-Sur)', 'Cóbano-Paquera', 'Jicaral', 'San Vito'],
+    'Limón': ['Limón', 'Pococí', 'Batán']
+};
+const PROVINCIAS = Object.keys(FILIALES_POR_PROVINCIA);
+const porNombreFilial = (a, b) => a.localeCompare(b, 'es');
+const FILIALES = PROVINCIAS.flatMap(p => FILIALES_POR_PROVINCIA[p]).sort(porNombreFilial);
+// Provincia de una filial (si el dato viejo ya era una provincia, se devuelve tal cual)
+const provinciaDe = f => PROVINCIAS.find(p => FILIALES_POR_PROVINCIA[p].includes(f)) || (PROVINCIAS.includes(f) ? f : '');
+// Filial que ya no está en la lista (por ejemplo «Guanacaste», de cuando se usaban provincias)
+const filialVieja = f => !!f && !FILIALES.includes(f);
+// Opciones de filial agrupadas por provincia; si el afiliado tiene una que ya no está en la lista, se conserva
+const opcionesFilial = actual => (filialVieja(actual) ? `<option selected>${esc(actual)}</option>` : '')
+    + PROVINCIAS.map(p => `<optgroup label="${esc(p)}">${[...FILIALES_POR_PROVINCIA[p]].sort(porNombreFilial)
+        .map(f => `<option ${actual === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</optgroup>`).join('');
 
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = id => document.getElementById(id);
@@ -677,8 +686,15 @@ document.addEventListener('click', e => {
 function renderAfiliados() {
     const q = ($('af-buscar').value || '').toLowerCase().trim();
     const todos = DB.afiliados();
-    const list = todos.filter(a => !q || a.nombre.toLowerCase().includes(q) || a.cedula.includes(q) || (a.provincia || '').toLowerCase().includes(q));
-    $('afiliados-list').innerHTML = `<p class="text-sm text-gray-500">${todos.length} afiliado(s) registrado(s)${q ? ` · ${list.length} coincidencia(s)` : ''}</p>` + (list.length ? list.map(a => `
+    // Filtro por filial o provincia: «f:Barva», «p:Heredia», «sin» (sin filial) o «vieja» (filial que ya no está en la lista)
+    const ver = $('af-ver-filial').value;
+    const enFiltro = a => !ver || (ver === 'sin' ? !a.provincia : ver === 'vieja' ? filialVieja(a.provincia)
+        : ver.startsWith('p:') ? provinciaDe(a.provincia) === ver.slice(2) : a.provincia === ver.slice(2));
+    const list = todos.filter(a => enFiltro(a) && (!q || a.nombre.toLowerCase().includes(q) || a.cedula.includes(q) || (a.provincia || '').toLowerCase().includes(q) || provinciaDe(a.provincia).toLowerCase().includes(q)));
+    const viejas = todos.filter(a => filialVieja(a.provincia)).length;
+    $('afiliados-list').innerHTML = `<p class="text-sm text-gray-500">${todos.length} afiliado(s) registrado(s)${q || ver ? ` · ${list.length} coincidencia(s)` : ''}</p>`
+        + (viejas && ver !== 'vieja' ? `<p class="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"><i class="fa-solid fa-circle-info mr-1"></i>${viejas} afiliado(s) tienen una filial que ya no está en la lista (de cuando se usaban provincias). Elija «Filial vieja (revisar)» arriba para verlos y asignarles su filial, o vuelva a importarlos con «Actualizar su nombre, filial y teléfono».</p>` : '')
+        + (list.length ? list.map(a => `
         <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
                 <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)}</p>
@@ -688,7 +704,7 @@ function renderAfiliados() {
                     <select data-af-filial="${esc(a.cedula)}" aria-label="Filial de ${esc(a.nombre)}" class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold bg-white">
                         <option value="">Sin filial</option>
                         ${opcionesFilial(a.provincia)}
-                    </select></p>
+                    </select>${filialVieja(a.provincia) ? '<span class="text-amber-700 font-semibold">Elija la filial nueva</span>' : ''}</p>
                 <p class="text-sm text-gray-600 mt-1"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i>${a.telefono ? esc(telefonoTxt(a.telefono)) : '<span class="text-gray-500">Sin teléfono</span>'}</p>
             </div>
             <div class="flex flex-wrap gap-2 text-sm font-bold">
@@ -701,6 +717,10 @@ function renderAfiliados() {
         </div>`).join('') : '<p class="text-base text-gray-500 text-center py-8">No hay afiliados que mostrar.</p>');
 }
 $('af-buscar').addEventListener('input', renderAfiliados);
+$('af-ver-filial').insertAdjacentHTML('beforeend', '<option value="sin">Sin filial</option><option value="vieja">Filial vieja (revisar)</option>'
+    + PROVINCIAS.map(p => `<optgroup label="${esc(p)}"><option value="p:${esc(p)}">Toda la provincia de ${esc(p)}</option>${[...FILIALES_POR_PROVINCIA[p]].sort(porNombreFilial)
+        .map(f => `<option value="f:${esc(f)}">${esc(f)}</option>`).join('')}</optgroup>`).join(''));
+$('af-ver-filial').addEventListener('change', renderAfiliados);
 
 function showCredentials(cedula, pin, filial) {
     const box = $('af-nueva');

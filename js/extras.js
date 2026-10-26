@@ -128,8 +128,13 @@
             <div id="xt-cards" class="xt-cards"></div>
             <div class="xt-box space-y-4">
                 <div class="flex items-center justify-between gap-3 flex-wrap">
-                    <h3 class="font-extrabold text-lg text-gray-900"><i class="fa-solid fa-location-dot text-adep-green mr-1"></i> Participación por filial</h3>
-                    <select id="xt-f-poll" aria-label="Consulta a analizar" class="border-2 border-gray-300 rounded-xl p-2.5 font-semibold bg-white max-w-full"></select>
+                    <h3 class="font-extrabold text-lg text-gray-900"><i class="fa-solid fa-location-dot text-adep-green mr-1"></i> Participación por <span id="xt-f-tit">filial</span></h3>
+                    <div class="flex gap-2 flex-wrap max-w-full">
+                        <select id="xt-f-por" aria-label="Agrupar por" class="border-2 border-gray-300 rounded-xl p-2.5 font-semibold bg-white">
+                            <option value="filial">Por filial</option><option value="provincia">Por provincia</option>
+                        </select>
+                        <select id="xt-f-poll" aria-label="Consulta a analizar" class="border-2 border-gray-300 rounded-xl p-2.5 font-semibold bg-white max-w-full"></select>
+                    </div>
                 </div>
                 <div id="xt-filial" class="space-y-4"></div>
             </div>
@@ -144,6 +149,7 @@
         const ult = (() => { try { return localStorage.getItem("adep_ultimo_respaldo"); } catch { return null; } })();
         q("xt-respaldo-info").textContent = ult ? `Último respaldo descargado en este equipo: ${fmtF(ult)}.` : "Todavía no ha descargado un respaldo en este equipo.";
         q("xt-f-poll").addEventListener("change", e => { filialSel = e.target.value; renderFilial(); });
+        q("xt-f-por").addEventListener("change", renderFilial);
 
         // Resultados: botón de exportar a Excel en el encabezado
         const head = q("sec-resultados").firstElementChild;
@@ -217,16 +223,19 @@
 
         const ps = filialSel === "todas" ? vis : vis.filter(p => String(p.id) === filialSel);
         const afs = DB.afiliados().filter(a => a.activo !== false);
-        // Las filiales de la lista y cualquier otra que tengan los afiliados (por ejemplo, provincias de antes)
-        const nombres = [...new Set([...FILIALES, ...afs.map(a => a.provincia || "")])];
+        // Por filial (las de la lista y cualquier otra que tengan los afiliados) o por provincia de la filial
+        const porProv = q("xt-f-por").value === "provincia";
+        q("xt-f-tit").textContent = porProv ? "provincia" : "filial";
+        const grupo = a => porProv ? provinciaDe(a.provincia || "") : (a.provincia || "");
+        const nombres = [...new Set([...(porProv ? PROVINCIAS : FILIALES), ...afs.map(grupo)])];
         const voto = new Map(ps.map(p => [p.id, new Set(quienVoto(p.id).votaron.map(a => a.cedula))]));
         const filas = nombres.map(f => {
-            const m = afs.filter(a => (a.provincia || "") === f);
+            const m = afs.filter(a => grupo(a) === f);
             if (!m.length) return null;
             let votos = 0;
             ps.forEach(p => m.forEach(a => { if (voto.get(p.id).has(a.cedula)) votos++; }));
             const posibles = m.length * ps.length;
-            return { f: f || "Sin filial", n: m.length, votos, posibles, pct: Math.min(100, Math.round(votos * 100 / posibles)) };
+            return { f: f || (porProv ? "Sin provincia" : "Sin filial"), n: m.length, votos, posibles, pct: Math.min(100, Math.round(votos * 100 / posibles)) };
         }).filter(Boolean).sort((a, b) => b.pct - a.pct);
         if (!filas.length) { cont.innerHTML = '<p class="text-gray-500">Aún no hay afiliados registrados con filial.</p>'; return; }
 

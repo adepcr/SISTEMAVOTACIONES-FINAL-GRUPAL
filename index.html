@@ -202,8 +202,11 @@
                     </form>
                     <div id="af-nueva" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm"></div>
                 </div>
-                <input id="af-buscar" type="search" placeholder="Buscar por nombre o cédula..." aria-label="Buscar afiliado"
+                <input id="af-buscar" type="search" placeholder="Buscar nombre, cédula o filial..." aria-label="Buscar afiliado"
                     class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                <select id="af-ver-filial" aria-label="Mostrar afiliados de" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none bg-white">
+                    <option value="">Todas las filiales</option>
+                </select>
                 <div id="afiliados-list" class="space-y-3"></div>
             </section>
 

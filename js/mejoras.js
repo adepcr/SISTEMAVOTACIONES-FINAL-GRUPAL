@@ -311,7 +311,7 @@
                 "Resumen general",
                 [
                     "Las tarjetas muestran los afiliados activos, las votaciones abiertas, la participación y los votos de hoy.",
-                    "Abajo verá la participación de cada filial. Puede elegir una consulta en la lista.",
+                    "Abajo verá la participación de cada filial. Puede verla por filial o por provincia, y elegir una consulta en la lista.",
                     "Use las pestañas de arriba para crear, gestionar y revisar votaciones.",
                     "Abajo, «Descargar respaldo completo» guarda una copia de todos los datos. Hágalo cada semana y después de cada votación.",
                 ],
