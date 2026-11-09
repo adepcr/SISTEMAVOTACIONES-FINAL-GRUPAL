@@ -140,7 +140,7 @@
             </div>
             <div class="xt-box space-y-3">
                 <h3 class="font-extrabold text-lg text-gray-900"><i class="fa-solid fa-shield-halved text-adep-green mr-1"></i> Respaldo de datos</h3>
-                <p class="text-gray-600">Firebase (plan gratuito) no guarda copias automáticas. Descargue un respaldo completo cada semana y después de cada votación, y guárdelo en un lugar seguro (por ejemplo, Google Drive de ADEP). Contiene datos personales de los afiliados: no lo comparta.</p>
+                <p class="text-gray-600">Supabase (plan gratuito) no guarda copias automáticas. Descargue un respaldo completo cada semana y después de cada votación, y guárdelo en un lugar seguro (por ejemplo, Google Drive de ADEP). Contiene datos personales de los afiliados: no lo comparta.</p>
                 <button type="button" id="xt-respaldo" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold px-4 py-3 rounded-xl"><i class="fa-solid fa-download mr-1"></i> Descargar respaldo completo</button>
                 <p id="xt-respaldo-info" class="text-sm text-gray-500"></p>
             </div>`;
@@ -251,20 +251,10 @@
     async function descargarRespaldo() {
         const b = q("xt-respaldo"); if (b.disabled) return;
         b.disabled = true; const txt = b.innerHTML; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Preparando respaldo…';
-        // Fechas de Firestore → texto ISO, para que el archivo se pueda leer y volver a cargar
-        const limpio = v => v && typeof v.toDate === "function" ? v.toDate().toISOString()
-            : Array.isArray(v) ? v.map(limpio)
-            : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, limpio(x)])) : v;
-        const COLS = ["config", "admins", "afiliados", "activaciones", "acceso", "cuentas", "ingresos", "alertas",
-            "polls", "conteos", "participacion", "votos", "codigos", "auditoria", "eliminados"];
         const datos = {}, faltan = [];
         try {
-            for (const c of COLS) {
-                try {
-                    const s = await FB.getDocs(FB.collection(FB.db, c));
-                    datos[c] = Object.fromEntries(s.docs.map(d => [d.id, limpio(d.data())]));
-                } catch (e) { console.error(c, e); faltan.push(c); }
-            }
+            try { Object.assign(datos, await DB.respaldo()); }
+            catch (e) { console.error(e); return showToast("No se pudo preparar el respaldo. Revise su conexión e intente de nuevo.", "error"); }
             const archivo = {
                 sistema: "ADEP Vota", generado: new Date().toISOString(), por: user.nombre,
                 nota: "Respaldo completo de la base de datos.",
@@ -277,7 +267,7 @@
             setTimeout(() => URL.revokeObjectURL(a.href), 2000);
             try { localStorage.setItem("adep_ultimo_respaldo", archivo.generado); } catch { }
             q("xt-respaldo-info").textContent = `Último respaldo descargado en este equipo: ${fmtF(archivo.generado)}.`;
-            DB.log("Respaldo completo descargado", faltan.length ? `Incompleto: ${faltan.join(", ")}` : `${Object.values(datos).reduce((n, c) => n + Object.keys(c).length, 0)} registro(s)`);
+            DB.log("Respaldo completo descargado", faltan.length ? `Incompleto: ${faltan.join(", ")}` : `${Object.values(datos).reduce((n, c) => n + (Array.isArray(c) ? c.length : Object.keys(c).length), 0)} registro(s)`);
             showToast(faltan.length ? "Respaldo descargado, pero faltaron algunas partes. Revise su conexión e intente de nuevo." : "Respaldo descargado. Guárdelo en un lugar seguro.", faltan.length ? "error" : "success");
         } finally { b.disabled = false; b.innerHTML = txt; }
     }

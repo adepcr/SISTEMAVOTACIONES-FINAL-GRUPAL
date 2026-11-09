@@ -52,4 +52,5 @@ Desde entonces se publica sola con cada cambio en `main`.
 
 ## Notas
 - En iPhone no se instala el APK: se usa el botón «Instalar la app en este celular» (Safari → **Compartir → Agregar a pantalla de inicio**).
-- Las reglas de seguridad (`firestore.rules`) se siguen publicando a mano en la consola de Firebase cuando cambian.
+- Firebase ya **solo publica la página** (Hosting). Los datos están en **Supabase** (proyecto `inventario-archivo` de ADEP).
+  Cuando cambia `supabase/votaciones.sql`, se pega a mano en Supabase → **SQL Editor** → **Run** (ver `SEGURIDAD.md`).

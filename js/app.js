@@ -806,22 +806,15 @@ function showAdminError(msg) { $('ad-error').textContent = msg; $('ad-error').cl
 
 $('form-admin').addEventListener('submit', async e => {
     e.preventDefault();
-    const nombre = $('ad-nombre').value.trim(), correo = $('ad-correo').value.trim(), pass = $('ad-pass').value;
-    if (!nombre || !correo || !pass) return showAdminError('Complete nombre, correo y contraseña.');
+    const nombre = $('ad-nombre').value.trim(), correo = $('ad-correo').value.trim();
+    if (!nombre || !correo) return showAdminError('Complete nombre y correo.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showAdminError('Escriba un correo válido.');
-    if (pass.length < 8) return showAdminError('La contraseña debe tener al menos 8 caracteres.');
-    const res = await DB.addAdmin({ nombre, correo, pass });
+    const res = await DB.addAdmin({ nombre, correo });
     if (res.error) return showAdminError(res.error);
     showAdminError('');
     $('form-admin').reset();
-    showToast('Administrador creado.', 'success');
+    showToast('Administrador agregado.', 'success');
     renderAdmins();
-});
-
-$('ad-ver').addEventListener('click', () => {
-    const p = $('ad-pass'), ver = p.type === 'password';
-    p.type = ver ? 'text' : 'password';
-    $('ad-ver').innerHTML = `<i class="fa-solid ${ver ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
 });
 
 $('admins-list').addEventListener('click', async e => {

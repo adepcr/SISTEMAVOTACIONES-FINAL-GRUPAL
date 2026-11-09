@@ -256,19 +256,17 @@
             <form id="form-instalar" class="hidden space-y-4" novalidate>
                 <div class="rounded-2xl p-4" style="background:#fffbeb;border:2px solid #fcd34d;color:#78350f">
                     <h2 class="text-lg font-extrabold"><i class="fa-solid fa-screwdriver-wrench mr-1"></i> Configuración inicial</h2>
-                    <p class="text-sm mt-1">Todavía no hay administradores. Cree la cuenta del <strong>primer administrador</strong>. Esto solo se puede hacer una vez.</p>
+                    <p class="text-sm mt-1">Todavía no hay administradores. Ingrese con su <strong>cuenta de Supabase de ADEP</strong> (la misma del inventario): quedará como <strong>primer administrador</strong>. Esto solo se puede hacer una vez.</p>
                 </div>
                 <input id="i-nombre" type="text" placeholder="Nombre completo" autocomplete="name"
                     class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
                 <input id="i-correo" type="email" placeholder="Correo electrónico" autocomplete="username"
                     class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
-                <input id="i-pass" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password"
-                    class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
-                <input id="i-pass2" type="password" placeholder="Repita la contraseña" autocomplete="new-password"
+                <input id="i-pass" type="password" placeholder="Contraseña de esa cuenta" autocomplete="current-password"
                     class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
                 <p id="i-error" role="alert" aria-live="assertive" class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2"></p>
                 <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-lg shadow-md">
-                    <i class="fa-solid fa-user-shield mr-1"></i> Crear primer administrador</button>
+                    <i class="fa-solid fa-user-shield mr-1"></i> Entrar como primer administrador</button>
             </form>
 
             <p class="lg-seguro"><i class="fa-solid fa-lock"></i> Conexión segura · Sus datos están protegidos</p>
@@ -324,8 +322,6 @@
     </script>
 
     <script type="module">
-        import "./js/firebase.js";
-
         function cargar(src) {
             return new Promise((ok, fail) => {
                 const s = document.createElement("script");
@@ -333,6 +329,8 @@
                 document.head.appendChild(s);
             });
         }
+        await cargar("js/lib/supabase.js");
+        await cargar("js/conexion.js");
 
         const $ = id => document.getElementById(id);
         const soloNumeros = s => s.replace(/\D/g, '');
@@ -349,6 +347,21 @@
         let sesion = null;
         try {
             await cargar("js/db.js");
+            // Llegó desde el enlace del correo para crear una contraseña nueva (administradores)
+            if (DB.vieneDeRecuperacion()) {
+                await SB.auth.getSession();   // espera a que Supabase abra la sesión que trae el enlace
+                let hecho = false;
+                while (!hecho) {
+                    const nueva = prompt('Escriba su contraseña nueva (mínimo 8 caracteres):');
+                    if (nueva === null) break;
+                    if (nueva.length < 8) { alert('La contraseña debe tener al menos 8 caracteres.'); continue; }
+                    const r = await DB.cambiarMiClave(nueva);
+                    if (r.error) alert(r.error + ' Si el enlace venció, pida otro con «Olvidé mi contraseña».');
+                    else { alert('Listo: su contraseña quedó cambiada.'); hecho = true; }
+                    if (r.error) break;
+                }
+                history.replaceState(null, '', location.pathname);
+            }
             sesion = await DB.revisarSesion();
             if (!sesion) window.sinInstalar = !(await DB.instalado());
         } catch (e) {
@@ -399,7 +412,7 @@
             finEspera = DB.esperarAprobacion(ok => {
                 if (ok) return entrar();
                 finEspera && finEspera();
-                FB.signOut(FB.auth).catch(() => { });
+                DB.cerrarSesionForzada();
                 irPaso(1);
                 showErr('a-error', 'ADEP no aprobó este ingreso. Si cree que es un error, comuníquese con ADEP.');
             });
@@ -437,7 +450,7 @@
         document.querySelector('[data-cambiar]').addEventListener('click', () => { localStorage.removeItem('adep_recordar'); irPaso(1); });
         $('espera-cancelar').addEventListener('click', async () => {
             finEspera && finEspera();
-            await FB.signOut(FB.auth).catch(() => { });
+            await DB.cerrarSesionForzada();
             irPaso(1);
         });
 
@@ -546,7 +559,7 @@
         $('l-olvide').addEventListener('click', async () => {
             const correo = $('l-correo').value.trim();
             if (!correo) { $('l-correo').focus(); return showErr('l-error', 'Escriba su correo y vuelva a tocar «Olvidé mi contraseña».'); }
-            try { await FB.sendPasswordResetEmail(FB.auth, correo); } catch (e) { console.error(e); }
+            try { await DB.olvideClave(correo); } catch (e) { console.error(e); }
             // Mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados
             showErr('l-error', `Si ${correo} es un administrador, recibirá un correo con un enlace para crear una contraseña nueva.`);
         });
@@ -558,8 +571,6 @@
                 const nombre = $('i-nombre').value.trim(), correo = $('i-correo').value.trim(), pass = $('i-pass').value;
                 if (!nombre || !correo || !pass) return showErr('i-error', 'Complete nombre, correo y contraseña.');
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showErr('i-error', 'Escriba un correo válido.');
-                if (pass.length < 8) return showErr('i-error', 'La contraseña debe tener al menos 8 caracteres.');
-                if (pass !== $('i-pass2').value) return showErr('i-error', 'Las contraseñas no son iguales.');
                 const r = await DB.instalar({ nombre, correo, pass });
                 if (r.error) return showErr('i-error', r.error);
                 entrar();

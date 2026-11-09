@@ -224,15 +224,9 @@
                             class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
                         <input id="ad-correo" type="email" placeholder="Correo electrónico" autocomplete="off"
                             class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
-                        <div class="relative">
-                            <input id="ad-pass" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password"
-                                class="w-full border-2 border-gray-200 rounded-xl p-3 pr-12 text-sm font-semibold focus:border-adep-green focus:outline-none">
-                            <button type="button" id="ad-ver" title="Ver contraseña" aria-label="Ver u ocultar contraseña" class="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 text-gray-500 hover:text-adep-green">
-                                <i class="fa-solid fa-eye"></i>
-                            </button>
-                        </div>
-                        <button type="submit" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3">
-                            <i class="fa-solid fa-user-shield mr-1"></i> Crear administrador
+                        <p class="sm:col-span-2 text-sm text-gray-600">La cuenta se crea primero en <strong>Supabase → Authentication → Users → Add user</strong> (marque «Auto Confirm User»). Aquí solo se le da permiso de administrador en ADEP Vota.</p>
+                        <button type="submit" class="sm:col-span-2 bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3">
+                            <i class="fa-solid fa-user-shield mr-1"></i> Dar permiso de administrador
                         </button>
                     </form>
                     <p id="ad-error" role="alert" class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2"></p>
@@ -427,8 +421,6 @@
     </div>
 
     <script type="module">
-        import "./js/firebase.js";
-
         function cargar(src) {
             return new Promise((ok, fail) => {
                 const s = document.createElement("script");
@@ -436,6 +428,8 @@
                 document.head.appendChild(s);
             });
         }
+        await cargar("js/lib/supabase.js");
+        await cargar("js/conexion.js");
 
         try {
             await cargar("js/db.js");

@@ -1,80 +1,76 @@
 # Seguridad de ADEP Vota
 
+Los datos están en **Supabase**, en el mismo proyecto de ADEP que el inventario y el carnet (`inventario-archivo`).
+Todo lo de este sistema está definido en **`supabase/votaciones.sql`** (tablas `vota_*` y sus funciones).
+
 ## Qué protege el sistema
 
 | Riesgo | Cómo se evita |
 |---|---|
-| Descargar la base de datos completa | Cada persona solo puede leer lo que le corresponde (reglas de `firestore.rules`). Sin iniciar sesión no se puede leer nada. |
-| Robar o adivinar claves | Las contraseñas las guarda **Firebase Authentication**, nunca la base de datos. Firebase bloquea temporalmente a quien prueba muchas claves. |
-| Votar dos veces, en nombre de otro o fuera de horario | Las reglas solo aceptan **un voto por afiliado**, de su propia cuenta y con la consulta abierta. |
-| Alterar resultados | Un afiliado solo puede sumar **exactamente 1 voto a una opción**, y solo junto con su registro de participación. |
-| Saber qué votó cada persona | En voto secreto, la elección se guarda **solo como un conteo** (`conteos`), sin cédula ni nombre. La participación (`participacion`) dice quién votó, nunca qué eligió. |
-| Hacerse administrador | Solo un administrador puede crear otro. El primero se crea una sola vez, en la instalación. |
-| Borrar huellas | La bitácora solo la leen y borran los administradores; cada registro guarda quién lo hizo y la hora del servidor (no se puede falsificar). |
+| Descargar la base de datos completa | Con la clave pública nadie puede leer las tablas. Los afiliados solo usan funciones (`vota_*`) que revisan su sesión y devuelven únicamente lo que les corresponde. |
+| Que un afiliado vea el inventario | Los afiliados **no tienen cuenta de Supabase**: entran con su cédula y una sesión propia de este sistema. Las cuentas de Supabase son solo para el personal (inventario y administradores de ADEP Vota). |
+| Robar o adivinar claves | La clave de 6 números se guarda cifrada (bcrypt), nunca tal cual. Tras 5 claves malas la cédula queda frenada 15 minutos, y cada dirección IP tiene un límite de intentos fallidos. |
+| Votar dos veces, en nombre de otro o fuera de horario | El voto lo registra la función `vota_votar`, en un solo paso: revisa la sesión, que la consulta esté abierta con la hora del servidor y que la cédula no haya votado (la base de datos no acepta un segundo registro). |
+| Alterar resultados | Nadie puede escribir en los conteos directamente. Solo `vota_votar` suma exactamente 1, y solo un administrador puede restaurar un voto mientras la consulta está abierta. |
+| Saber qué votó cada persona | En voto secreto la elección se guarda **solo como un conteo** (`vota_conteos`), sin cédula ni nombre. La participación (`vota_participacion`) dice quién votó, nunca qué eligió. El comprobante del voto secreto solo guarda el día, no la hora. |
+| Hacerse administrador | Solo un administrador activo puede dar permiso a otro. El primero se crea una sola vez, en la instalación. |
+| Borrar huellas | La bitácora solo la leen y borran los administradores; cada registro guarda el nombre real de quien lo hizo y la hora del servidor. |
 
 ### Cómo ingresan los afiliados
-1. El administrador registra al afiliado (o lo importa desde Excel). El sistema genera un **código de activación** de 8 caracteres, por ejemplo `K7P2-9QXM`. Se muestra **una sola vez**.
-2. Se entrega en persona o por WhatsApp.
-3. El afiliado escribe su cédula y toca **«Continuar»**. Como es su primera vez, el sistema le pide el código y que **cree su propia clave de 6 números**. El código sirve una sola vez.
-4. En su propio celular la sesión queda abierta: no tendrá que escribir la clave cada vez.
-4. Después ingresa siempre con cédula y clave.
-5. ¿Olvidó la clave? El administrador pulsa **«Nuevo código»**: la cuenta anterior deja de funcionar y el afiliado repite el paso 3.
+1. La lista de afiliados es **la misma del carnet** (`carnet_afiliados`): se actualiza cada mes con el reporte de ADEP (ver la guía del carnet, `GUIA-TI.md` → *Rutina mensual*). Trae cédula, nombre y filial.
+2. Hay dos formas de entrar:
+   - **Código de activación** (8 caracteres, por ejemplo `K7P2-9QXM`): el administrador lo genera en **Afiliados → Nuevo código** y se muestra **una sola vez**. El afiliado escribe su cédula, el código, y **crea su propia clave de 6 números**. Después entra siempre con cédula y clave.
+   - **Código general de ingreso** (6 números, vence solo): la cédula queda amarrada al primer celular que lo use (una cédula, un celular). Si cambia de celular, el administrador pulsa **«Liberar cédula»**.
+3. ¿Olvidó la clave? El administrador pulsa **«Nuevo código»**: la cuenta anterior deja de funcionar.
 
-De la base de datos no se puede sacar el código: solo se guarda su huella (SHA-256), y las reglas comprueban que el afiliado escribió el código correcto.
+De la base de datos no se puede sacar el código de activación: solo se guarda su huella (SHA-256).
 
----
-
-## Pasos para activarlo (una sola vez, en la consola de Firebase)
-
-Entre a **https://console.firebase.google.com** → proyecto **ADEP Vota** (`adep-vota`).
-
-### 1. Activar el inicio de sesión
-1. Menú izquierdo: **Compilación → Authentication** → botón **Comenzar** (si aparece).
-2. Pestaña **Método de inicio de sesión** (*Sign-in method*).
-3. Elija **Correo electrónico/contraseña**, active el **primer** interruptor y pulse **Guardar**.
-
-### 2. Publicar las reglas de seguridad
-1. Menú izquierdo: **Compilación → Firestore Database** → pestaña **Reglas**.
-2. Borre todo lo que haya y pegue el contenido completo del archivo **`firestore.rules`** de este proyecto.
-3. Pulse **Publicar**.
-
-### 3. Borrar los datos de prueba del sistema anterior
-1. En **Firestore Database → Datos**, busque la colección **`adep`**.
-2. Menú ⋮ de la colección → **Eliminar colección**.
-   (Con las reglas nuevas ya nadie puede leerla, pero contenía las claves del sistema anterior.)
-
-### 4. Publicar el sitio y crear el primer administrador
-1. Publique la versión nueva del sitio (como lo hace siempre).
-2. Abra la página → pestaña **Administrador** → aparecerá **Configuración inicial**.
-3. Escriba su nombre, correo y una contraseña de al menos 8 caracteres. Este formulario **solo funciona una vez**.
-4. Desde **Administradores** puede crear más cuentas. Si alguien olvida su contraseña, use **«Olvidé mi contraseña»** en el ingreso o **«Enviar correo de contraseña»** en la lista.
-
-### 5. Recomendado
-- **Authentication → Plantillas → Restablecimiento de contraseña**: cambie el idioma a **español**.
-- **Authentication → Configuración → Dominios autorizados**: agregue el dominio donde publica el sitio, si no está.
+Quien sale de la lista mensual (o el administrador desactiva) pierde la sesión en ese momento. Desactivar en ADEP Vota
+solo impide votar: no le quita el carnet. **Eliminar** a un afiliado sí lo quita de la lista compartida (y del carnet,
+hasta que vuelva a aparecer en el reporte).
 
 ---
 
-## Límites del plan gratuito (Spark)
+## Instalar o actualizar la base de datos (una sola vez, y cada vez que cambie `supabase/votaciones.sql`)
 
-- **Cuota diaria gratis** de Firestore: 50.000 lecturas y 20.000 escrituras por día. Alcanza de sobra para una asociación; si se supera, el sistema se detiene hasta el día siguiente (no cobra).
-- **Voto secreto:** nadie puede ver qué votó cada persona, ni siquiera un administrador desde el sistema. Sin funciones en el servidor (plan Blaze), un técnico que vigilara la base de datos **en el mismo segundo** en que alguien vota podría intentar relacionar la hora del voto con el conteo. Para eliminar incluso eso, se puede pasar al plan Blaze y mover el voto a una función del servidor.
-- La clave del afiliado es de 6 números (pensada para personas mayores). Firebase limita los intentos fallidos, pero conviene recordar a los afiliados que no usen claves fáciles.
+1. https://supabase.com/dashboard → proyecto **inventario-archivo** → **SQL Editor**.
+2. Si es la primera vez, primero debe estar corrido `basedatos/supabase.sql` del repositorio del carnet (crea la lista de afiliados).
+3. Pegue **todo** el archivo `supabase/votaciones.sql` y toque **Run**. Se puede correr varias veces sin perder datos.
+4. **Authentication → URL Configuration → Redirect URLs**: agregue `https://adep-vota.web.app/**`
+   (para que el enlace de «Olvidé mi contraseña» de los administradores vuelva a esta página y no al inventario).
+
+### Primer administrador
+- Abra la página → pestaña **Administrador** → aparece **Configuración inicial**.
+- Escriba su nombre y entre con su **cuenta de Supabase de ADEP** (la misma del inventario). Esto solo funciona una vez.
+- Otra forma: en el SQL Editor, corra las líneas del final de `supabase/votaciones.sql` (sección 9) con el correo de la persona.
+
+### Más administradores
+1. Supabase → **Authentication → Users → Add user → Create new user** (correo y contraseña, marque *Auto Confirm User*).
+   Si la persona ya usa el inventario, ya tiene cuenta: no hace falta crearla.
+2. En ADEP Vota → **Administradores**: nombre y correo → **Dar permiso de administrador**.
+
+Tener cuenta de Supabase **no** da permiso en ADEP Vota: hay que agregarla aquí. Y al revés: un administrador de ADEP Vota
+puede consultar el inventario como «lector», porque es la misma cuenta del personal de ADEP.
 
 ---
 
-## Para técnicos: probar las reglas
+## Límites del plan gratuito de Supabase
 
-Las pruebas están en `tests/reglas.test.mjs` (94 casos: votar dos veces, entrar con la cédula de otro, ver resultados antes del cierre, firmar la bitácora como otro, sumar a dos opciones, códigos falsos, leer datos ajenos, etc.). Necesitan Node.js y Java:
+- 500 MB de base de datos para los tres sistemas (inventario, carnet y votaciones). ADEP Vota usa muy poco (no guarda fotos).
+- El proyecto se **pausa** si pasa 7 días sin uso. El carnet y el inventario ya lo mantienen despierto con una consulta diaria. Si aun así se pausa: Supabase → **Restore project** (no se pierde nada).
+- **No hay respaldos automáticos**: descargue el respaldo completo (**Respaldo** en el sistema) cada semana y después de cada votación.
+- La página revisa si hay cambios cada 10 segundos (no al instante).
+
+---
+
+## Para técnicos: probar la seguridad
+
+Las pruebas están en `supabase/pruebas/pruebas.sql` (votar dos veces, cédula de otro, consulta cerrada o sin publicar, opción inexistente,
+sesión inventada, clave por fuerza bruta, segundo celular, leer tablas sin permiso, hacerse administrador, firmar la bitácora como otro,
+lista mensual, etc.). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
 
 ```bash
-cd tests
-npm install
-npx firebase emulators:exec --only firestore --project demo-adep "node reglas.test.mjs"
+PGHOST=localhost PGUSER=postgres sh supabase/pruebas/correr.sh
 ```
 
-Para publicar las reglas desde la terminal en vez de la consola:
-
-```bash
-npx firebase deploy --only firestore:rules --project adep-vota
-```
+Necesita PostgreSQL 15 o más nuevo y la carpeta del carnet al lado (`../carnet-adep`).
