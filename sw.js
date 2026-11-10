@@ -1,7 +1,7 @@
 // Service worker de la PWA: permite instalar la página como app.
 // Primero intenta la red (para tener siempre la versión nueva) y si no hay internet usa la copia guardada.
 // Solo guarda los archivos de esta página; los votos siguen yendo directo a Firebase.
-const CACHE = "adep-vota-v1";
+const CACHE = "adep-vota-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => {
