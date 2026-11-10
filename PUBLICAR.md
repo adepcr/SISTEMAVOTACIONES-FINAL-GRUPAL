@@ -3,7 +3,7 @@
 Cada vez que se sube un cambio a `main`, GitHub publica la página en **https://adep-vota.web.app** (en unos 5 minutos).
 No hay que hacer nada más.
 
-> 📦 Desde noviembre de 2026 el repositorio oficial es **https://github.com/adepcr/sistema-votaciones** (organización de ADEP, privado).
+> 📦 Desde noviembre de 2026 el repositorio oficial es **https://github.com/adepcr/sistema-votaciones-Abigail-Avendano** (organización de ADEP, privado).
 > La llave `FIREBASE_SERVICE_ACCOUNT` se generó de nuevo para ese repositorio (pasos 2 y 4).
 
 ## Cómo reciben la app los afiliados
@@ -38,14 +38,14 @@ Para publicar la página, GitHub necesita permiso en Firebase. Esto se configur�
 3. **Agregar otro rol** → escriba **Firebase Hosting** → elija **Administrador de Firebase Hosting** → **Guardar**.
 
 ### 4. Guardar la llave en GitHub
-1. https://github.com/adepcr/sistema-votaciones/settings/secrets/actions
+1. https://github.com/adepcr/sistema-votaciones-Abigail-Avendano/settings/secrets/actions
 2. **New repository secret**.
 3. Name: `FIREBASE_SERVICE_ACCOUNT`
 4. Secret: abra el archivo `.json` del paso 2 con el Bloc de notas, copie **todo** y péguelo.
 5. **Add secret**. Después puede borrar el archivo `.json` de su computadora.
 
 ### 5. Publicar
-1. https://github.com/adepcr/sistema-votaciones/actions → **Publicar app y página** → **Run workflow** → **Run workflow**.
+1. https://github.com/adepcr/sistema-votaciones-Abigail-Avendano/actions → **Publicar app y página** → **Run workflow** → **Run workflow**.
 2. En unos 5 minutos la página queda en **https://adep-vota.web.app**.
 
 Desde entonces se publica sola con cada cambio en `main`.
