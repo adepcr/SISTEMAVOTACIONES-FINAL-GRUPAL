@@ -369,12 +369,15 @@ function quienVoto(pollId) {
     };
 }
 // pollId (opcional): si se indica, cada afiliado muestra el botón "Restaurar" (consulta abierta)
-function listaAfiliados(arr, vacio, pollId = null) {
+// Con miles de afiliados se muestran los primeros 200 (la lista completa está en el Excel de resultados)
+const MAX_LISTA = 200;
+function listaAfiliados(todos, vacio, pollId = null) {
+    const arr = todos.slice(0, MAX_LISTA), resto = todos.length - arr.length;
     return arr.length
         ? `<ul class="text-sm space-y-1 max-h-56 overflow-y-auto pr-1">${arr.map(a => `<li class="flex justify-between items-center gap-2 border-b border-gray-100 pb-1">
             <span class="font-semibold text-gray-800 min-w-0">${esc(a.nombre)}${a.provincia ? `<span class="block text-xs font-normal text-gray-500">Filial: ${esc(a.provincia)}</span>` : ''}</span>
             <span class="flex items-center gap-2 shrink-0"><span class="text-gray-500">${esc(a.cedula)}</span>${pollId !== null ? `<button data-restore="${pollId}" data-ced="${esc(a.cedula)}" class="px-2 py-1 rounded-lg bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold"><i class="fa-solid fa-rotate-left mr-1"></i>Restaurar</button>` : ''}</span>
-        </li>`).join('')}</ul>`
+        </li>`).join('')}</ul>${resto > 0 ? `<p class="text-xs text-gray-500 mt-1">… y ${resto} más. Busque a alguien en la pestaña Afiliados o descargue el Excel de resultados.</p>` : ''}`
         : `<p class="text-sm text-gray-500">${vacio}</p>`;
 }
 
@@ -697,7 +700,11 @@ document.addEventListener('click', e => {
     DB.log('Clave enviada por WhatsApp', a ? `${a.nombre} (${a.cedula})` : w.dataset.wa);
 });
 
+// Con miles de afiliados, dibujarlos todos congela la página: se muestran de a 50 (y solo si la pestaña está abierta)
+const AF_PAGINA = 50;
+let afMostrar = AF_PAGINA;
 function renderAfiliados() {
+    if ($('sec-afiliados').classList.contains('hidden')) return;
     const q = ($('af-buscar').value || '').toLowerCase().trim();
     const todos = DB.afiliados();
     // Filtro por filial o provincia: «f:Barva», «p:Heredia», «sin» (sin filial) o «vieja» (filial que ya no está en la lista)
@@ -708,7 +715,7 @@ function renderAfiliados() {
     const viejas = todos.filter(a => filialVieja(a.provincia)).length;
     $('afiliados-list').innerHTML = `<p class="text-sm text-gray-500">${todos.length} afiliado(s) registrado(s)${q || ver ? ` · ${list.length} coincidencia(s)` : ''}</p>`
         + (viejas && ver !== 'vieja' ? `<p class="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"><i class="fa-solid fa-circle-info mr-1"></i>${viejas} afiliado(s) tienen una filial que ya no está en la lista (de cuando se usaban provincias). Elija «Filial vieja (revisar)» arriba para verlos y asignarles su filial, o vuelva a importarlos con «Actualizar su nombre, filial y teléfono».</p>` : '')
-        + (list.length ? list.map(a => `
+        + (list.length ? list.slice(0, afMostrar).map(a => `
         <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
                 <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)}</p>
@@ -728,13 +735,17 @@ function renderAfiliados() {
                 <button data-af="toggle" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">${a.activo === false ? 'Activar' : 'Desactivar'}</button>
                 <button data-af="del" data-id="${esc(a.cedula)}" class="px-3 py-2 rounded-xl bg-adep-redLight text-adep-red border border-red-200">Eliminar</button>
             </div>
-        </div>`).join('') : '<p class="text-base text-gray-500 text-center py-8">No hay afiliados que mostrar.</p>');
+        </div>`).join('') + (list.length > afMostrar
+            ? `<div class="text-center space-y-2 py-2"><p class="text-sm text-gray-500">Se muestran ${afMostrar} de ${list.length}. Para encontrar a alguien, use el buscador de arriba.</p>
+                <button type="button" id="af-mas" class="px-4 py-3 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200 font-bold text-sm">Mostrar ${Math.min(AF_PAGINA, list.length - afMostrar)} más</button></div>` : '')
+        : '<p class="text-base text-gray-500 text-center py-8">No hay afiliados que mostrar.</p>');
 }
-$('af-buscar').addEventListener('input', renderAfiliados);
+let afEspera = null;
+$('af-buscar').addEventListener('input', () => { clearTimeout(afEspera); afEspera = setTimeout(() => { afMostrar = AF_PAGINA; renderAfiliados(); }, 250); });
 $('af-ver-filial').insertAdjacentHTML('beforeend', '<option value="sin">Sin filial</option><option value="vieja">Filial vieja (revisar)</option>'
     + PROVINCIAS.map(p => `<optgroup label="${esc(p)}"><option value="p:${esc(p)}">Toda la provincia de ${esc(p)}</option>${[...FILIALES_POR_PROVINCIA[p]].sort(porNombreFilial)
         .map(f => `<option value="f:${esc(f)}">${esc(f)}</option>`).join('')}</optgroup>`).join(''));
-$('af-ver-filial').addEventListener('change', renderAfiliados);
+$('af-ver-filial').addEventListener('change', () => { afMostrar = AF_PAGINA; renderAfiliados(); });
 
 function showCredentials(cedula, pin, filial) {
     const box = $('af-nueva');
@@ -771,6 +782,7 @@ $('afiliados-list').addEventListener('change', e => {
 });
 
 $('afiliados-list').addEventListener('click', async e => {
+    if (e.target.closest('#af-mas')) { afMostrar += AF_PAGINA; return renderAfiliados(); }
     const b = e.target.closest('[data-af]'); if (!b) return;
     const id = b.dataset.id;
     if (b.dataset.af === 'reset') { const pin = await DB.resetPass(id); if (pin) { const a = DB.afiliados().find(x => x.cedula === id); showCredentials(id, pin, a ? a.provincia : ''); } }
