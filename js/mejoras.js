@@ -30,7 +30,21 @@
   .cal-ley b{width:8px;height:8px;border-radius:50%;background:#e52521}
   .cal-t{display:flex;align-items:center;gap:.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #d5e2da;flex-wrap:wrap}
   .cal-t label{font-weight:800;color:#04492a;margin-right:.25rem}
-  .cal-t select{min-height:48px;border:2px solid #b6c6bc;border-radius:.8rem;padding:0 .6rem;font-size:1.1rem;font-weight:700;background:#fff}
+  .cal-t{flex-direction:column;align-items:stretch;gap:.7rem}
+  .cal-reloj{display:flex;align-items:center;justify-content:center;gap:.5rem;background:#f4fbf7;border:2px solid #cfe3d6;border-radius:1.1rem;padding:.6rem .5rem}
+  .cal-col{display:flex;flex-direction:column;align-items:center;gap:.2rem}
+  .cal-col button{width:56px;height:38px;border:0;border-radius:.7rem;background:#e2f2e9;color:#006b35;font-size:1rem;cursor:pointer}
+  .cal-col button:hover{background:#cfe9da}
+  .cal-col input{width:64px;height:58px;text-align:center;font:900 2rem/1 Outfit,sans-serif;color:#04492a;background:#fff;border:2px solid #b6c6bc;border-radius:.85rem;padding:0}
+  .cal-col input:focus{outline:none;border-color:#008744;box-shadow:0 0 0 3px rgba(0,135,68,.25)}
+  .cal-dp{font:900 2rem/1 Outfit,sans-serif;color:#04492a;margin-top:-.2rem}
+  .cal-reloj .cal-ap{display:flex;flex-direction:column;margin-left:.4rem}
+  .cal-reloj .cal-ap button:first-child{border-radius:.8rem .8rem 0 0}.cal-reloj .cal-ap button:last-child{border-radius:0 0 .8rem .8rem;border-left:2px solid #b6c6bc;border-top:0}
+  .cal-reloj .cal-ap button[aria-pressed=true]{border-color:#008744}
+  .cal-rap{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;justify-content:center}
+  .cal-rap span{width:100%;text-align:center;font-weight:700;color:#4a5a53;font-size:.95rem}
+  .cal-rap button{min-height:40px;padding:0 .8rem;border-radius:999px;border:2px solid #cfe3d6;background:#fff;color:#006b35;font-weight:800}
+  .cal-rap button[aria-pressed=true]{background:#008744;border-color:#008744;color:#fff}
   .cal-ap button{min-height:48px;padding:0 .9rem;border:2px solid #b6c6bc;background:#fff;font-weight:800;font-size:1rem}
   .cal-ap button:first-child{border-radius:.8rem 0 0 .8rem}.cal-ap button:last-child{border-radius:0 .8rem .8rem 0;border-left:0}
   .cal-ap button[aria-pressed=true]{background:#008744;border-color:#008744;color:#fff}
@@ -171,18 +185,16 @@
                 act = S.marcar && S.marcar(dt);
             cells += `<button type="button" class="cal-d${esSel ? " sel" : ""}${esHoy ? " hoy" : ""}${act ? " act" : ""}" data-d="${d}" aria-pressed="${!!esSel}" aria-label="${dt.toLocaleDateString("es-CR", { weekday: "long", day: "numeric", month: "long" })}${act ? ", con actividad" : ""}">${d}</button>`;
         }
-        const hs = Array.from(
-            { length: 12 },
-            (_, i) =>
-                `<option value="${i + 1}" ${S.h === i + 1 ? "selected" : ""}>${i + 1}</option>`,
-        ).join("");
-        // Todos los minutos (00 a 59), para programar a la hora exacta
-        const ms = Array.from(
-            { length: 60 },
-            (_, i) => `<option value="${i}" ${S.mi === i ? "selected" : ""}>${pad(i)}</option>`,
-        ).join("");
-        const hora = `<div class="cal-t"><label for="cal-h">Hora</label><select id="cal-h" aria-label="Hora">${hs}</select><b>:</b><select id="cal-m" aria-label="Minutos">${ms}</select>
-        <span class="cal-ap"><button type="button" data-ap="0" aria-pressed="${!S.pm}">a. m.</button><button type="button" data-ap="1" aria-pressed="${S.pm}">p. m.</button></span></div>`;
+        // Hora: números grandes con flechas ▲▼ (de a uno), se pueden escribir, y minutos rápidos
+        const flecha = (t, dir, que) => `<button type="button" data-t="${t}" aria-label="${dir === "up" ? "Subir" : "Bajar"} ${que}"><i class="fa-solid fa-chevron-${dir}"></i></button>`;
+        const hora = `<div class="cal-t"><label for="cal-h">Hora</label>
+        <div class="cal-reloj">
+          <div class="cal-col">${flecha("h+", "up", "la hora")}<input id="cal-h" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Hora (1 a 12)" value="${S.h}">${flecha("h-", "down", "la hora")}</div>
+          <b class="cal-dp" aria-hidden="true">:</b>
+          <div class="cal-col">${flecha("m+", "up", "los minutos")}<input id="cal-m" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Minutos (0 a 59)" value="${pad(S.mi)}">${flecha("m-", "down", "los minutos")}</div>
+          <span class="cal-ap"><button type="button" data-ap="0" aria-pressed="${!S.pm}">a. m.</button><button type="button" data-ap="1" aria-pressed="${S.pm}">p. m.</button></span>
+        </div>
+        <div class="cal-rap"><span>Minutos:</span>${[0, 15, 30, 45].map((m) => `<button type="button" data-mr="${m}" aria-pressed="${S.mi === m}">:${pad(m)}</button>`).join("")}</div></div>`;
         ov.querySelector(".cal-in").innerHTML = `
       <div class="cal-nav"><button type="button" data-nav="-1" aria-label="Mes anterior"><i class="fa-solid fa-chevron-left"></i></button><b>${MESES[S.m]} ${S.y}</b><button type="button" data-nav="1" aria-label="Mes siguiente"><i class="fa-solid fa-chevron-right"></i></button></div>
       <div class="cal-g">${cells}</div>
@@ -229,6 +241,14 @@
                 S.y++;
             }
             dibujar();
+        } else if (e.target.closest("[data-t]") || e.target.closest("[data-mr]")) {
+            const t = e.target.closest("[data-t]"), mr = e.target.closest("[data-mr]");
+            if (mr) S.mi = +mr.dataset.mr;
+            else if (t.dataset.t === "h+") S.h = (S.h % 12) + 1;
+            else if (t.dataset.t === "h-") S.h = ((S.h + 10) % 12) + 1;
+            else if (t.dataset.t === "m+") S.mi = (S.mi + 1) % 60;
+            else if (t.dataset.t === "m-") S.mi = (S.mi + 59) % 60;
+            pintarHora();
         } else if (ap) {
             S.pm = ap.dataset.ap === "1";
             ov.querySelectorAll("[data-ap]").forEach((b) =>
@@ -245,16 +265,26 @@
             cerrar();
         }
     });
-    document.addEventListener("change", (e) => {
-        if (!ov || !S) return;
-        if (e.target.id === "cal-h") {
-            S.h = +e.target.value;
-            refrescarRes();
-        }
-        if (e.target.id === "cal-m") {
-            S.mi = +e.target.value;
-            refrescarRes();
-        }
+    // Muestra la hora elegida sin volver a dibujar todo (así no se pierde lo que se está escribiendo)
+    function pintarHora(escribiendo) {
+        const h = ov.querySelector("#cal-h"), m = ov.querySelector("#cal-m");
+        if (h && escribiendo !== "h") h.value = S.h;
+        if (m && escribiendo !== "m") m.value = pad(S.mi);
+        ov.querySelectorAll("[data-mr]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.mr === S.mi)));
+        refrescarRes();
+    }
+    // Escribir la hora o los minutos a mano (solo números; fuera de rango se ajusta al salir)
+    document.addEventListener("input", (e) => {
+        if (!ov || !S || (e.target.id !== "cal-h" && e.target.id !== "cal-m")) return;
+        e.target.value = e.target.value.replace(/\D/g, "").slice(0, 2);
+        const n = parseInt(e.target.value, 10);
+        if (isNaN(n)) return;
+        if (e.target.id === "cal-h" && n >= 1 && n <= 12) S.h = n;
+        if (e.target.id === "cal-m" && n <= 59) S.mi = n;
+        pintarHora(e.target.id === "cal-h" ? "h" : "m");
+    });
+    document.addEventListener("focusout", (e) => {
+        if (ov && S && (e.target.id === "cal-h" || e.target.id === "cal-m")) pintarHora();
     });
     document.addEventListener(
         "keydown",

@@ -822,15 +822,17 @@ const DB = {
         if (!poll) return { error: 'Consulta no encontrada.' };
         if (this.estado(poll) !== 'abierta') return { error: 'Solo se puede restaurar un voto mientras la consulta está abierta.' };
         if (!this._part.find(r => r.pollId === pollId && r.cedula === cedula)) return { error: 'Este afiliado no ha votado.' };
+        // La base de datos sabe sola qué opción quitar; «opcion» solo hace falta para votos secretos
+        // emitidos antes de la actualización (entonces responde pedirOpcion)
         let idx = null;
-        if (!poll.publica) {
+        if (!poll.publica && opcion !== undefined) {
             idx = poll.opciones.indexOf(opcion);
             if (idx < 0 || !((this._conteos[String(pollId)] || {})['c' + idx] > 0)) return { error: 'No hay votos registrados con esa opción.' };
         }
         let r;
         try { r = await this._rpc('vota_restaurar', { p_poll: pollId, p_cedula: cedula, p_idx: idx }); }
         catch (e) { this._falla(e); return { error: 'No se pudo restaurar el voto.' }; }
-        if (r.error) return { error: r.error };
+        if (r.error) return { error: r.error, pedirOpcion: !!r.pedirOpcion };
         const a = this._afiliados[cedula];
         this.log('Voto restaurado', `${poll.titulo} · ${a ? a.nombre : cedula}`.slice(0, 120));
         await this._refrescar();

@@ -445,17 +445,17 @@ function startRestore(pid, ced) {
     if (DB.estado(poll) !== 'abierta') return showToast('Solo se puede restaurar un voto mientras la consulta está abierta.');
     const a = DB.afiliados().find(x => x.cedula === ced);
     const nombre = a ? a.nombre : ced;
-    if (poll.publica) {
-        // Voto público: se sabe qué eligió, se quita directamente
-        if (!confirm(`¿Restaurar el voto de ${nombre}? Podrá votar de nuevo en esta consulta.`)) return;
-        DB.restaurarVoto(pid, ced).then(r => {
-            if (r.error) return showToast(r.error);
-            showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
-            renderAll();
-        });
-        return;
-    }
-    // Voto secreto: el afiliado indica qué opción eligió por error
+    // Solo se pide confirmar: el sistema sabe qué voto quitar (sin mostrarle a nadie qué eligió)
+    if (!confirm(`¿Está seguro de restaurar el voto de ${nombre}?\n\nSu voto se anulará y podrá votar de nuevo en esta consulta.`)) return;
+    DB.restaurarVoto(pid, ced).then(r => {
+        if (r.pedirOpcion) return pedirOpcionRestaurar(pid, ced, nombre, poll);
+        if (r.error) return showToast(r.error);
+        showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
+        renderAll();
+    });
+}
+// Solo para votos secretos emitidos antes de la actualización: el afiliado indica qué opción eligió
+function pedirOpcionRestaurar(pid, ced, nombre, poll) {
     pendingRestore = { pid, ced };
     $('rs-who').innerText = `${nombre} · Cédula ${ced}`;
     $('rs-opcion').innerHTML = poll.opciones.map((o, i) => `<option value="${i}">${esc(o)}</option>`).join('');
@@ -730,7 +730,7 @@ function renderAfiliados() {
         <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
                 <p class="font-bold text-base text-gray-900 truncate">${esc(a.nombre)}</p>
-                <p class="text-sm text-gray-500 truncate">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}${a.activado ? '' : ' · <span class="text-amber-700 font-semibold">Todavía no ha entrado</span>'}${a.pendiente && a.uid ? ' · <span class="text-amber-700 font-semibold">Esperando aprobación</span>' : ''}</p>
+                <p class="text-sm text-gray-500 break-words">Cédula ${esc(a.cedula)} · ${a.activo === false ? 'Desactivado' : 'Activo'}${a.activado ? '' : ' · <span class="text-amber-700 font-semibold">Todavía no ha entrado</span>'}${a.pendiente && a.uid ? ' · <span class="text-amber-700 font-semibold">Esperando aprobación</span>' : ''}</p>
                 ${a.uid && a.dispositivo ? `<p class="text-sm text-gray-600 mt-1"><i class="fa-solid fa-mobile-screen text-adep-green mr-1"></i>Entra desde: ${esc(a.dispositivo)}</p>` : ''}
                 <p class="text-sm text-gray-600 flex items-center gap-2 flex-wrap mt-1"><span><i class="fa-solid fa-location-dot text-adep-green mr-1"></i>Filial:</span>
                     <select data-af-filial="${esc(a.cedula)}" aria-label="Filial de ${esc(a.nombre)}" class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm font-semibold bg-white">

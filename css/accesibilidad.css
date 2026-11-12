@@ -17,7 +17,7 @@ body { padding-bottom: 64px; }
 
 /* Barra flotante A- / A+ / contraste (compacta, con px para que no crezca con la letra) */
 #a11y-bar {
-    position: fixed; left: 8px; bottom: 8px; z-index: 60;
+    position: fixed; left: 8px; bottom: 8px; z-index: 40;   /* debajo de las ventanas emergentes (z 50) */
     display: flex; gap: 4px; align-items: center;
     background: #fff; border: 2px solid #008744; border-radius: 12px;
     padding: 4px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
@@ -31,8 +31,17 @@ body { padding-bottom: 64px; }
 #a11y-bar button[aria-pressed="true"] { background: #008744; color: #fff; }
 #a11y-bar button:focus-visible { outline: 3px solid #E52521; outline-offset: 2px; }
 
-/* En celulares: "Contraste" queda solo con el ícono */
+/* En computadora no hace falta el botón «Aa» */
+#a11y-bar #a11y-abrir { display: none; }
+
+/* En celulares: la barra queda cerrada como un botón «Aa» pequeño en la esquina, para no tapar
+   el contenido; al tocarlo aparecen A−, A+ y contraste (solo con el ícono). */
 @media (max-width: 640px) {
+    #a11y-bar { opacity: .92; }   /* a la izquierda: a la derecha está el asistente Robi */
+    #a11y-bar #a11y-abrir { display: inline-block; font-size: 16px; }
+    #a11y-bar:not(.abierta) button:not(#a11y-abrir) { display: none; }
+    #a11y-bar.abierta { opacity: 1; }
+    #a11y-bar.abierta #a11y-abrir { background: #008744; color: #fff; }
     #a11y-bar button#a11y-hc { font-size: 0; }
     #a11y-bar button#a11y-hc i { font-size: 16px; }
 }

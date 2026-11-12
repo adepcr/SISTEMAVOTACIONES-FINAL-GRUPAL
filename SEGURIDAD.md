@@ -12,7 +12,7 @@ Todo lo de este sistema está definido en **`supabase/votaciones.sql`** (tablas 
 | Robar o adivinar claves | La clave de 6 números se guarda cifrada (bcrypt), nunca tal cual. Tras 5 claves malas la cédula queda frenada 15 minutos, y cada dirección IP tiene un límite de intentos fallidos. |
 | Votar dos veces, en nombre de otro o fuera de horario | El voto lo registra la función `vota_votar`, en un solo paso: revisa la sesión, que la consulta esté abierta con la hora del servidor y que la cédula no haya votado (la base de datos no acepta un segundo registro). |
 | Alterar resultados | Nadie puede escribir en los conteos directamente. Solo `vota_votar` suma exactamente 1, y solo un administrador puede restaurar un voto mientras la consulta está abierta. |
-| Saber qué votó cada persona | En voto secreto la elección se guarda **solo como un conteo** (`vota_conteos`), sin cédula ni nombre. La participación (`vota_participacion`) dice quién votó, nunca qué eligió. El comprobante del voto secreto solo guarda el día, no la hora. |
+| Saber qué votó cada persona | En voto secreto la elección se guarda **solo como un conteo** (`vota_conteos`), sin cédula ni nombre. La participación (`vota_participacion`) dice quién votó, nunca qué eligió. El comprobante del voto secreto solo guarda el día, no la hora. Para poder **«Restaurar voto»** sin preguntarle al afiliado qué marcó, mientras la consulta está abierta se guarda su opción en `vota_restaurables`, una tabla que nadie puede leer (ni los administradores desde el sistema; solo la usa la función de restaurar). Al cerrar la consulta esa opción se borra y queda solo el conteo. |
 | Hacerse administrador | Solo un administrador activo puede dar permiso a otro. El primero se crea una sola vez, en la instalación. |
 | Borrar huellas | La bitácora solo la leen y borran los administradores; cada registro guarda el nombre real de quien lo hizo y la hora del servidor. |
 
@@ -71,7 +71,7 @@ puede consultar el inventario como «lector», porque es la misma cuenta del per
 Las pruebas están en `supabase/pruebas/pruebas.sql` (votar dos veces, cédula de otro, consulta cerrada o sin publicar, opción inexistente,
 sesión inventada, clave por fuerza bruta, segundo celular, leer tablas sin permiso, hacerse administrador, firmar la bitácora como otro,
 lista mensual, pedir ayuda o cambios de datos sin sesión, aprobar pedidos sin ser administrador, crear administradores sin serlo,
-afiliados sin filial en la lista, etc.: 96 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
+afiliados sin filial en la lista, leer la opción guardada para restaurar, etc.: 104 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
 
 ```bash
 PGHOST=localhost PGUSER=postgres sh supabase/pruebas/correr.sh

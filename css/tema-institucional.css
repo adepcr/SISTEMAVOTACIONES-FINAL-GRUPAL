@@ -1360,3 +1360,48 @@ html.hc body .receipt-card {
         scroll-behavior: auto !important;
     }
 }
+
+/* ==========================================================================
+   QUE TODO QUEPA EN EL CELULAR (también con la letra agrandada con A+ o desde el teléfono)
+   Las columnas de grilla y los elementos flex pueden encogerse (min-width: 0) y los textos
+   largos se parten en vez de empujar la página hacia la derecha.
+   ========================================================================== */
+html, body { max-width: 100%; overflow-x: hidden; }
+.lg-shell { grid-template-columns: minmax(0, 1fr); }
+.lg-shell > *, .lg-marca > div, .lg-card-in > * { min-width: 0; }
+.lg-titulo, .lg-sub, .lg-bienv h2, .lg-bienv p { overflow-wrap: anywhere; }
+.lg-tabs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.lg-tabs button { min-width: 0; padding: .45rem .5rem; line-height: 1.15; text-align: center; }
+
+@media (max-width: 480px) {
+    /* Pestañas: ícono arriba y texto abajo, con un tamaño que siempre cabe */
+    .lg-tabs button { flex-direction: column; gap: .25rem; min-height: 62px; font-size: clamp(14px, 4.3vw, 17px); }
+    .lg-tabs button i { font-size: 1.15em; }
+    .lg-titulo { font-size: clamp(26px, 9vw, 2rem); }
+    .lg-sub { font-size: clamp(13px, 3.9vw, .95rem); }
+    .lg-logo { width: 3.75rem; height: 3.75rem; }
+    .lg-bienv h2 { font-size: clamp(24px, 8vw, 1.7rem); }
+}
+@media (min-width: 900px) {
+    .lg-shell { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+}
+
+/* ---------- Panel (index.html) en celulares ---------- */
+@media (max-width: 639px) {
+    /* Formularios de una columna que nunca se salen de la tarjeta (la lista de filiales es larga) */
+    #form-afiliado, #form-admin { grid-template-columns: minmax(0, 1fr); }
+    main input, main select, main textarea { min-width: 0; max-width: 100%; }
+    /* Encabezado: logo y usuario se encogen en vez de empujar el botón de salir fuera de la pantalla */
+    header .flex > * { min-width: 0; }
+    #user-name { max-width: 100%; }
+    /* Listas (afiliados, consultas, resultados…): una columna del ancho de la pantalla */
+    main [id$="-list"] { grid-template-columns: minmax(0, 1fr); }
+    main [id$="-list"] > *, main [id$="-list"] > * > * { min-width: 0; }
+    main .grid > * { min-width: 0; }
+}
+@media (max-width: 480px) {
+    /* Con poco espacio, el recuadro del usuario muestra solo sus iniciales y el botón de salir
+       (el nombre ya aparece en el saludo) */
+    #user-name, #user-role { display: none; }
+    #user-name + #user-role, #user-avatar + div { display: none; }
+}

@@ -119,6 +119,16 @@ create table if not exists public.vota_votos (
   primary key (poll_id, cedula)
 );
 
+-- Solo para «Restaurar voto» sin preguntarle al afiliado qué marcó: la opción de cada voto secreto
+-- mientras la consulta está abierta. NADIE la puede leer (ni administradores): solo la usa
+-- vota_restaurar. Se borra apenas la consulta cierra (y al restaurar).
+create table if not exists public.vota_restaurables (
+  poll_id  bigint not null references public.vota_polls (id) on delete cascade,
+  cedula   text not null,
+  idx      int not null,
+  primary key (poll_id, cedula)
+);
+
 -- Códigos de verificación de los comprobantes
 create table if not exists public.vota_codigos (
   codigo   text primary key,
@@ -216,12 +226,14 @@ alter table public.vota_eliminados    enable row level security;
 alter table public.vota_intentos      enable row level security;
 alter table public.vota_ayuda         enable row level security;
 alter table public.vota_afiliados     enable row level security;
+alter table public.vota_restaurables  enable row level security;
 alter table public.vota_solicitudes   enable row level security;
 
 revoke all on public.vota_admins, public.vota_cuentas, public.vota_sesiones, public.vota_config,
               public.vota_polls, public.vota_conteos, public.vota_participacion, public.vota_votos,
               public.vota_codigos, public.vota_auditoria, public.vota_alertas, public.vota_eliminados,
-              public.vota_intentos, public.vota_ayuda, public.vota_solicitudes, public.vota_afiliados
+              public.vota_intentos, public.vota_ayuda, public.vota_solicitudes, public.vota_afiliados,
+              public.vota_restaurables
   from anon, authenticated;
 
 -- ¿La cuenta de Supabase conectada es un administrador activo de ADEP Vota?
@@ -361,6 +373,13 @@ language sql stable set search_path = '' as $$
      and (coalesce((p_datos ->> 'cierreMs')::bigint, 0) = 0 or public.vota_ahora_ms() <  (p_datos ->> 'cierreMs')::bigint);
 $$;
 
+-- Borra la opción guardada de las consultas que ya no están abiertas (el voto vuelve a ser solo un conteo)
+create or replace function public.vota_purgar_restaurables() returns void
+language sql security definer set search_path = '' as $$
+  delete from public.vota_restaurables r using public.vota_polls p
+  where p.id = r.poll_id and not public.vota_abierta(p.datos);
+$$;
+
 drop function if exists public.vota_conteo_json(public.vota_conteos);
 create or replace function public.vota_conteo_json(p_c int[], p_total int) returns jsonb
 language sql immutable set search_path = '' as $$
@@ -374,7 +393,7 @@ begin
   foreach f in array array['vota_ip()', 'vota_frenado(text, int)', 'vota_fallo(text)', 'vota_ahora_ms()',
     'vota_huella(text)', 'vota_huella_activacion(text, text)', 'vota_azar(int, text)', 'vota_afiliado(text)',
     'vota_nueva_sesion(text, text)', 'vota_cedula_sesion(text)', 'vota_perfil(text)', 'vota_abierta(jsonb)',
-    'vota_conteo_json(int[], int)', 'vota_conteo_nuevo()']
+    'vota_conteo_json(int[], int)', 'vota_conteo_nuevo()', 'vota_purgar_restaurables()']
   loop
     execute format('revoke execute on function public.%s from public, anon, authenticated', f);
   end loop;
@@ -601,6 +620,11 @@ begin
   update public.vota_conteos set c[p_idx + 1] = c[p_idx + 1] + 1, total = total + 1 where poll_id = p_poll;
   -- En el voto secreto el comprobante solo guarda el día, para que la hora no delate el voto
   insert into public.vota_codigos (codigo, poll_id, fecha) values (cod, p_poll, left(case when publica then p_fecha else p_dia end, 40));
+  perform public.vota_purgar_restaurables();
+  if not publica then
+    insert into public.vota_restaurables (poll_id, cedula, idx) values (p_poll, ced, p_idx)
+    on conflict (poll_id, cedula) do update set idx = excluded.idx;
+  end if;
   if publica then
     insert into public.vota_votos (poll_id, cedula, nombre, filial, opcion, idx, codigo, fecha)
     values (p_poll, ced, coalesce(nullif(a.nombre, ''), 'Afiliado ' || ced), coalesce(a.filial, ''), opcion, p_idx, cod, left(p_fecha, 40));
@@ -906,11 +930,13 @@ language plpgsql security definer set search_path = '' as $$
 begin
   perform public.vota_exigir_admin();
   update public.vota_polls set datos = datos || (p_cambios - 'id') where id = p_id;
+  perform public.vota_purgar_restaurables();   -- si la cerró a mano, se borra la opción guardada
 end;
 $$;
 
--- Restaurar un voto por equivocación: el afiliado podrá votar de nuevo
--- (p_idx: en voto secreto, la opción que el afiliado indica; en voto público se toma la suya)
+-- Restaurar un voto por equivocación: el afiliado podrá votar de nuevo.
+-- La opción se toma sola (voto público: de su voto; secreto: de vota_restaurables). p_idx solo se usa
+-- para votos secretos emitidos antes de que existiera vota_restaurables.
 create or replace function public.vota_restaurar(p_poll bigint, p_cedula text, p_idx int) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare p public.vota_polls; r public.vota_participacion; i int; publica boolean;
@@ -922,11 +948,14 @@ begin
   select * into r from public.vota_participacion where poll_id = p_poll and cedula = p_cedula for update;
   if r.cedula is null then return jsonb_build_object('error', 'Este afiliado no ha votado.'); end if;
   publica := coalesce((p.datos ->> 'publica')::boolean, false);
+  perform public.vota_purgar_restaurables();
   if publica then
     select idx into i from public.vota_votos where poll_id = p_poll and cedula = p_cedula;
     if i is null then return jsonb_build_object('error', 'No se encontró el voto de este afiliado.'); end if;
   else
-    i := p_idx;
+    select idx into i from public.vota_restaurables where poll_id = p_poll and cedula = p_cedula;
+    if i is null then i := p_idx; end if;
+    if i is null then return jsonb_build_object('error', 'Este voto se emitió antes de la actualización: indique qué opción marcó el afiliado.', 'pedirOpcion', true); end if;
   end if;
   if i is null or i < 0 or i >= 10 or (select c[i + 1] from public.vota_conteos where poll_id = p_poll) < 1 then
     return jsonb_build_object('error', 'No se pudo restaurar: la opción elegida no tiene votos. Revise con el afiliado qué opción eligió.');
@@ -934,6 +963,7 @@ begin
   update public.vota_conteos set c[i + 1] = c[i + 1] - 1, total = total - 1 where poll_id = p_poll;
   delete from public.vota_participacion where poll_id = p_poll and cedula = p_cedula;
   delete from public.vota_votos where poll_id = p_poll and cedula = p_cedula;
+  delete from public.vota_restaurables where poll_id = p_poll and cedula = p_cedula;
   delete from public.vota_codigos where codigo = r.codigo;
   return jsonb_build_object('ok', true);
 end;

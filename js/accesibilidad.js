@@ -34,13 +34,19 @@ document.addEventListener('DOMContentLoaded', () => {
     bar.id = 'a11y-bar';
     bar.setAttribute('role', 'toolbar');
     bar.setAttribute('aria-label', 'Opciones de accesibilidad');
+    // En celulares la barra queda cerrada como un botón «Aa» (para no tapar el contenido) y se abre al tocarlo
     bar.innerHTML = `
+        <button type="button" id="a11y-abrir" aria-label="Tamaño de letra y contraste" aria-expanded="false">Aa</button>
         <button type="button" id="a11y-menos" aria-label="Disminuir tamaño de letra">A−</button>
         <button type="button" id="a11y-mas" aria-label="Aumentar tamaño de letra">A+</button>
         <button type="button" id="a11y-hc" aria-label="Activar alto contraste" aria-pressed="${!!s.hc}">
             <i class="fa-solid fa-circle-half-stroke"></i> Contraste
         </button>`;
     document.body.appendChild(bar);
+    const abrir = document.getElementById('a11y-abrir');
+    abrir.onclick = () => { const v = !bar.classList.contains('abierta'); bar.classList.toggle('abierta', v); abrir.setAttribute('aria-expanded', String(v)); };
+    // Tocar fuera la cierra otra vez
+    document.addEventListener('click', e => { if (!bar.contains(e.target) && bar.classList.contains('abierta')) abrir.click(); });
 
     const cambiar = fn => { const n = A11Y.load(); fn(n); A11Y.save(n); A11Y.apply(n); };
     document.getElementById('a11y-menos').onclick = () => cambiar(n => n.fs = Math.max(0, n.fs - 1));

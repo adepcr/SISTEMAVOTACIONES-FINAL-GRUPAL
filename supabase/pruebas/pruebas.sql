@@ -257,6 +257,31 @@ reset role;
 select pg_temp.ok((select por from public.vota_auditoria where accion = 'Prueba') = 'NUEVO NOMBRE', 'la bitácora queda con el nombre real');
 select pg_temp.ok(not exists (select 1 from public.vota_auditoria where accion = 'Falsa'), 'sin sesión válida no se escribe en la bitácora');
 
+-- ---------- Restaurar un voto secreto sin preguntar qué marcó ----------
+insert into public.vota_polls (id, datos) values
+  (5, '{"titulo":"Secreta abierta","opciones":["Sí","No","Abstengo"],"publicada":true,"publica":false,"aperturaMs":0,"cierreMs":0}');
+set role anon;
+select pg_temp.ok(public.vota_votar(:'nuevo', 5, 1, 'hoy', 'hoy') ? 'codigo', 'afiliado vota en secreto');
+do $$ begin perform 1 from public.vota_restaurables; raise exception 'anon leyó vota_restaurables'; exception when insufficient_privilege then null; end $$;
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin perform 1 from public.vota_restaurables; raise exception 'el admin leyó qué votó cada uno'; exception when insufficient_privilege then null; end $$;
+select pg_temp.ok(true, 'nadie (ni el administrador) puede leer la opción guardada para restaurar');
+select pg_temp.ok(public.vota_restaurar(5, '404440444', null) ->> 'ok' = 'true', 'el administrador restaura un voto secreto sin indicar la opción');
+select pg_temp.ok((select c[2] = 0 and total = 0 from public.vota_conteos where poll_id = 5), 'se quita el voto de la opción correcta');
+reset role;
+select pg_temp.ok(not exists (select 1 from public.vota_restaurables where poll_id = 5), 'al restaurar se borra la opción guardada');
+set role anon;
+select pg_temp.ok(public.vota_votar(:'nuevo', 5, 2, 'hoy', 'hoy') ? 'codigo', 'el afiliado vuelve a votar');
+reset role;
+select pg_temp.ok(exists (select 1 from public.vota_restaurables where poll_id = 5), 'mientras está abierta se guarda la opción');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.vota_cambiar_poll(5, '{"cierreMs": 1000}'::jsonb);
+reset role;
+select pg_temp.ok(not exists (select 1 from public.vota_restaurables where poll_id = 5), 'al cerrar la consulta se borra la opción guardada (queda solo el conteo)');
+
 -- ---------- Reingreso con el código general sin haber guardado la sesión ----------
 set role anon;
 select pg_temp.ok(public.vota_ingresar_codigo('404440444', '123456', 'Android', :'nuevo') ->> 'token' = :'nuevo', 'el mismo celular vuelve a entrar con el código (sin haber guardado la sesión)');
