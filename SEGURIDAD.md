@@ -36,7 +36,8 @@ hasta que vuelva a aparecer en el reporte).
 1. https://supabase.com/dashboard → proyecto **inventario-archivo** → **SQL Editor**.
 2. Si es la primera vez, primero debe estar corrido `basedatos/supabase.sql` del repositorio del carnet (crea la lista de afiliados).
 3. Pegue **todo** el archivo `supabase/votaciones.sql` y toque **Run**. Se puede correr varias veces sin perder datos.
-4. **Authentication → URL Configuration → Redirect URLs**: agregue `https://adep-vota.web.app/**`
+4. **Authentication → URL Configuration → Redirect URLs**: agregue `https://sistemavotaciones-final-grupal.vercel.app/**`
+   (y en **Site URL**, `https://sistemavotaciones-final-grupal.vercel.app`)
    (para que el enlace de «Olvidé mi contraseña» de los administradores vuelva a esta página y no al inventario).
 
 ### Primer administrador

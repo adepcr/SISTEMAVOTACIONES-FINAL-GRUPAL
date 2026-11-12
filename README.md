@@ -1,9 +1,9 @@
 # ADEP Vota — Sistema de votación (proyecto final grupal)
 
-Sistema de votación oficial de ADEP (web, Android e iOS), con base de datos en **Supabase**
-(la misma lista de afiliados del carnet).
+Prototipo del sistema de votación de ADEP (web, Android e iOS). Todo vive en **Supabase** (datos y cuentas de
+administrador, con la misma lista de afiliados del carnet) y la página se publica en **Vercel**.
 
-- **Página:** https://adep-vota.web.app
+- **Página (Vercel):** https://sistemavotaciones-final-grupal.vercel.app
 - **Repositorio:** https://github.com/adepcr/SISTEMAVOTACIONES-FINAL-GRUPAL
 - Cómo se publica: [PUBLICAR.md](PUBLICAR.md) · App móvil: [APP-MOVIL.md](APP-MOVIL.md) · Seguridad: [SEGURIDAD.md](SEGURIDAD.md)
 - Base de datos: [supabase/votaciones.sql](supabase/votaciones.sql) (pegar completo en Supabase → SQL Editor → Run; se puede correr de nuevo sin perder datos)

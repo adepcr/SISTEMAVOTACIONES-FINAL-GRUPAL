@@ -1,10 +1,7 @@
-# Cada vez que se sube un cambio a main:
-#   1) arma la app de Android (.apk) — queda en "Actions" → la ejecución → "Artifacts"
-#   2) publica la página en Firebase Hosting (https://adep-vota.web.app).
-#      Los afiliados instalan esa página como app con el botón «Instalar la app en este celular» (js/instalar.js),
-#      así que los cambios les llegan solos. El APK es opcional (ver PUBLICAR.md).
-#      El paso 2 necesita el secreto FIREBASE_SERVICE_ACCOUNT (ver PUBLICAR.md); sin él, solo se arma el APK.
-name: Publicar app y página
+# Cada vez que se sube un cambio a main, arma la app de Android (.apk).
+# Queda en "Actions" → la ejecución → "Artifacts" → ADEP-Vota-android. Es opcional (ver PUBLICAR.md).
+# La página NO se publica aquí: la publica Vercel solo, conectado a este repositorio.
+name: Armar app Android
 
 on:
   push:
@@ -12,10 +9,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  publicar:
+  android:
     runs-on: ubuntu-latest
-    env:
-      FB_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -32,17 +27,3 @@ jobs:
         with:
           name: ADEP-Vota-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Publicar en Firebase Hosting
-        if: env.FB_SA != ''
-        run: |
-          echo "$FB_SA" > "$RUNNER_TEMP/cuenta.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/cuenta.json"
-          set +e
-          npx -y firebase-tools@14 deploy --only hosting --project adep-vota --non-interactive 2>&1 | tee "$RUNNER_TEMP/salida.txt"
-          estado=${PIPESTATUS[0]}
-          rm -f "$RUNNER_TEMP/cuenta.json"
-          if [ "$estado" != "0" ]; then
-            # Muestra el motivo en el resumen de la ejecución
-            grep -iE "error|denied|permission|not found|enable|403|404" "$RUNNER_TEMP/salida.txt" | tail -8 | while IFS= read -r l; do echo "::error::$l"; done
-            exit 1
-          fi

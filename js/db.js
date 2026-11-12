@@ -25,7 +25,7 @@
      vota_solicitudes        pedidos de corrección de datos del afiliado */
 const DB = {
     MAX_OPCIONES: 10,
-    URL_PUBLICADA: 'https://adep-vota.web.app/',   // para los enlaces de «Olvidé mi contraseña» desde la app
+    URL_PUBLICADA: 'https://sistemavotaciones-final-grupal.vercel.app/',   // dirección en Vercel: para los enlaces de «Olvidé mi contraseña» desde la app
 
     yo: null, _token: null,
     _polls: [], _conteos: {}, _part: [], _votos: [], _afiliados: {}, _admins: {}, _audit: [], _config: {}, _ingreso: null, _alertas: [],
