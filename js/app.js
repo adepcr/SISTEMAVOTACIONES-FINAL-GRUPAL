@@ -108,7 +108,7 @@ function fmtRestante(ms) {
 }
 function timerHtml(p, kind) {
     const target = kind === 'open' ? p.apertura : p.cierre;
-    const left = new Date(target).getTime() - Date.now();
+    const left = new Date(target).getTime() - DB.ahora();
     const cls = kind === 'open' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-adep-greenLight border-emerald-200 text-adep-green';
     return `<div data-countdown="${p.id}" data-kind="${kind}" role="timer" class="flex items-center justify-between gap-2 flex-wrap border-2 rounded-xl p-3 font-bold ${cls}">
         <span><i class="fa-solid fa-hourglass-half mr-1"></i>${kind === 'open' ? 'La votación abre en:' : 'La votación cierra en:'}</span>
@@ -117,12 +117,17 @@ function timerHtml(p, kind) {
 }
 function tickTimers() {
     let refrescar = false;
+    // Si la consulta se cierra mientras el afiliado revisa su voto, la ventana se cierra sola
+    if (pendingPoll !== null) {
+        const pp = DB.polls().find(x => x.id === pendingPoll);
+        if (!pp || DB.estado(pp) !== 'abierta') { closeConfirm(); showToast('La votación se cerró. Ya no se pueden enviar votos en esa consulta.'); }
+    }
     document.querySelectorAll('[data-countdown]').forEach(el => {
         const p = DB.polls().find(x => x.id == el.dataset.countdown);
         if (!p) { refrescar = true; return; }
         const kind = el.dataset.kind, est = DB.estado(p);
         const target = kind === 'open' ? p.apertura : p.cierre;
-        const left = target ? new Date(target).getTime() - Date.now() : 0;
+        const left = target ? new Date(target).getTime() - DB.ahora() : 0;
         const vigente = kind === 'open' ? est === 'programada' : est === 'abierta';
         if (left <= 0 || !vigente) { refrescar = true; return; }
         const t = el.querySelector('.cd-time'); if (t) t.textContent = fmtRestante(left);
@@ -229,10 +234,19 @@ function startConfirm(pid) {
     $('c-option').innerText = selectedVotes[pid];
     $('c-privacy').innerText = poll.publica ? 'Su nombre aparecerá junto a este voto.' : 'Su voto es secreto: no se guardará junto a su nombre.';
     $('modal-confirm').classList.remove('hidden');
-    $('c-yes').focus();
+    // Protección contra toques accidentales: «Sí, enviar» se habilita tras una breve pausa
+    // y el foco empieza en la opción segura («No, quiero cambiarlo»).
+    const si = $('c-yes');
+    si.disabled = true;
+    clearTimeout(confirmEspera);
+    confirmEspera = setTimeout(() => { si.disabled = false; }, 700);
+    $('c-no').focus();
 }
-function closeConfirm() { $('modal-confirm').classList.add('hidden'); pendingPoll = null; }
-function confirmVote() { const pid = pendingPoll; closeConfirm(); if (pid) processVote(pid); }
+let confirmEspera = null;
+function closeConfirm() { clearTimeout(confirmEspera); $('modal-confirm').classList.add('hidden'); pendingPoll = null; }
+function confirmVote() { if ($('c-yes').disabled) return; const pid = pendingPoll; closeConfirm(); if (pid) processVote(pid); }
+// Tocar fuera de la ventana equivale a «No, quiero cambiarlo»
+$('modal-confirm').addEventListener('click', e => { if (e.target === e.currentTarget) closeConfirm(); });
 
 let votando = false;
 async function processVote(pid) {
@@ -488,7 +502,7 @@ async function createNewPoll(e) {
     if (repetida) { opts.classList.add('field-error'); return showToast(`La opción «${repetida}» está repetida. Cada opción debe ser distinta.`); }
     const ap = $('new-poll-open').value, ci = $('new-poll-close').value;
     if (ap && ci && new Date(ci) <= new Date(ap)) return showToast('La fecha de cierre debe ser posterior a la de apertura.');
-    if (ci && new Date(ci) <= new Date()) return showToast('La fecha de cierre ya pasó. Elija una fecha y hora futuras.');
+    if (ci && new Date(ci).getTime() <= DB.ahora()) return showToast('La fecha de cierre ya pasó. Elija una fecha y hora futuras.');
     guardandoConsulta = true;
     showToast('Guardando la consulta…', 'success');
     const creada = await DB.addPoll({
@@ -629,7 +643,7 @@ $('manage-list').addEventListener('click', e => {
     }
     if (act === 'close') {
         if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;
-        DB.updatePoll(id, { cierre: new Date().toISOString() }, `Consulta cerrada manualmente: ${p.titulo}`);
+        DB.updatePoll(id, { cierre: new Date(DB.ahora()).toISOString() }, `Consulta cerrada manualmente: ${p.titulo}`);
     }
     if (act === 'del') return openDelPoll(id); // pregunta si desea descargar la minuta antes de eliminar
     renderAll();

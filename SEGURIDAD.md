@@ -67,7 +67,7 @@ puede consultar el inventario como «lector», porque es la misma cuenta del per
 
 Las pruebas están en `supabase/pruebas/pruebas.sql` (votar dos veces, cédula de otro, consulta cerrada o sin publicar, opción inexistente,
 sesión inventada, clave por fuerza bruta, segundo celular, leer tablas sin permiso, hacerse administrador, firmar la bitácora como otro,
-lista mensual, etc.). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
+lista mensual, pedir ayuda o cambios de datos sin sesión, aprobar pedidos sin ser administrador, etc.: 81 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
 
 ```bash
 PGHOST=localhost PGUSER=postgres sh supabase/pruebas/correr.sh

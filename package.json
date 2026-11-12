@@ -10,14 +10,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adepcr/sistema-votaciones-Abigail-Avendano.git"
+    "url": "git+https://github.com/adepcr/SISTEMAVOTACIONES-FINAL-GRUPAL.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/adepcr/sistema-votaciones-Abigail-Avendano/issues"
+    "url": "https://github.com/adepcr/SISTEMAVOTACIONES-FINAL-GRUPAL/issues"
   },
-  "homepage": "https://github.com/adepcr/sistema-votaciones-Abigail-Avendano#readme",
+  "homepage": "https://github.com/adepcr/SISTEMAVOTACIONES-FINAL-GRUPAL#readme",
   "dependencies": {
     "@capacitor-community/text-to-speech": "^6.1.0",
     "@capacitor/android": "^7.6.9",

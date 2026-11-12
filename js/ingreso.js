@@ -26,7 +26,7 @@
     const titulo = host.parentElement.firstElementChild;
     host.parentElement.insertBefore(caja, titulo.nextElementSibling);
 
-    const vigente = g => g && g.activo && g.venceMs > Date.now();
+    const vigente = g => g && g.activo && g.venceMs > DB.ahora();
 
     let mostrado = null;   // si lo dibujado fue un código vigente (para redibujar al vencer)
     function pintar() {
@@ -106,7 +106,7 @@
             if (b.id === "xg-generar") {
                 if (vigente(g) && !confirm("¿Cambiar el código? El código actual dejará de servir (quienes ya entraron siguen entrando normal).")) return;
                 const horas = +q("xg-dur").value, codigo = DB.genCodigoIngreso();
-                await DB.setIngreso({ codigo, activo: true, venceMs: Date.now() + horas * 3600e3, aprobacion: !!(g && g.aprobacion) }, "Código de ingreso generado", `Válido por ${horas} h`);
+                await DB.setIngreso({ codigo, activo: true, venceMs: DB.ahora() + horas * 3600e3, aprobacion: !!(g && g.aprobacion) }, "Código de ingreso generado", `Válido por ${horas} h`);
                 showToast("Código generado. Compártalo con los afiliados.", "success");
             }
             if (b.id === "xg-apagar") {

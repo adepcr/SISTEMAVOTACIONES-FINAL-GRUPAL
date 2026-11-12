@@ -158,6 +158,27 @@ create table if not exists public.vota_intentos (
 );
 create index if not exists vota_intentos_ip on public.vota_intentos (ip, tipo, fecha);
 
+-- Pedidos de ayuda durante una votación (no dicen qué votó). Uno por consulta y afiliado.
+create table if not exists public.vota_ayuda (
+  poll_id  bigint not null references public.vota_polls (id) on delete cascade,
+  cedula   text not null,
+  nombre   text not null,
+  motivo   text not null check (motivo in ('equivocado', 'tiempo', 'problema')),
+  nota     text not null default '' check (length(nota) <= 200),
+  fecha    timestamptz not null default now(),
+  primary key (poll_id, cedula)
+);
+
+-- Pedidos de corrección de datos del afiliado (solo un administrador los aplica)
+create table if not exists public.vota_solicitudes (
+  cedula     text primary key,
+  nombre     text not null check (length(trim(nombre)) between 1 and 120),
+  provincia  text not null default '' check (length(provincia) <= 80),
+  telefono   text not null default '' check (length(telefono) <= 20),
+  nota       text not null default '' check (length(nota) <= 200),
+  fecha      timestamptz not null default now()
+);
+
 -- Cada consulta nueva nace con su conteo en cero
 create or replace function public.vota_conteo_nuevo() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -189,11 +210,13 @@ alter table public.vota_auditoria     enable row level security;
 alter table public.vota_alertas       enable row level security;
 alter table public.vota_eliminados    enable row level security;
 alter table public.vota_intentos      enable row level security;
+alter table public.vota_ayuda         enable row level security;
+alter table public.vota_solicitudes   enable row level security;
 
 revoke all on public.vota_admins, public.vota_cuentas, public.vota_sesiones, public.vota_config,
               public.vota_polls, public.vota_conteos, public.vota_participacion, public.vota_votos,
               public.vota_codigos, public.vota_auditoria, public.vota_alertas, public.vota_eliminados,
-              public.vota_intentos
+              public.vota_intentos, public.vota_ayuda, public.vota_solicitudes
   from anon, authenticated;
 
 -- ¿La cuenta de Supabase conectada es un administrador activo de ADEP Vota?
@@ -207,7 +230,7 @@ grant execute on function public.vota_es_admin() to authenticated;
 -- Lo que el administrador lee directamente (lo demás, por funciones)
 grant select on public.vota_admins, public.vota_config, public.vota_polls, public.vota_conteos,
                 public.vota_participacion, public.vota_votos, public.vota_auditoria,
-                public.vota_alertas, public.vota_eliminados
+                public.vota_alertas, public.vota_eliminados, public.vota_ayuda, public.vota_solicitudes
   to authenticated;
 grant insert, delete on public.vota_polls to authenticated;
 grant update (activo) on public.vota_admins to authenticated;
@@ -217,7 +240,8 @@ do $$
 declare t text;
 begin
   foreach t in array array['vota_admins', 'vota_config', 'vota_polls', 'vota_conteos', 'vota_participacion',
-                           'vota_votos', 'vota_auditoria', 'vota_alertas', 'vota_eliminados']
+                           'vota_votos', 'vota_auditoria', 'vota_alertas', 'vota_eliminados',
+                           'vota_ayuda', 'vota_solicitudes']
   loop
     execute format('drop policy if exists "administradores" on public.%I', t);
     execute format('create policy "administradores" on public.%I for all to authenticated
@@ -229,7 +253,8 @@ end $$;
 grant usage on schema public to service_role;
 grant select, insert, update, delete on public.vota_admins, public.vota_cuentas, public.vota_sesiones,
   public.vota_config, public.vota_polls, public.vota_conteos, public.vota_participacion, public.vota_votos,
-  public.vota_codigos, public.vota_auditoria, public.vota_alertas, public.vota_eliminados, public.vota_intentos
+  public.vota_codigos, public.vota_auditoria, public.vota_alertas, public.vota_eliminados, public.vota_intentos,
+  public.vota_ayuda, public.vota_solicitudes
   to service_role;
 
 
@@ -516,6 +541,10 @@ begin
                        from public.vota_votos v join public.vota_polls p on p.id = v.poll_id
                        where coalesce((p.datos ->> 'publicada')::boolean, false)), '[]'::jsonb),
     'config', coalesce((select valor from public.vota_config where clave = 'general'), '{}'::jsonb),
+    'ayuda', coalesce((select jsonb_agg(jsonb_build_object('pollId', y.poll_id, 'cedula', y.cedula, 'motivo', y.motivo, 'nota', y.nota, 'fecha', y.fecha))
+                       from public.vota_ayuda y where y.cedula = ced), '[]'::jsonb),
+    'solicitud', (select jsonb_build_object('cedula', s.cedula, 'nombre', s.nombre, 'provincia', s.provincia, 'telefono', s.telefono,
+                         'nota', s.nota, 'fecha', s.fecha) from public.vota_solicitudes s where s.cedula = ced),
     'padron', (select count(*) from public.carnet_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula
                where a.activo and not coalesce(c.bloqueado, false))
   );
@@ -598,6 +627,65 @@ begin
     values (left(p_accion, 120), left(coalesce(p_detalle, ''), 300), adm.nombre, adm.uid::text);
   end if;
 end;
+$$;
+
+
+-- Hora del servidor en milisegundos (para corregir celulares con la hora mal puesta)
+create or replace function public.vota_hora() returns bigint
+language sql stable set search_path = '' as $$
+  select (extract(epoch from clock_timestamp()) * 1000)::bigint;
+$$;
+
+-- Pedir ayuda en una consulta publicada: «me equivoqué», «no alcancé» u «otro problema».
+-- No guarda qué votó. Si ya había un pedido para esa consulta, se reemplaza.
+create or replace function public.vota_pedir_ayuda(p_token text, p_poll bigint, p_motivo text, p_nota text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare ced text := public.vota_cedula_sesion(p_token);
+begin
+  if ced is null then return jsonb_build_object('error', 'Su sesión terminó. Vuelva a ingresar.'); end if;
+  if (select pendiente from public.vota_cuentas where cedula = ced) then
+    return jsonb_build_object('error', 'Su ingreso todavía espera la aprobación de ADEP.');
+  end if;
+  if not exists (select 1 from public.vota_polls where id = p_poll and coalesce((datos ->> 'publicada')::boolean, false)) then
+    return jsonb_build_object('error', 'Consulta no encontrada.');
+  end if;
+  if coalesce(p_motivo, '') not in ('equivocado', 'tiempo', 'problema') then
+    return jsonb_build_object('error', 'Motivo no válido.');
+  end if;
+  insert into public.vota_ayuda (poll_id, cedula, nombre, motivo, nota)
+  values (p_poll, ced, public.vota_perfil(ced) ->> 'nombre', p_motivo, left(trim(coalesce(p_nota, '')), 200))
+  on conflict (poll_id, cedula) do update set motivo = excluded.motivo, nota = excluded.nota, fecha = now();
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- El afiliado cancela su pedido de ayuda
+create or replace function public.vota_cancelar_ayuda(p_token text, p_poll bigint) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.vota_ayuda where poll_id = p_poll and cedula = public.vota_cedula_sesion(p_token);
+$$;
+
+-- Pedir corrección de nombre, filial o teléfono (reemplaza el pedido anterior)
+create or replace function public.vota_pedir_cambio(p_token text, p_nombre text, p_provincia text, p_telefono text, p_nota text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare ced text := public.vota_cedula_sesion(p_token);
+begin
+  if ced is null then return jsonb_build_object('error', 'Su sesión terminó. Vuelva a ingresar.'); end if;
+  if length(trim(coalesce(p_nombre, ''))) not between 1 and 120 then
+    return jsonb_build_object('error', 'Escriba su nombre completo.');
+  end if;
+  insert into public.vota_solicitudes (cedula, nombre, provincia, telefono, nota)
+  values (ced, trim(p_nombre), left(trim(coalesce(p_provincia, '')), 80),
+          left(regexp_replace(coalesce(p_telefono, ''), '[^0-9]', '', 'g'), 20), left(trim(coalesce(p_nota, '')), 200))
+  on conflict (cedula) do update set nombre = excluded.nombre, provincia = excluded.provincia,
+    telefono = excluded.telefono, nota = excluded.nota, fecha = now();
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.vota_cancelar_cambio(p_token text) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.vota_solicitudes where cedula = public.vota_cedula_sesion(p_token);
 $$;
 
 
@@ -836,6 +924,36 @@ begin
 end;
 $$;
 
+-- Marcar como atendido un pedido de ayuda (lo borra)
+create or replace function public.vota_atender_ayuda(p_poll bigint, p_cedula text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.vota_exigir_admin();
+  delete from public.vota_ayuda where poll_id = p_poll and cedula = p_cedula;
+end;
+$$;
+
+-- Aprobar (aplica nombre, filial y teléfono pedidos) o rechazar un pedido de corrección de datos
+create or replace function public.vota_resolver_cambio(p_cedula text, p_aprobar boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare s public.vota_solicitudes;
+begin
+  perform public.vota_exigir_admin();
+  select * into s from public.vota_solicitudes where cedula = p_cedula for update;
+  if s.cedula is null then return jsonb_build_object('error', 'El pedido ya no existe.'); end if;
+  if p_aprobar then
+    if not exists (select 1 from public.carnet_afiliados where cedula = p_cedula) then
+      return jsonb_build_object('error', 'Esa cédula ya no está en la lista de afiliados.');
+    end if;
+    update public.carnet_afiliados set nombre = s.nombre, filial = nullif(s.provincia, ''), actualizado = now() where cedula = p_cedula;
+    insert into public.vota_cuentas (cedula) values (p_cedula) on conflict do nothing;
+    update public.vota_cuentas set telefono = s.telefono where cedula = p_cedula;
+  end if;
+  delete from public.vota_solicitudes where cedula = p_cedula;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
 -- Respaldo completo (todas las tablas de este sistema, sin claves ni sesiones)
 create or replace function public.vota_respaldo() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -853,7 +971,9 @@ begin
     'codigos',       coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_codigos x), '[]'),
     'auditoria',     coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_auditoria x), '[]'),
     'alertas',       coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_alertas x), '[]'),
-    'eliminados',    coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_eliminados x), '[]'));
+    'eliminados',    coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_eliminados x), '[]'),
+    'ayuda',         coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_ayuda x), '[]'),
+    'solicitudes',   coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_solicitudes x), '[]'));
 end;
 $$;
 
@@ -868,7 +988,9 @@ begin
   foreach f in array array['vota_publico()', 'vota_estado_cedula(text)', 'vota_activar(text, text, text)',
     'vota_login(text, text)', 'vota_ingresar_codigo(text, text, text)', 'vota_avisar_intento(text)',
     'vota_yo(text)', 'vota_datos(text)', 'vota_votar(text, bigint, int, text, text)', 'vota_salir(text)',
-    'vota_verificar(text, text)', 'vota_log(text, text, text)']
+    'vota_verificar(text, text)', 'vota_log(text, text, text)', 'vota_hora()',
+    'vota_pedir_ayuda(text, bigint, text, text)', 'vota_cancelar_ayuda(text, bigint)',
+    'vota_pedir_cambio(text, text, text, text, text)', 'vota_cancelar_cambio(text)']
   loop
     execute format('revoke execute on function public.%s from public', f);
     execute format('grant execute on function public.%s to anon, authenticated', f);
@@ -878,7 +1000,8 @@ begin
     'vota_padron()', 'vota_guardar_afiliados(jsonb)', 'vota_cambiar_afiliado(text, jsonb)', 'vota_liberar(text)',
     'vota_eliminar_afiliado(text, text)', 'vota_eliminar_todos(text)', 'vota_cambiar_poll(bigint, jsonb)',
     'vota_restaurar(bigint, text, int)', 'vota_guardar_config(text, jsonb)', 'vota_eliminar_admin(uuid, text)',
-    'vota_limpiar_auditoria()', 'vota_respaldo()']
+    'vota_limpiar_auditoria()', 'vota_respaldo()', 'vota_atender_ayuda(bigint, text)',
+    'vota_resolver_cambio(text, boolean)']
   loop
     execute format('revoke execute on function public.%s from public, anon', f);
     execute format('grant execute on function public.%s to authenticated', f);

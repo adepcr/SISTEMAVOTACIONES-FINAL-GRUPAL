@@ -26,6 +26,7 @@
     <script src="js/app-movil.js"></script>
     <script src="js/instalar.js"></script>
     <script src="js/temporadas.js"></script>
+    <script src="js/aviso-conexion.js"></script>
     <style>
         .big-input {
             font-size: 1.5rem;
@@ -109,7 +110,7 @@
                     <input id="a-cedula" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12"
                         autocomplete="username" placeholder="Solo números"
                         class="big-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none font-semibold">
-                    <p class="text-sm text-gray-500 mt-1">Escríbala sin guiones ni espacios.</p>
+                    <p class="text-sm text-gray-500 mt-1">Escriba solo los números: los guiones se ponen solos.</p>
                 </div>
 
                 <!-- Paso 2: la clave -->
@@ -334,6 +335,8 @@
 
         const $ = id => document.getElementById(id);
         const soloNumeros = s => s.replace(/\D/g, '');
+        // Cédula nacional (9 números) se muestra como 1-1111-1111; DIMEX y otras quedan solo con números
+        const formatoCedula = s => { const d = soloNumeros(String(s || '')); return d.length === 9 ? `${d[0]}-${d.slice(1, 5)}-${d.slice(5)}` : d; };
         const showErr = (id, msg) => { $(id).textContent = msg; $(id).classList.toggle('hidden', !msg); };
         const entrar = () => location.replace('index.html');
         // Evita dobles clics mientras se espera la respuesta
@@ -443,7 +446,7 @@
             showErr('a-error', '');
         });
         $('a-tengo-act').addEventListener('click', () => {
-            $('act-cedula').value = soloNumeros(cedula.value);
+            $('act-cedula').value = formatoCedula(cedula.value);
             mostrar('form-activar');
             $('act-codigo').focus();
         });
@@ -454,7 +457,7 @@
             irPaso(1);
         });
 
-        cedula.addEventListener('input', () => { cedula.value = soloNumeros(cedula.value); showErr('a-error', ''); });
+        cedula.addEventListener('input', () => { cedula.value = formatoCedula(cedula.value); showErr('a-error', ''); });
         pin.addEventListener('input', () => {
             pin.value = soloNumeros(pin.value).slice(0, 6);
             pintarPuntos(); showErr('a-error', '');
@@ -482,8 +485,8 @@
 
         // Esperando aprobación desde antes, o cédula recordada en este equipo
         const guardada = DB._get('recordar', '');
-        if (sesion && sesion.pendiente) { cedula.value = sesion.cedula; dentro(sesion); }
-        else if (guardada) { cedula.value = guardada; revisarCedula(true); }
+        if (sesion && sesion.pendiente) { cedula.value = formatoCedula(sesion.cedula); dentro(sesion); }
+        else if (guardada) { cedula.value = formatoCedula(guardada); revisarCedula(true); }
         else cedula.focus();
 
         $('form-afiliado').addEventListener('submit', e => {
@@ -514,7 +517,7 @@
         });
 
         // ---------- Primera vez: activar con el código ----------
-        $('act-cedula').addEventListener('input', e => { e.target.value = soloNumeros(e.target.value); showErr('c-error', ''); });
+        $('act-cedula').addEventListener('input', e => { e.target.value = formatoCedula(e.target.value); showErr('c-error', ''); });
         $('act-codigo').addEventListener('input', e => {
             const c = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
             e.target.value = c.length > 4 ? c.slice(0, 4) + '-' + c.slice(4) : c;
@@ -530,7 +533,7 @@
         $('form-activar').addEventListener('submit', e => {
             e.preventDefault();
             ocupado(e.target, async () => {
-                const ced = $('act-cedula').value, cod = $('act-codigo').value.replace(/-/g, '');
+                const ced = soloNumeros($('act-cedula').value), cod = $('act-codigo').value.replace(/-/g, '');
                 const nueva = $('c-nueva').value, repite = $('c-repite').value;
                 if (ced.length < 9) { $('act-cedula').focus(); return showErr('c-error', 'Escriba su número de cédula completo (solo números).'); }
                 if (cod.length !== 8) { $('act-codigo').focus(); return showErr('c-error', 'El código de activación tiene 8 letras y números.'); }

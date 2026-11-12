@@ -150,6 +150,70 @@ select pg_temp.ok(public.vota_yo(:'ana') is null, 'cédula liberada: la sesión 
 select pg_temp.ok(public.vota_estado_cedula('101110111') = 'sin-activar', 'cédula liberada puede entrar de nuevo');
 reset role;
 
+-- ---------- Reloj del servidor ----------
+set role anon;
+select pg_temp.ok(abs(public.vota_hora() - (extract(epoch from now()) * 1000)::bigint) < 60000, 'cualquiera puede pedir la hora del servidor');
+do $$ begin perform public.vota_ahora_ms(); raise exception 'anon llamó un ayudante interno'; exception when insufficient_privilege then null; end $$;
+reset role;
+
+-- ---------- Pedidos de ayuda ----------
+set role anon;
+do $$ begin perform 1 from public.vota_ayuda; raise exception 'anon leyó vota_ayuda'; exception when insufficient_privilege then null; end $$;
+do $$ begin insert into public.vota_ayuda (poll_id, cedula, nombre, motivo) values (2, '404440444', 'X', 'problema');
+  raise exception 'anon escribió en vota_ayuda'; exception when insufficient_privilege then null; end $$;
+select pg_temp.ok(public.vota_pedir_ayuda('inventado', 2, 'equivocado', '') ? 'error', 'sin sesión no se pide ayuda');
+select pg_temp.ok(public.vota_pedir_ayuda(:'luis', 2, 'equivocado', '') ? 'error', 'afiliado bloqueado no pide ayuda');
+select pg_temp.ok(public.vota_pedir_ayuda(:'nuevo', 1, 'equivocado', '') ? 'error', 'no se pide ayuda en una consulta sin publicar');
+select pg_temp.ok(public.vota_pedir_ayuda(:'nuevo', 2, 'inventado', '') ? 'error', 'no se acepta un motivo inventado');
+select pg_temp.ok(public.vota_pedir_ayuda(:'nuevo', 2, 'equivocado', 'toqué mal') ->> 'ok' = 'true', 'afiliado pide ayuda');
+select pg_temp.ok(public.vota_pedir_ayuda(:'nuevo', 3, 'tiempo', repeat('x', 500)) ->> 'ok' = 'true', 'se puede pedir ayuda en una consulta cerrada (no alcanzó)');
+select pg_temp.ok(jsonb_array_length(public.vota_datos(:'nuevo') -> 'ayuda') = 2, 'el afiliado ve sus pedidos de ayuda');
+select public.vota_cancelar_ayuda(:'nuevo', 3);
+select pg_temp.ok(jsonb_array_length(public.vota_datos(:'nuevo') -> 'ayuda') = 1, 'el afiliado cancela su pedido');
+select public.vota_cancelar_ayuda('inventado', 2);
+do $$ begin perform public.vota_atender_ayuda(2, '404440444'); raise exception 'anon atendió un pedido'; exception when insufficient_privilege then null; end $$;
+reset role;
+select pg_temp.ok((select nombre from public.vota_ayuda where poll_id = 2 and cedula = '404440444') = 'NUEVO NOMBRE', 'el pedido lleva el nombre real (no lo escribe el afiliado)');
+select pg_temp.ok((select count(*) from public.vota_ayuda) = 1, 'una sesión inventada no cancela pedidos ajenos');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+select pg_temp.ok((select count(*) from public.vota_ayuda) = 0, 'la cuenta del inventario no ve pedidos de ayuda');
+do $$ begin perform public.vota_atender_ayuda(2, '404440444'); raise exception 'no admin atendió'; exception when insufficient_privilege then null; end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select pg_temp.ok((select count(*) from public.vota_ayuda) = 1, 'el administrador ve los pedidos de ayuda');
+select public.vota_atender_ayuda(2, '404440444');
+select pg_temp.ok((select count(*) from public.vota_ayuda) = 0, 'el administrador marca el pedido como atendido');
+reset role;
+
+-- ---------- Pedidos de corrección de datos ----------
+set role anon;
+do $$ begin perform 1 from public.vota_solicitudes; raise exception 'anon leyó vota_solicitudes'; exception when insufficient_privilege then null; end $$;
+select pg_temp.ok(public.vota_pedir_cambio('inventado', 'X', '', '', '') ? 'error', 'sin sesión no se piden cambios');
+select pg_temp.ok(public.vota_pedir_cambio(:'nuevo', '  ', '', '', '') ? 'error', 'no se acepta nombre vacío');
+select pg_temp.ok(public.vota_pedir_cambio(:'nuevo', 'Nombre Corregido', 'HEREDIA', '8888-7777', '') ->> 'ok' = 'true', 'afiliado pide corregir sus datos');
+select pg_temp.ok(public.vota_datos(:'nuevo') -> 'solicitud' ->> 'telefono' = '88887777', 'el afiliado ve su pedido (teléfono solo con números)');
+select pg_temp.ok(public.vota_yo(:'nuevo') ->> 'nombre' = 'NUEVO NOMBRE', 'pedir cambios no cambia los datos');
+do $$ begin perform public.vota_resolver_cambio('404440444', true); raise exception 'anon aprobó'; exception when insufficient_privilege then null; end $$;
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin perform public.vota_resolver_cambio('404440444', true); raise exception 'no admin aprobó'; exception when insufficient_privilege then null; end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select pg_temp.ok(public.vota_resolver_cambio('404440444', true) ->> 'ok' = 'true', 'el administrador aprueba el pedido');
+select pg_temp.ok(not exists (select 1 from public.vota_solicitudes), 'el pedido aprobado desaparece');
+reset role;
+set role anon;
+select pg_temp.ok(public.vota_yo(:'nuevo') ->> 'nombre' = 'Nombre Corregido' and public.vota_yo(:'nuevo') ->> 'telefono' = '88887777', 'los datos quedan corregidos');
+select public.vota_pedir_cambio(:'nuevo', 'Otro', '', '', '');
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.vota_resolver_cambio('404440444', false);
+reset role;
+select pg_temp.ok((select nombre from public.carnet_afiliados where cedula = '404440444') = 'Nombre Corregido' and not exists (select 1 from public.vota_solicitudes),
+  'rechazar borra el pedido sin cambiar los datos');
+update public.carnet_afiliados set nombre = 'NUEVO NOMBRE' where cedula = '404440444';
+
 -- ---------- Bitácora: nadie firma como otro ----------
 set role anon;
 select public.vota_log(:'nuevo', 'Prueba', 'detalle');

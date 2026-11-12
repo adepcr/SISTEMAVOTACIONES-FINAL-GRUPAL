@@ -28,6 +28,7 @@
     <script src="js/app-movil.js"></script>
     <script src="js/instalar.js"></script>
     <script src="js/temporadas.js"></script>
+    <script src="js/aviso-conexion.js"></script>
 </head>
 <body class="h-full antialiased selection:bg-adep-green selection:text-white">
 
@@ -315,8 +316,8 @@
                     <p id="c-privacy" class="text-sm text-gray-600"></p>
                     <p class="text-xl font-extrabold text-gray-900">¿Es correcto?</p>
                     <div class="grid gap-3">
-                        <button id="c-yes" onclick="confirmVote()" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md">Sí, enviar mi voto</button>
-                        <button onclick="closeConfirm()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-4 rounded-2xl text-lg">No, quiero cambiarlo</button>
+                        <button id="c-yes" onclick="confirmVote()" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed">Sí, enviar mi voto</button>
+                        <button id="c-no" onclick="closeConfirm()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-4 rounded-2xl text-lg">No, quiero cambiarlo</button>
                     </div>
                 </div>
             </div>
@@ -441,6 +442,7 @@
                 await cargar("js/reglas.js");
                 await cargar("js/importar.js");
                 await cargar("js/ingreso.js");
+                await cargar("js/solicitudes.js");
             }
         } catch (e) {
             console.error(e);

@@ -20,7 +20,9 @@
      vota_auditoria          bitácora
      vota_alertas            intentos de entrar con una cédula que ya está en otro celular
      vota_eliminados         copia de lo que se borró
-     vota_config             general (práctica) · publico (WhatsApp, enlace) · ingreso (código general) */
+     vota_config             general (práctica) · publico (WhatsApp, enlace) · ingreso (código general)
+     vota_ayuda              pedidos de ayuda durante una votación (no dicen qué votó)
+     vota_solicitudes        pedidos de corrección de datos del afiliado */
 const DB = {
     MAX_OPCIONES: 10,
     URL_PUBLICADA: 'https://adep-vota.web.app/',   // para los enlaces de «Olvidé mi contraseña» desde la app
@@ -28,6 +30,8 @@ const DB = {
     yo: null, _token: null,
     _polls: [], _conteos: {}, _part: [], _votos: [], _afiliados: {}, _admins: {}, _audit: [], _config: {}, _ingreso: null, _alertas: [],
     _padron: 0, _votesCache: null, _firmas: {},
+    _ayuda: [], _solicitudes: [], ayudaCargada: false,
+    _desfase: 0, relojSincronizado: false,
 
     // ================= Utilidades =================
     _norm(id) { return String(id).replace(/\D/g, ''); },   // cédulas: solo números
@@ -333,6 +337,38 @@ const DB = {
         return this.yo;
     },
 
+    // ================= Reloj del servidor =================
+    // La apertura y el cierre los decide la hora del servidor. Si el celular tiene la hora adelantada
+    // o atrasada, la pantalla mostraría «cerrada» o «abierta» por error: se mide la diferencia
+    // con el servidor (2 mediciones, se usa la más rápida) y se corrige. Cada 5 min y al volver internet.
+    ahora() { return Date.now() + this._desfase; },
+    async sincronizarReloj() {
+        if (this._midiendo) return;
+        this._midiendo = true;
+        try {
+            const m = [];
+            for (let i = 0; i < 2; i++) {
+                try {
+                    const t0 = Date.now(), srv = Number(await this._rpc('vota_hora')), t1 = Date.now();
+                    if (srv > 0) m.push({ desfase: srv - (t0 + t1) / 2, demora: t1 - t0 });
+                } catch (e) { console.warn('Reloj', e); }
+            }
+            if (m.length) {
+                const mejor = m.sort((a, b) => a.demora - b.demora)[0], antes = this._desfase;
+                this._desfase = Math.abs(mejor.desfase) < 500 ? 0 : Math.round(mejor.desfase);   // menos de medio segundo no importa
+                this.relojSincronizado = true;
+                if (Math.abs(antes - this._desfase) > 1000) this._redibujar();
+            }
+        } finally { this._midiendo = false; }
+    },
+    _iniciarReloj() {
+        if (this._relojIniciado) return;
+        this._relojIniciado = true;
+        this.sincronizarReloj();
+        setInterval(() => this.sincronizarReloj(), 5 * 60 * 1000);
+        window.addEventListener('online', () => this.sincronizarReloj());
+    },
+
     // ================= Datos (se actualizan solos) =================
     _redibujar() {
         clearTimeout(this._t);
@@ -374,14 +410,18 @@ const DB = {
         cambio = this._poner('votos', d.votos, v => { this._votos = v.map(x => ({ ...x, pollId: Number(x.pollId) })); }) || cambio;
         cambio = this._poner('config', d.config, v => { this._config = v || {}; }) || cambio;
         cambio = this._poner('padron', d.padron, v => { this._padron = v || 0; }) || cambio;
+        cambio = this._poner('ayuda', d.ayuda || [], v => { this._ayuda = v.map(a => ({ ...a, pollId: Number(a.pollId), id: a.pollId + '_' + a.cedula })); }) || cambio;
+        cambio = this._poner('solicitudes', d.solicitud ? [d.solicitud] : [], v => { this._solicitudes = v; }) || cambio;
+        this.ayudaCargada = true;
         if (d.yo) this.yo = { ...this.yo, ...d.yo };
         return cambio;
     },
     async _cargarAdmin(conPadron) {
-        const [polls, conteos, part, votos, config, alertas, admins, audit, padron] = await Promise.all([
+        const [polls, conteos, part, votos, config, alertas, admins, audit, padron, ayuda, solicitudes] = await Promise.all([
             this._todo('vota_polls', 'id'), this._todo('vota_conteos'), this._todo('vota_participacion'), this._todo('vota_votos'),
             this._todo('vota_config'), this._todo('vota_alertas', 'fecha', false, 50), this._todo('vota_admins'),
-            this._todo('vota_auditoria', 'fecha', false, 1000), conPadron ? this._rpc('vota_padron') : null
+            this._todo('vota_auditoria', 'fecha', false, 1000), conPadron ? this._rpc('vota_padron') : null,
+            this._todo('vota_ayuda', 'fecha'), this._todo('vota_solicitudes', 'fecha')
         ]);
         let cambio = false;
         cambio = this._poner('polls', polls, v => { this._polls = v.map(p => ({ ...p.datos, id: Number(p.id) })); }) || cambio;
@@ -397,6 +437,11 @@ const DB = {
         cambio = this._poner('alertas', alertas, v => { this._alertas = v; }) || cambio;
         cambio = this._poner('admins', admins, v => { this._admins = {}; v.forEach(a => { this._admins[a.uid] = { ...a, cedula: a.uid }; }); }) || cambio;
         cambio = this._poner('audit', audit, v => { this._audit = v; }) || cambio;
+        cambio = this._poner('ayuda', ayuda, v => {
+            this._ayuda = v.map(a => ({ id: a.poll_id + '_' + a.cedula, pollId: Number(a.poll_id), cedula: a.cedula, nombre: a.nombre, motivo: a.motivo, nota: a.nota, fecha: a.fecha }));
+        }) || cambio;
+        cambio = this._poner('solicitudes', solicitudes, v => { this._solicitudes = v; }) || cambio;
+        this.ayudaCargada = true;
         if (padron) cambio = this._poner('afiliados', padron, v => { this._afiliados = {}; v.forEach(a => { this._afiliados[a.cedula] = a; }); }) || cambio;
         return cambio;
     },
@@ -409,6 +454,7 @@ const DB = {
         } catch (e) { console.error('Actualizar datos', e); }
     },
     async _escuchar() {
+        this._iniciarReloj();
         const admin = this.yo.rol === 'Administrador';
         if (admin) await this._cargarAdmin(true); else await this._cargarAfiliado();
         let vueltas = 0;
@@ -599,11 +645,69 @@ const DB = {
         this.log('Administrador eliminado', `${a.nombre} (${a.correo})`);
     },
 
+    // ================= Pedidos de ayuda y de corrección de datos =================
+    escucharSolicitudes() { },   // se leen junto con lo demás, cada pocos segundos
+    ayudas() { return this._ayuda; },
+    miAyuda(pollId) { return this._ayuda.find(a => a.pollId === pollId && a.cedula === (this.yo && this.yo.cedula)); },
+    async pedirAyuda(pollId, motivo, nota) {
+        const poll = this._polls.find(p => p.id === pollId);
+        if (!poll) return { error: 'Consulta no encontrada.' };
+        let r;
+        try { r = await this._rpc('vota_pedir_ayuda', { p_token: this._token, p_poll: pollId, p_motivo: motivo, p_nota: String(nota || '').slice(0, 200) }); }
+        catch (e) { console.error(e); return { error: 'No se pudo enviar el pedido. Revise su conexión e intente de nuevo.' }; }
+        if (r.error) return { error: r.error };
+        this.log('Pedido de ayuda enviado', `Consulta: ${poll.titulo}`.slice(0, 120));
+        await this._refrescar();
+        return { ok: true };
+    },
+    async cancelarAyuda(pollId, cedula) {
+        const admin = this.yo.rol === 'Administrador';
+        try {
+            if (admin) await this._rpc('vota_atender_ayuda', { p_poll: pollId, p_cedula: cedula });
+            else await this._rpc('vota_cancelar_ayuda', { p_token: this._token, p_poll: pollId });
+        } catch (e) { this._falla(e); return false; }
+        if (admin) {
+            const poll = this._polls.find(p => p.id === pollId), a = this._afiliados[cedula];
+            this.log('Pedido de ayuda atendido', `${poll ? poll.titulo : pollId} · ${a ? a.nombre : cedula}`.slice(0, 120));
+        }
+        await this._refrescar();
+        return true;
+    },
+    solicitudes() { return this._solicitudes; },
+    async pedirCambioDatos({ nombre, provincia, telefono, nota }) {
+        let r;
+        try { r = await this._rpc('vota_pedir_cambio', { p_token: this._token, p_nombre: nombre, p_provincia: provincia || '', p_telefono: telefono || '', p_nota: nota || '' }); }
+        catch (e) { console.error(e); return { error: 'No se pudo enviar el pedido. Revise su conexión e intente de nuevo.' }; }
+        if (r.error) return { error: r.error };
+        this.log('Pedido de corrección de datos enviado');
+        await this._refrescar();
+        return { ok: true };
+    },
+    async cancelarCambioDatos() {
+        try { await this._rpc('vota_cancelar_cambio', { p_token: this._token }); }
+        catch (e) { this._falla(e); return false; }
+        await this._refrescar();
+        return true;
+    },
+    async _resolverCambio(cedula, aprobar) {
+        const a = this._afiliados[cedula], s = this._solicitudes.find(x => x.cedula === cedula);
+        let r;
+        try { r = await this._rpc('vota_resolver_cambio', { p_cedula: cedula, p_aprobar: aprobar }); }
+        catch (e) { this._falla(e); return { error: 'No se pudo guardar.' }; }
+        if (r.error) return { error: r.error };
+        this.log(aprobar ? 'Datos de afiliado corregidos (por pedido)' : 'Pedido de corrección de datos rechazado',
+            `${a ? a.nombre : ''}${aprobar && s ? ' → ' + s.nombre : ''} (${cedula})`.slice(0, 300));
+        await this._refrescar(true);
+        return { ok: true };
+    },
+    aprobarCambioDatos(cedula) { return this._resolverCambio(cedula, true); },
+    async rechazarCambioDatos(cedula) { return !(await this._resolverCambio(cedula, false)).error; },
+
     // ================= Votaciones =================
     polls() { return this._polls; },
     estado(p) {
         if (!p.publicada) return 'borrador';
-        const now = Date.now();
+        const now = this.ahora();
         if (p.apertura && now < new Date(p.apertura).getTime()) return 'programada';
         if (p.cierre && now >= new Date(p.cierre).getTime()) return 'cerrada';
         return 'abierta';
