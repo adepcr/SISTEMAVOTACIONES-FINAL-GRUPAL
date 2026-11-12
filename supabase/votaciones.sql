@@ -334,7 +334,7 @@ language sql stable security definer set search_path = '' as $$
   select s.cedula from public.vota_sesiones s
   join public.vota_cuentas c on c.cedula = s.cedula and c.tipo = s.tipo
   where s.huella = public.vota_huella(coalesce(p_token, ''))
-    and public.vota_afiliado(s.cedula) is not null;
+    and (public.vota_afiliado(s.cedula)).cedula is not null;
 $$;
 
 create or replace function public.vota_perfil(p_cedula text) returns jsonb
@@ -408,7 +408,7 @@ begin
   end if;
   select * into c from public.vota_cuentas where cedula = p_cedula for update;
   if c.cedula is null or c.act_usada or c.act_hash is distinct from public.vota_huella_activacion(p_cedula, upper(coalesce(p_codigo, '')))
-     or public.vota_afiliado(p_cedula) is null then
+     or (public.vota_afiliado(p_cedula)).cedula is null then
     perform public.vota_fallo('activar');
     return jsonb_build_object('error', 'La cédula o el código de activación no son correctos, o el código ya se usó. Revíselos o pida un código nuevo a ADEP.');
   end if;
@@ -445,7 +445,7 @@ begin
     where cedula = p_cedula;
     return jsonb_build_object('error', 'La cédula o la clave no son correctas. Revise e intente de nuevo.');
   end if;
-  if public.vota_afiliado(p_cedula) is null then
+  if (public.vota_afiliado(p_cedula)).cedula is null then
     return jsonb_build_object('error', 'Su cuenta fue desactivada o su acceso fue renovado. Comuníquese con ADEP.');
   end if;
   update public.vota_cuentas set fallos = 0, bloqueo_hasta = null, ultimo_ingreso = now() where cedula = p_cedula;
@@ -464,7 +464,7 @@ begin
   g := coalesce((select valor from public.vota_config where clave = 'ingreso'), '{}'::jsonb);
   if not (coalesce((g ->> 'activo')::boolean, false) and p_codigo = (g ->> 'codigo')
           and public.vota_ahora_ms() < coalesce((g ->> 'venceMs')::bigint, 0))
-     or public.vota_afiliado(p_cedula) is null then
+     or (public.vota_afiliado(p_cedula)).cedula is null then
     perform public.vota_fallo('ingreso');
     return jsonb_build_object('error', 'El código de ingreso no es correcto o ya venció. Revíselo o pídalo de nuevo a ADEP. Si su cédula no está registrada, comuníquese con ADEP.');
   end if;
@@ -741,6 +741,43 @@ begin
 end;
 $$;
 
+-- Crear un administrador desde el panel: crea su cuenta de Supabase (correo y contraseña, ya confirmada)
+-- y le da permiso en ADEP Vota. Si el correo ya tiene cuenta (por ejemplo, del inventario), solo le da
+-- permiso y conserva su contraseña de siempre.
+create or replace function public.vota_crear_admin(p_nombre text, p_correo text, p_pass text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare u uuid; mail text := lower(trim(coalesce(p_correo, ''))); nueva boolean := false;
+begin
+  perform public.vota_exigir_admin();
+  if length(trim(coalesce(p_nombre, ''))) not between 2 and 80 then
+    return jsonb_build_object('error', 'Escriba el nombre completo (de 2 a 80 letras).');
+  end if;
+  if mail !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+    return jsonb_build_object('error', 'Escriba un correo válido.');
+  end if;
+  select id into u from auth.users where lower(email) = mail;
+  if u is null then
+    if length(coalesce(p_pass, '')) < 8 then
+      return jsonb_build_object('error', 'La contraseña debe tener al menos 8 caracteres.');
+    end if;
+    u := gen_random_uuid();
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+                            raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+                            confirmation_token, recovery_token, email_change, email_change_token_new)
+    values ('00000000-0000-0000-0000-000000000000', u, 'authenticated', 'authenticated', mail,
+            extensions.crypt(p_pass, extensions.gen_salt('bf', 10)), now(),
+            '{"provider": "email", "providers": ["email"]}'::jsonb, jsonb_build_object('nombre', trim(p_nombre)),
+            now(), now(), '', '', '', '');
+    insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+    values (u::text, u, jsonb_build_object('sub', u::text, 'email', mail, 'email_verified', true), 'email', now(), now(), now());
+    nueva := true;
+  end if;
+  insert into public.vota_admins (uid, nombre, correo) values (u, trim(p_nombre), mail)
+  on conflict (uid) do update set nombre = excluded.nombre, activo = true;
+  return jsonb_build_object('ok', true, 'correo', mail, 'nueva', nueva);
+end;
+$$;
+
 -- Lista de afiliados (la compartida) con los datos de su cuenta en este sistema
 create or replace function public.vota_padron() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -997,6 +1034,7 @@ begin
   end loop;
   -- Administradores (cada función revisa además que sea administrador activo)
   foreach f in array array['vota_instalar(text)', 'vota_admin_perfil()', 'vota_agregar_admin(text, text)',
+    'vota_crear_admin(text, text, text)',
     'vota_padron()', 'vota_guardar_afiliados(jsonb)', 'vota_cambiar_afiliado(text, jsonb)', 'vota_liberar(text)',
     'vota_eliminar_afiliado(text, text)', 'vota_eliminar_todos(text)', 'vota_cambiar_poll(bigint, jsonb)',
     'vota_restaurar(bigint, text, int)', 'vota_guardar_config(text, jsonb)', 'vota_eliminar_admin(uuid, text)',

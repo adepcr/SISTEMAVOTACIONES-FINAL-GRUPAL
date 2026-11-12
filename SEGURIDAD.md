@@ -46,9 +46,9 @@ hasta que vuelva a aparecer en el reporte).
 - Otra forma: en el SQL Editor, corra las líneas del final de `supabase/votaciones.sql` (sección 9) con el correo de la persona.
 
 ### Más administradores
-1. Supabase → **Authentication → Users → Add user → Create new user** (correo y contraseña, marque *Auto Confirm User*).
-   Si la persona ya usa el inventario, ya tiene cuenta: no hace falta crearla.
-2. En ADEP Vota → **Administradores**: nombre y correo → **Dar permiso de administrador**.
+En ADEP Vota → **Administradores**: nombre, correo y una contraseña (mínimo 8 caracteres) → **Crear administrador**.
+La cuenta queda creada y confirmada en ese momento (función `vota_crear_admin`; solo la puede usar un administrador activo).
+Si el correo ya tiene cuenta (por ejemplo, del inventario), solo se le da el permiso y sigue entrando con su contraseña de siempre.
 
 Tener cuenta de Supabase **no** da permiso en ADEP Vota: hay que agregarla aquí. Y al revés: un administrador de ADEP Vota
 puede consultar el inventario como «lector», porque es la misma cuenta del personal de ADEP.
@@ -68,7 +68,8 @@ puede consultar el inventario como «lector», porque es la misma cuenta del per
 
 Las pruebas están en `supabase/pruebas/pruebas.sql` (votar dos veces, cédula de otro, consulta cerrada o sin publicar, opción inexistente,
 sesión inventada, clave por fuerza bruta, segundo celular, leer tablas sin permiso, hacerse administrador, firmar la bitácora como otro,
-lista mensual, pedir ayuda o cambios de datos sin sesión, aprobar pedidos sin ser administrador, etc.: 81 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
+lista mensual, pedir ayuda o cambios de datos sin sesión, aprobar pedidos sin ser administrador, crear administradores sin serlo,
+afiliados sin filial en la lista, etc.: 92 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
 
 ```bash
 PGHOST=localhost PGUSER=postgres sh supabase/pruebas/correr.sh

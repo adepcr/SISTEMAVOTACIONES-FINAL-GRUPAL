@@ -828,18 +828,26 @@ function renderAdmins() {
     }).join('');
 }
 
+$('ad-ver').addEventListener('click', () => {
+    const p = $('ad-pass'), ver = p.type === 'password';
+    p.type = ver ? 'text' : 'password';
+    $('ad-ver').innerHTML = `<i class="fa-solid ${ver ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
+});
 function showAdminError(msg) { $('ad-error').textContent = msg; $('ad-error').classList.toggle('hidden', !msg); }
 
 $('form-admin').addEventListener('submit', async e => {
     e.preventDefault();
-    const nombre = $('ad-nombre').value.trim(), correo = $('ad-correo').value.trim();
+    const nombre = $('ad-nombre').value.trim(), correo = $('ad-correo').value.trim(), pass = $('ad-pass').value;
     if (!nombre || !correo) return showAdminError('Complete nombre y correo.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showAdminError('Escriba un correo válido.');
-    const res = await DB.addAdmin({ nombre, correo });
+    const boton = e.target.querySelector('button[type="submit"]');
+    boton.disabled = true;
+    const res = await DB.addAdmin({ nombre, correo, pass }).finally(() => { boton.disabled = false; });
     if (res.error) return showAdminError(res.error);
     showAdminError('');
     $('form-admin').reset();
-    showToast('Administrador agregado.', 'success');
+    showToast(res.nueva ? `Administrador creado. Entra con ${res.correo} y la contraseña que escribió.`
+        : `Ese correo ya tenía cuenta: ahora es administrador y entra con su contraseña de siempre.`, 'success');
     renderAdmins();
 });
 

@@ -214,6 +214,40 @@ select pg_temp.ok((select nombre from public.carnet_afiliados where cedula = '40
   'rechazar borra el pedido sin cambiar los datos');
 update public.carnet_afiliados set nombre = 'NUEVO NOMBRE' where cedula = '404440444';
 
+-- ---------- Afiliado sin filial ni nombre en la lista (caso común en la lista real) ----------
+insert into public.carnet_afiliados (cedula, activo) values ('606660666', true);
+set role anon;
+select public.vota_ingresar_codigo('606660666', '123456', 'Android') ->> 'token' as sinf \gset
+select pg_temp.ok(public.vota_yo(:'sinf') is not null, 'afiliado sin filial ni nombre: su sesión vale después de entrar');
+select pg_temp.ok(public.vota_datos(:'sinf') ? 'error' and public.vota_datos(:'sinf') ->> 'error' = 'pendiente', 'afiliado sin filial: la página lo reconoce (aquí queda pendiente por la aprobación encendida)');
+reset role;
+
+-- ---------- Crear administradores desde el panel ----------
+set role anon;
+do $$ begin perform public.vota_crear_admin('Intruso', 'x@x.cr', 'clave12345'); raise exception 'anon creó un admin'; exception when insufficient_privilege then null; end $$;
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin perform public.vota_crear_admin('Intruso', 'x@x.cr', 'clave12345'); raise exception 'no admin creó un admin'; exception when insufficient_privilege then null; end $$;
+select pg_temp.ok(true, 'solo un administrador puede crear administradores');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select pg_temp.ok(public.vota_crear_admin('Ana Nueva', 'Ana.Nueva@ADEPcr.org', 'corta') ? 'error', 'contraseña corta: no se crea');
+select pg_temp.ok(public.vota_crear_admin('Ana Nueva', 'no-es-correo', 'clave12345') ? 'error', 'correo inválido: no se crea');
+select pg_temp.ok(public.vota_crear_admin('Ana Nueva', 'Ana.Nueva@ADEPcr.org', 'clave12345') ->> 'nueva' = 'true', 'el administrador crea la cuenta de otro administrador');
+reset role;
+select pg_temp.ok((select u.encrypted_password = extensions.crypt('clave12345', u.encrypted_password) and u.email_confirmed_at is not null
+                          and u.confirmation_token = '' and u.aud = 'authenticated'
+                   from auth.users u where u.email = 'ana.nueva@adepcr.org'), 'la cuenta queda confirmada y con la contraseña cifrada');
+select pg_temp.ok(exists (select 1 from auth.identities i join auth.users u on u.id = i.user_id where u.email = 'ana.nueva@adepcr.org' and i.provider = 'email'),
+  'la cuenta tiene su identidad de correo (para poder entrar)');
+select pg_temp.ok(exists (select 1 from public.vota_admins a join auth.users u on u.id = a.uid where u.email = 'ana.nueva@adepcr.org' and a.activo), 'y queda como administradora activa');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select pg_temp.ok(public.vota_crear_admin('Inventario', 'inventario@adepcr.org', '') ->> 'nueva' = 'false', 'un correo que ya tiene cuenta solo recibe el permiso');
+reset role;
+select pg_temp.ok((select encrypted_password is null from auth.users where email = 'inventario@adepcr.org'), 'y su contraseña de siempre no se toca');
+delete from public.vota_admins where correo = 'inventario@adepcr.org';
+
 -- ---------- Bitácora: nadie firma como otro ----------
 set role anon;
 select public.vota_log(:'nuevo', 'Prueba', 'detalle');

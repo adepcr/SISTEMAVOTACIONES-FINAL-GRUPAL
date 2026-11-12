@@ -217,7 +217,7 @@
             <section id="sec-admins" class="hidden space-y-5">
                 <div class="border-b border-gray-200 pb-3">
                     <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Administradores</h2>
-                    <p class="text-sm text-gray-500">Cree cuentas para otros administradores. Ingresan con su correo y contraseña desde "Soy administrador".</p>
+                    <p class="text-sm text-gray-500">Cree aquí las cuentas de otros administradores. Entran con ese correo y contraseña en la pestaña «Administrador» de la pantalla de ingreso.</p>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
                     <form id="form-admin" class="grid sm:grid-cols-2 gap-3" novalidate>
@@ -225,9 +225,14 @@
                             class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
                         <input id="ad-correo" type="email" placeholder="Correo electrónico" autocomplete="off"
                             class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
-                        <p class="sm:col-span-2 text-sm text-gray-600">La cuenta se crea primero en <strong>Supabase → Authentication → Users → Add user</strong> (marque «Auto Confirm User»). Aquí solo se le da permiso de administrador en ADEP Vota.</p>
+                        <div class="sm:col-span-2 flex gap-2">
+                            <input id="ad-pass" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" minlength="8"
+                                class="flex-1 min-w-0 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
+                            <button type="button" id="ad-ver" class="shrink-0 px-3 rounded-xl bg-slate-100 text-gray-700 text-sm font-bold" aria-label="Ver contraseña"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                        <p class="sm:col-span-2 text-sm text-gray-600">Entréguele la contraseña en persona; después puede cambiarla desde esta misma sección. Si el correo ya tiene cuenta en el sistema de ADEP (por ejemplo, del inventario), solo se le da el permiso y sigue entrando con su contraseña de siempre.</p>
                         <button type="submit" class="sm:col-span-2 bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3">
-                            <i class="fa-solid fa-user-shield mr-1"></i> Dar permiso de administrador
+                            <i class="fa-solid fa-user-plus mr-1"></i> Crear administrador
                         </button>
                     </form>
                     <p id="ad-error" role="alert" class="hidden text-sm font-bold text-adep-red bg-adep-redLight border border-red-200 rounded-lg p-2"></p>

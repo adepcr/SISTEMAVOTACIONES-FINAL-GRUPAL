@@ -613,15 +613,15 @@ const DB = {
 
     // ================= Administradores =================
     admins() { return Object.values(this._admins); },
-    // La cuenta se crea en Supabase (Authentication → Users → Add user); aquí solo se le da permiso.
-    async addAdmin({ nombre, correo }) {
+    // Crea la cuenta (correo y contraseña) y le da permiso. Si el correo ya tenía cuenta, solo le da permiso.
+    async addAdmin({ nombre, correo, pass }) {
         let r;
-        try { r = await this._rpc('vota_agregar_admin', { p_nombre: nombre, p_correo: correo.trim().toLowerCase() }); }
-        catch (e) { this._falla(e); return { error: 'No se pudo guardar el administrador.' }; }
+        try { r = await this._rpc('vota_crear_admin', { p_nombre: nombre, p_correo: correo.trim().toLowerCase(), p_pass: pass || '' }); }
+        catch (e) { this._falla(e); return { error: 'No se pudo guardar el administrador. Revise que supabase/votaciones.sql esté actualizado en Supabase.' }; }
         if (r.error) return { error: r.error };
-        this.log('Administrador agregado', `${nombre} (${r.correo})`);
+        this.log(r.nueva ? 'Administrador creado' : 'Permiso de administrador dado', `${nombre} (${r.correo})`);
         await this._refrescar();
-        return { correo: r.correo };
+        return { correo: r.correo, nueva: r.nueva };
     },
     // Su propia contraseña: se cambia aquí. La de otro administrador: se le envía un correo para cambiarla.
     async setPass(uid, pass) {
