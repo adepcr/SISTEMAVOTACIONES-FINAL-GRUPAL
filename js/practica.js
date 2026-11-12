@@ -22,14 +22,14 @@
             lista.insertAdjacentHTML("beforebegin", `
                 <label class="flex items-start gap-3 bg-white border-2 border-gray-200 rounded-2xl p-4 font-semibold text-gray-800 cursor-pointer">
                     <input type="checkbox" id="xt-pr-on" class="w-6 h-6 accent-adep-green mt-0.5">
-                    <span>Mostrar «Práctica: aprenda a votar» a los afiliados
-                        <span class="block text-sm font-normal text-gray-500">Es una votación de ejemplo que no se guarda ni cuenta votos. Aparece al inicio de «Votaciones» de cada afiliado.</span></span>
+                    <span>Mostrar «Práctica: aprenda a votar» a los representantes
+                        <span class="block text-sm font-normal text-gray-500">Es una votación de ejemplo que no se guarda ni cuenta votos. Aparece al inicio de «Votaciones» de cada representante.</span></span>
                 </label>`);
             const chk = q("xt-pr-on");
             chk.addEventListener("change", () => {
                 DB._set("practica_activa", chk.checked);
                 DB.log(chk.checked ? "Modo práctica activado" : "Modo práctica desactivado");
-                showToast(chk.checked ? "La práctica ya se muestra a los afiliados." : "La práctica quedó oculta para los afiliados.", "success");
+                showToast(chk.checked ? "La práctica ya se muestra a los representantes." : "La práctica quedó oculta para los representantes.", "success");
             });
             const _all = window.renderAll;
             window.renderAll = function () { _all(); chk.checked = activa(); };

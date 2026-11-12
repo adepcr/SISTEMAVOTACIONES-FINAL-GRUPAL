@@ -29,12 +29,12 @@
         return { q: +p.quorum || 0, m, base: p.mayoriaBase === "padron" ? "padron" : "emitidos" };
     }
     const votosTxt = (m, base) => {
-        const de = base === "padron" ? "de todos los afiliados activos" : "de los votos";
-        if (m === 50) return base === "padron" ? "más de la mitad de todos los afiliados activos" : "más de la mitad de los votos";
+        const de = base === "padron" ? "de todos los representantes activos" : "de los votos";
+        if (m === 50) return base === "padron" ? "más de la mitad de todos los representantes activos" : "más de la mitad de los votos";
         if (Math.abs(m - 200 / 3) < 0.01) return `dos tercios (2 de cada 3) ${de}`;
         return `al menos ${f1(m)}% ${de}`;
     };
-    const afiTxt = qn => (qn === 50 ? "la mitad de los afiliados" : `el ${f1(qn)}% de los afiliados`);
+    const afiTxt = qn => (qn === 50 ? "la mitad de los representantes" : `el ${f1(qn)}% de los representantes`);
     function describir(p) {
         const r = regla(p), a = [];
         if (r.q) a.push(`deben votar al menos ${afiTxt(r.q)}`);
@@ -65,7 +65,7 @@
     function veredicto(p) {
         const ev = evaluar(p); if (!ev) return null;
         const r = regla(p), L = [];
-        if (r.q) L.push(`Han votado ${ev.total} de ${ev.padron} afiliados (${Math.round(ev.part)}%). Se necesita ${afiTxt(r.q)}.`);
+        if (r.q) L.push(`Han votado ${ev.total} de ${ev.padron} representantes (${Math.round(ev.part)}%). Se necesita ${afiTxt(r.q)}.`);
         if (r.m) {
             if (ev.empate) L.push("Hay empate en el primer lugar.");
             else if (ev.ganador) L.push(`«${ev.ganador.o}» lleva ${f1(ev.pct)}%. Necesita ${votosTxt(r.m, r.base)}.`);
@@ -73,7 +73,7 @@
         }
         let tono, t;
         if (ev.fin) {
-            if (!ev.quorumOk) { tono = "mal"; t = "La votación no vale: votaron muy pocos afiliados."; }
+            if (!ev.quorumOk) { tono = "mal"; t = "La votación no vale: votaron muy pocos representantes."; }
             else if (r.m && !ev.mayOk) { tono = "mal"; t = ev.empate ? "Sin decisión: hay empate." : "Sin decisión: ninguna opción alcanzó los votos necesarios."; }
             else { tono = "ok"; t = r.m && ev.ganador ? `Votación válida. Ganó: «${ev.ganador.o}».` : "Votación válida: votó suficiente gente."; }
         } else {
@@ -90,12 +90,12 @@
     const PRESET = { ninguna: [0, 0], mitad: [50, 0], ganar: [0, 50], ambas: [50, 50], dos: [0, 66.67] };
     function ayuda(v) {
         const mitad = Math.ceil(DB.padron() / 2);
-        const ej = `Ejemplo: hoy hay ${DB.padron()} afiliados activos, así que tendrían que votar al menos ${mitad}.`;
+        const ej = `Ejemplo: hoy hay ${DB.padron()} representantes activos, así que tendrían que votar al menos ${mitad}.`;
         return {
             ninguna: "La votación vale siempre. Gana la opción con más votos.",
-            mitad: "La votación solo vale si vota al menos la mitad de los afiliados. Gana la opción con más votos. " + ej,
+            mitad: "La votación solo vale si vota al menos la mitad de los representantes. Gana la opción con más votos. " + ej,
             ganar: "Una opción gana solo si tiene más de la mitad de los votos. Si ninguna lo logra, no hay decisión.",
-            ambas: "Debe votar al menos la mitad de los afiliados y la ganadora debe tener más de la mitad de los votos. " + ej,
+            ambas: "Debe votar al menos la mitad de los representantes y la ganadora debe tener más de la mitad de los votos. " + ej,
             dos: "Una opción gana solo si tiene al menos 2 de cada 3 votos.",
             otra: "Escriba los porcentajes que quiere usar. Deje en blanco el que no necesite."
         }[v];
@@ -105,7 +105,7 @@
             <p class="font-extrabold text-base text-gray-900"><i class="fa-solid fa-scale-balanced text-adep-green mr-1"></i> ¿Qué se necesita para que la votación valga? (opcional)</p>
             <select id="${pfx}-r" data-xr-r="${pfx}" aria-label="Reglas de la votación" class="${inp}">
                 <option value="ninguna">Nada especial: gana la opción con más votos</option>
-                <option value="mitad">Que voten al menos la mitad de los afiliados</option>
+                <option value="mitad">Que voten al menos la mitad de los representantes</option>
                 <option value="ganar">Que la ganadora tenga más de la mitad de los votos</option>
                 <option value="ambas">Las dos cosas anteriores</option>
                 <option value="dos">Que la ganadora tenga dos tercios de los votos</option>
@@ -113,7 +113,7 @@
             </select>
             <p id="${pfx}-ayuda" class="text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl p-3"></p>
             <div id="${pfx}-ow" class="hidden grid gap-3">
-                <div><label for="${pfx}-q" class="${lab}">Mínimo de afiliados que deben votar (%)</label>
+                <div><label for="${pfx}-q" class="${lab}">Mínimo de representantes que deben votar (%)</label>
                     <input id="${pfx}-q" type="number" min="1" max="100" inputmode="numeric" placeholder="Ejemplo: 40" class="${inp}"></div>
                 <div><label for="${pfx}-m" class="${lab}">Porcentaje de votos que necesita la ganadora (%)</label>
                     <input id="${pfx}-m" type="number" min="51" max="100" step="0.1" inputmode="decimal" placeholder="Ejemplo: 75" class="${inp}"></div>
@@ -130,7 +130,7 @@
         if (PRESET[v]) return { quorum: PRESET[v][0], mayoria: PRESET[v][1], mayoriaBase: "emitidos" };
         const qv = q(pfx + "-q").value.trim(), mv = q(pfx + "-m").value.trim();
         const qn = qv === "" ? 0 : Number(qv), mn = mv === "" ? 0 : Number(mv);
-        if (isNaN(qn) || qn < 0 || qn > 100) return { error: "El porcentaje de afiliados debe estar entre 1 y 100." };
+        if (isNaN(qn) || qn < 0 || qn > 100) return { error: "El porcentaje de representantes debe estar entre 1 y 100." };
         if (mv !== "" && (isNaN(mn) || mn <= 50 || mn > 100)) return { error: "Los votos que necesita la ganadora deben ser entre 51 y 100." };
         return { quorum: qn, mayoria: mn, mayoriaBase: base || "emitidos" };
     }

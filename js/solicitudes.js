@@ -168,7 +168,7 @@
         const base = reabrir ? DB.ahora() : Math.max(DB.ahora(), new Date(p.cierre).getTime());
         const nuevo = new Date(base + MIN5).toISOString();
         if (!confirm(reabrir
-            ? `¿Reabrir «${tituloPoll(p.id)}» por 5 minutos para TODOS los afiliados que no han votado?`
+            ? `¿Reabrir «${tituloPoll(p.id)}» por 5 minutos para TODOS los representantes que no han votado?`
             : `¿Dar 5 minutos más a «${tituloPoll(p.id)}»?`)) return;
         DB.updatePoll(p.id, { cierre: nuevo }, `${reabrir ? "Consulta reabierta 5 minutos" : "Cierre extendido 5 minutos"}: ${p.titulo}`);
         showToast(reabrir ? "Consulta reabierta por 5 minutos." : "Se agregaron 5 minutos.", "success");
@@ -183,7 +183,7 @@
         const lista = DB.ayudas().slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
         if (!lista.length) { panel.innerHTML = ""; return; }
         panel.innerHTML = `<div class="bg-white rounded-2xl border-2 p-4 space-y-3" style="border-color:#f59e0b">
-            <h3 class="font-extrabold text-base text-gray-900"><i class="fa-solid fa-life-ring text-amber-600 mr-1"></i> Pedidos de ayuda de afiliados (${lista.length})</h3>
+            <h3 class="font-extrabold text-base text-gray-900"><i class="fa-solid fa-life-ring text-amber-600 mr-1"></i> Pedidos de ayuda de representantes (${lista.length})</h3>
             <ul class="space-y-3">${lista.map(a => {
                 const p = DB.polls().find(x => x.id === a.pollId), est = p ? DB.estado(p) : "";
                 const af = DB.afiliados().find(x => x.cedula === a.cedula) || {};

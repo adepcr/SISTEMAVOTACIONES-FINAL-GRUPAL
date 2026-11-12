@@ -231,7 +231,7 @@ const DB = {
         if (r.error) return { error: r.error };
         this._guardarSesion(ced, r.token, 'clave');
         this.yo = r.perfil;
-        await this.log('Ingreso al sistema', 'Afiliado');
+        await this.log('Ingreso al sistema', 'Representante');
         return this.yo;
     },
     // ================= Ingreso con el código general =================
@@ -253,7 +253,7 @@ const DB = {
         this.guardar = true;   // solo entra solo quien guardó la sesión en este celular
         this._guardarSesion(ced, k, 'dispositivo');
         this.yo = p;
-        if (!p.pendiente) await this.log('Ingreso al sistema', 'Afiliado (celular reconocido)');
+        if (!p.pendiente) await this.log('Ingreso al sistema', 'Representante (celular reconocido)');
         return p;
     },
     // Aviso al administrador: alguien intentó entrar con una cédula que ya está en otro celular
@@ -535,10 +535,10 @@ const DB = {
     async addAfiliado({ nombre, cedula, provincia, telefono }) {
         const key = this._norm(cedula);
         if (!/^\d{9,12}$/.test(key)) return { error: 'La cédula debe tener de 9 a 12 números.' };
-        if (this._afiliados[key]) return { error: 'Ya existe un afiliado con esa cédula.' };
+        if (this._afiliados[key]) return { error: 'Ya existe un representante con esa cédula.' };
         try { await this.crearAfiliados([{ nombre, cedula: key, provincia, telefono }], false); }
-        catch (e) { this._falla(e, 'No se pudo guardar el afiliado.'); return { error: 'No se pudo guardar el afiliado.' }; }
-        this.log('Afiliado creado', `${nombre} (${key})${provincia ? ' · ' + provincia : ''}`);
+        catch (e) { this._falla(e, 'No se pudo guardar el representante.'); return { error: 'No se pudo guardar el representante.' }; }
+        this.log('Representante creado', `${nombre} (${key})${provincia ? ' · ' + provincia : ''}`);
         return { cedula: key };
     },
     // Envía la lista de cambios a la base de datos en tandas de 500
@@ -617,13 +617,13 @@ const DB = {
         delete this._afiliados[cedula];
         this._rpc('vota_eliminar_afiliado', { p_cedula: cedula, p_fecha: this._fechaTexto() })
             .then(() => this._refrescar(true)).catch(e => this._falla(e));
-        this.log('Afiliado eliminado', `${a.nombre} (${cedula})`);
+        this.log('Representante eliminado', `${a.nombre} (${cedula})`);
     },
     // Borra a TODOS los afiliados de la lista compartida (queda copia de cada uno en «eliminados»).
     // Los votos ya emitidos no se tocan. Quien tenga la sesión abierta sale. Devuelve cuántos se borraron.
     async borrarTodosAfiliados() {
         const n = await this._rpc('vota_eliminar_todos', { p_fecha: this._fechaTexto() });
-        this.log('Todos los afiliados eliminados', `${n} afiliado(s)`);
+        this.log('Todos los representantes eliminados', `${n} representante(s)`);
         await this._refrescar(true);
         return n;
     },
@@ -712,7 +712,7 @@ const DB = {
         try { r = await this._rpc('vota_resolver_cambio', { p_cedula: cedula, p_aprobar: aprobar }); }
         catch (e) { this._falla(e); return { error: 'No se pudo guardar.' }; }
         if (r.error) return { error: r.error };
-        this.log(aprobar ? 'Datos de afiliado corregidos (por pedido)' : 'Pedido de corrección de datos rechazado',
+        this.log(aprobar ? 'Datos de representante corregidos (por pedido)' : 'Pedido de corrección de datos rechazado',
             `${a ? a.nombre : ''}${aprobar && s ? ' → ' + s.nombre : ''} (${cedula})`.slice(0, 300));
         await this._refrescar(true);
         return { ok: true };
@@ -821,7 +821,7 @@ const DB = {
         const poll = this._polls.find(p => p.id === pollId);
         if (!poll) return { error: 'Consulta no encontrada.' };
         if (this.estado(poll) !== 'abierta') return { error: 'Solo se puede restaurar un voto mientras la consulta está abierta.' };
-        if (!this._part.find(r => r.pollId === pollId && r.cedula === cedula)) return { error: 'Este afiliado no ha votado.' };
+        if (!this._part.find(r => r.pollId === pollId && r.cedula === cedula)) return { error: 'Este representante no ha votado.' };
         // La base de datos sabe sola qué opción quitar; «opcion» solo hace falta para votos secretos
         // emitidos antes de la actualización (entonces responde pedirOpcion)
         let idx = null;

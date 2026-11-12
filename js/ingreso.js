@@ -36,8 +36,8 @@
         const alertas = DB.alertas();
         const nombre = ced => { const a = DB.afiliados().find(x => x.cedula === ced); return a ? a.nombre : "Cédula no registrada"; };
         caja.innerHTML = `
-            <h3 class="font-bold text-base text-gray-900"><i class="fa-solid fa-key text-adep-green mr-1"></i> Código de ingreso para afiliados</h3>
-            <p class="text-sm text-gray-500">Son 6 números, el mismo para todos. El afiliado escribe su cédula y este código, y su cédula queda amarrada a su celular: nadie más puede entrar con ella desde otro aparato.</p>
+            <h3 class="font-bold text-base text-gray-900"><i class="fa-solid fa-key text-adep-green mr-1"></i> Código de ingreso para representantes</h3>
+            <p class="text-sm text-gray-500">Son 6 números, el mismo para todos. El representante escribe su cédula y este código, y su cédula queda amarrada a su celular: nadie más puede entrar con ella desde otro aparato.</p>
             ${ok ? `
                 <div class="rounded-2xl p-4 text-center" style="background:#e8f5ee;border:2px solid #a7dcbf">
                     <p class="text-sm font-bold text-gray-600">Código vigente</p>
@@ -49,7 +49,7 @@
                     <a id="xg-wa" target="_blank" rel="noopener" class="${btnS}"><i class="fa-brands fa-whatsapp mr-1"></i> Compartir por WhatsApp</a>
                     <button type="button" id="xg-apagar" class="${btnG}"><i class="fa-solid fa-power-off mr-1"></i> Apagar código</button>
                 </div>` : `
-                <p class="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"><i class="fa-solid fa-circle-info mr-1"></i>${g && g.codigo ? "El código anterior ya venció o está apagado." : "Todavía no hay código."} Los afiliados nuevos no pueden entrar hasta que genere uno. Quienes ya entraron siguen entrando normal.</p>`}
+                <p class="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"><i class="fa-solid fa-circle-info mr-1"></i>${g && g.codigo ? "El código anterior ya venció o está apagado." : "Todavía no hay código."} Los representantes nuevos no pueden entrar hasta que genere uno. Quienes ya entraron siguen entrando normal.</p>`}
             <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <label for="xg-dur" class="text-sm font-bold text-gray-700">Válido por:</label>
                 <select id="xg-dur" class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold bg-white">
@@ -59,7 +59,7 @@
             </div>
             <label class="flex items-start gap-3 text-sm font-semibold text-gray-700 cursor-pointer">
                 <input type="checkbox" id="xg-aprob" class="w-5 h-5 mt-0.5 accent-adep-green" ${g && g.aprobacion ? "checked" : ""}>
-                <span>Aprobar a mano cada ingreso nuevo <span class="block font-normal text-gray-500">Más control: cada afiliado que entra por primera vez espera hasta que un administrador lo apruebe aquí.</span></span>
+                <span>Aprobar a mano cada ingreso nuevo <span class="block font-normal text-gray-500">Más control: cada representante que entra por primera vez espera hasta que un administrador lo apruebe aquí.</span></span>
             </label>
             ${pend.length ? `
                 <div class="space-y-2">
@@ -87,8 +87,8 @@
                             <button type="button" data-xg="descartar" data-al="${E(al.id)}" class="${btnG.replace("px-4 py-3", "px-3 py-2")}">Descartar</button>
                         </div>
                     </div>`).join("")}
-                    <p class="text-xs text-gray-500">«Liberar cédula» saca a quien la esté usando y deja que el afiliado verdadero entre de nuevo con el código. Si esa persona ya votó, use «Restaurar voto» en Resultados.</p>`
-                : `<p class="text-sm text-gray-500">No hay intentos bloqueados. Si alguien intenta entrar con la cédula de un afiliado que ya entró desde otro celular, aparecerá aquí y le saldrá un aviso.</p>`}
+                    <p class="text-xs text-gray-500">«Liberar cédula» saca a quien la esté usando y deja que el representante verdadero entre de nuevo con el código. Si esa persona ya votó, use «Restaurar voto» en Resultados.</p>`
+                : `<p class="text-sm text-gray-500">No hay intentos bloqueados. Si alguien intenta entrar con la cédula de un representante que ya entró desde otro celular, aparecerá aquí y le saldrá un aviso.</p>`}
             </div>`;
         if (ok) q("xg-wa").href = "https://wa.me/?text=" + encodeURIComponent(mensaje(g));
     }
@@ -107,7 +107,7 @@
                 if (vigente(g) && !confirm("¿Cambiar el código? El código actual dejará de servir (quienes ya entraron siguen entrando normal).")) return;
                 const horas = +q("xg-dur").value, codigo = DB.genCodigoIngreso();
                 await DB.setIngreso({ codigo, activo: true, venceMs: DB.ahora() + horas * 3600e3, aprobacion: !!(g && g.aprobacion) }, "Código de ingreso generado", `Válido por ${horas} h`);
-                showToast("Código generado. Compártalo con los afiliados.", "success");
+                showToast("Código generado. Compártalo con los representantes.", "success");
             }
             if (b.id === "xg-apagar") {
                 if (!confirm("¿Apagar el código? Nadie nuevo podrá entrar hasta que genere otro.")) return;
@@ -124,7 +124,7 @@
         if (b.dataset.xg === "rechazar" && a && confirm(`¿Rechazar el ingreso de ${a.nombre}? Ese celular quedará fuera.`)) {
             if (await DB.liberarCedula(id, "Ingreso rechazado")) showToast("Ingreso rechazado.", "success");
         }
-        if (b.dataset.xg === "liberar" && a && confirm(`¿Liberar la cédula de ${a.nombre}? Quien la esté usando quedará fuera y el afiliado podrá entrar de nuevo con el código de ingreso.`)) {
+        if (b.dataset.xg === "liberar" && a && confirm(`¿Liberar la cédula de ${a.nombre}? Quien la esté usando quedará fuera y el representante podrá entrar de nuevo con el código de ingreso.`)) {
             if (await DB.liberarCedula(id)) { await DB.borrarAlerta(b.dataset.al); showToast("Cédula liberada.", "success"); }
         }
         if (b.dataset.xg === "descartar") await DB.borrarAlerta(b.dataset.al);
@@ -143,7 +143,7 @@
         const n = DB.alertas().length + DB.afiliados().filter(a => a.pendiente && a.uid).length, b = q("badge-afiliados");
         if (!b) return;
         b.textContent = n; b.classList.toggle("hidden", !n);
-        tab.setAttribute("aria-label", n ? `Afiliados (${n} aviso(s))` : "Afiliados");
+        tab.setAttribute("aria-label", n ? `Representantes (${n} aviso(s))` : "Representantes");
     }
 
     // Avisos emergentes: alguien espera aprobación, o hubo un intento bloqueado nuevo
@@ -155,12 +155,12 @@
         pintar();
         numerito();
         const ahora = DB.afiliados().filter(a => a.pendiente && a.uid).length;
-        if (ahora > antes) showToast(`Hay ${ahora} afiliado(s) esperando aprobación en la pestaña Afiliados.`, "success");
+        if (ahora > antes) showToast(`Hay ${ahora} representante(s) esperando aprobación en la pestaña Representantes.`, "success");
         antes = ahora;
         const nuevas = DB.alertas().filter(a => !vistas.has(a.id));
         if (nuevas.length) {
             const a = DB.afiliados().find(x => x.cedula === nuevas[0].cedula);
-            showToast(`⚠ Intento bloqueado: alguien quiso entrar con la cédula ${nuevas[0].cedula}${a ? " (" + a.nombre + ")" : ""} desde otro celular. Revise la pestaña Afiliados.`);
+            showToast(`⚠ Intento bloqueado: alguien quiso entrar con la cédula ${nuevas[0].cedula}${a ? " (" + a.nombre + ")" : ""} desde otro celular. Revise la pestaña Representantes.`);
         }
         vistas = new Set(DB.alertas().map(a => a.id));
     };

@@ -52,7 +52,7 @@ select pg_temp.ok(true, 'no puede agregarse como administrador');
 -- ---------- Administrador ----------
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select pg_temp.ok(jsonb_array_length(public.vota_padron()) = 4, 'administrador ve los 4 afiliados de la lista compartida');
-select pg_temp.ok((select x ->> 'nombre' from jsonb_array_elements(public.vota_padron()) x where x ->> 'cedula' = '404440444') = 'Afiliado 404440444',
+select pg_temp.ok((select x ->> 'nombre' from jsonb_array_elements(public.vota_padron()) x where x ->> 'cedula' = '404440444') = 'Representante 404440444',
   'afiliado sin nombre se muestra con su cédula');
 -- Códigos de activación (la página calcula la huella)
 select public.vota_guardar_afiliados(jsonb_build_array(

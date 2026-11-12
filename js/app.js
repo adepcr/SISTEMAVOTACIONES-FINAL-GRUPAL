@@ -312,7 +312,7 @@ function renderReceipts() {
                     <span class="text-sm text-gray-500"><i class="fa-regular fa-clock mr-1"></i>${esc(v.fecha)}</span>
                     <h4 class="font-bold text-gray-900 text-base">${esc(titulo)}</h4>
                     <p class="text-sm text-gray-600">Selección: <strong>${esc(v.opcion)}</strong></p>
-                    <p class="text-sm text-gray-500">Afiliado: <strong>${esc(v.nombre)}</strong>${user.provincia ? ` · Filial: <strong>${esc(user.provincia)}</strong>` : ''}</p>
+                    <p class="text-sm text-gray-500">Representante: <strong>${esc(v.nombre)}</strong>${user.provincia ? ` · Filial: <strong>${esc(user.provincia)}</strong>` : ''}</p>
                 </div>
                 <div class="sm:text-right space-y-2"><span class="block text-xs font-bold text-gray-400 uppercase">Código hash</span>
                     <span class="font-mono text-sm font-black text-adep-red bg-adep-redLight px-2.5 py-1 rounded-lg border border-red-200 inline-block">${esc(v.hash)}</span>
@@ -331,7 +331,7 @@ function receiptPDF(key) {
     doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.setFont('helvetica', 'normal');
     let y = 42;
     const line = (k, v) => { const t = doc.splitTextToSize(`${k}: ${v}`, 170); doc.text(t, 20, y); y += t.length * 6 + 3; };
-    line('Afiliado', r.nombre);
+    line('Representante', r.nombre);
     if (r.filial) line('Filial', r.filial);
     line('Consulta', r.titulo);
     if (r.opcion) line('Opcion elegida', r.opcion);
@@ -382,7 +382,7 @@ function listaAfiliados(todos, vacio, pollId = null) {
         ? `<ul class="text-sm space-y-1 max-h-56 overflow-y-auto pr-1">${arr.map(a => `<li class="flex justify-between items-center gap-2 border-b border-gray-100 pb-1">
             <span class="font-semibold text-gray-800 min-w-0">${esc(a.nombre)}${a.provincia ? `<span class="block text-xs font-normal text-gray-500">Filial: ${esc(a.provincia)}</span>` : ''}</span>
             <span class="flex items-center gap-2 shrink-0"><span class="text-gray-500">${esc(a.cedula)}</span>${pollId !== null ? `<button data-restore="${pollId}" data-ced="${esc(a.cedula)}" class="px-2 py-1 rounded-lg bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold"><i class="fa-solid fa-rotate-left mr-1"></i>Restaurar</button>` : ''}</span>
-        </li>`).join('')}</ul>${resto > 0 ? `<p class="text-xs text-gray-500 mt-1">… y ${resto} más. Busque a alguien en la pestaña Afiliados o descargue el Excel de resultados.</p>` : ''}`
+        </li>`).join('')}</ul>${resto > 0 ? `<p class="text-xs text-gray-500 mt-1">… y ${resto} más. Busque a alguien en la pestaña Representantes o descargue el Excel de resultados.</p>` : ''}`
         : `<p class="text-sm text-gray-500">${vacio}</p>`;
 }
 
@@ -403,8 +403,8 @@ function renderResults() {
             detalle = `<details data-det="${p.id}" ${abiertos.has(String(p.id)) ? 'open' : ''} class="bg-white border-2 border-gray-200 rounded-xl p-3">
                 <summary class="cursor-pointer text-sm sm:text-base font-bold text-gray-800"><i class="fa-solid fa-list-check text-adep-green mr-1"></i> Registro de participación <span class="text-gray-500 font-semibold">(${q.votaron.length} han votado · ${q.faltan.length} pendientes)</span></summary>
                 <div class="grid sm:grid-cols-2 gap-4 mt-3">
-                    <div><h4 class="text-sm font-extrabold text-adep-green mb-2"><i class="fa-solid fa-circle-check mr-1"></i> Han emitido su voto (${q.votaron.length})</h4>${listaAfiliados(q.votaron, 'Aún no se registran votos.', puedeRestaurar ? p.id : null)}${puedeRestaurar && q.votaron.length ? '<p class="text-xs text-gray-500 mt-2">«Restaurar» anula el voto registrado por error para que el afiliado pueda votar nuevamente.</p>' : ''}</div>
-                    <div><h4 class="text-sm font-extrabold text-adep-red mb-2"><i class="fa-regular fa-clock mr-1"></i> Pendientes de votar (${q.faltan.length})</h4>${listaAfiliados(q.faltan, 'Todos los afiliados activos han emitido su voto.')}</div>
+                    <div><h4 class="text-sm font-extrabold text-adep-green mb-2"><i class="fa-solid fa-circle-check mr-1"></i> Han emitido su voto (${q.votaron.length})</h4>${listaAfiliados(q.votaron, 'Aún no se registran votos.', puedeRestaurar ? p.id : null)}${puedeRestaurar && q.votaron.length ? '<p class="text-xs text-gray-500 mt-2">«Restaurar» anula el voto registrado por error para que el representante pueda votar nuevamente.</p>' : ''}</div>
+                    <div><h4 class="text-sm font-extrabold text-adep-red mb-2"><i class="fa-regular fa-clock mr-1"></i> Pendientes de votar (${q.faltan.length})</h4>${listaAfiliados(q.faltan, 'Todos los representantes activos han emitido su voto.')}</div>
                 </div>
             </details>`;
         }
@@ -427,7 +427,7 @@ function renderResults() {
             <div class="space-y-4">${rows}</div>
             ${DB.estado(p) === 'cerrada' ? `<div class="flex justify-between gap-2 text-sm sm:text-base font-semibold text-gray-500 border-t border-dashed border-gray-200 pt-3"><span><i class="fa-solid fa-ban mr-1"></i>Nulos (no votaron) <span class="block sm:inline text-xs font-normal">No se cuentan en el resultado</span></span><span>${Math.max(0, padron - total)}</span></div>` : ''}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div class="flex justify-between text-sm font-bold text-gray-700"><span><i class="fa-solid fa-people-group mr-1"></i>Participación</span><span>${total} de ${padron} afiliados (${part}%)</span></div>
+                <div class="flex justify-between text-sm font-bold text-gray-700"><span><i class="fa-solid fa-people-group mr-1"></i>Participación</span><span>${total} de ${padron} representantes (${part}%)</span></div>
                 <div class="h-3 bg-slate-200 rounded-full overflow-hidden mt-2"><div class="bar-fill h-full bg-amber-500 rounded-full transition-all duration-700" style="width:${part}%"></div></div>
             </div>${detalle}</div>`;
     }).join('');
@@ -450,7 +450,7 @@ function startRestore(pid, ced) {
     DB.restaurarVoto(pid, ced).then(r => {
         if (r.pedirOpcion) return pedirOpcionRestaurar(pid, ced, nombre, poll);
         if (r.error) return showToast(r.error);
-        showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
+        showToast('Voto restaurado. El representante puede votar de nuevo.', 'success');
         renderAll();
     });
 }
@@ -472,7 +472,7 @@ $('rs-ok').addEventListener('click', async () => {
     closeRestore();
     const r = await DB.restaurarVoto(pid, ced, opcion);
     if (r.error) return showToast(r.error);
-    showToast('Voto restaurado. El afiliado puede votar de nuevo.', 'success');
+    showToast('Voto restaurado. El representante puede votar de nuevo.', 'success');
     renderAll();
 });
 
@@ -588,7 +588,7 @@ const SUGERENCIAS = {
     'Propuesta': [
         '¿Aprueba la propuesta presentada en la asamblea?',
         '¿Está de acuerdo con la modificación del reglamento interno?',
-        '¿Apoya la realización de esta actividad para los afiliados?'
+        '¿Apoya la realización de esta actividad para los representantes?'
     ],
     'Retroalimentación': [
         '¿Cómo califica las actividades realizadas por ADEP este año?',
@@ -627,7 +627,7 @@ function renderManage() {
         return `<div class="bg-white rounded-2xl border-2 border-gray-200 p-4 space-y-3">
             <div class="flex justify-between gap-2"><h3 class="font-bold text-base text-gray-900">${esc(p.titulo)}</h3>${badgeEstado(p)}</div>
             <p class="text-sm text-gray-500">${esc(p.categoria)} · ${p.opciones.length} opciones · ${n} votos${horario(p) ? ' · ' + horario(p) : ''}</p>
-            ${p.ocultaHastaApertura && est === 'programada' ? '<p class="text-sm font-semibold text-amber-700"><i class="fa-regular fa-clock mr-1"></i>Se mostrará a los afiliados automáticamente a la hora de apertura.</p>' : ''}
+            ${p.ocultaHastaApertura && est === 'programada' ? '<p class="text-sm font-semibold text-amber-700"><i class="fa-regular fa-clock mr-1"></i>Se mostrará a los representantes automáticamente a la hora de apertura.</p>' : ''}
             <div class="flex flex-wrap gap-2 text-sm font-bold">
                 <button data-act="pub" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-green text-white">${p.publicada ? 'Retirar' : 'Publicar'}</button>
                 ${est === 'programada' ? `<button data-act="open" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-green text-white"><i class="fa-solid fa-play mr-1"></i>Abrir ahora</button>` : ''}
@@ -651,9 +651,9 @@ $('manage-list').addEventListener('click', e => {
         DB.updatePoll(id, { publica: !p.publica }, `Modalidad cambiada a ${p.publica ? 'anónima' : 'pública'}: ${p.titulo}`);
     }
     if (act === 'open') {
-        if (!confirm('¿Abrir esta consulta ahora? Los afiliados podrán votar desde este momento.')) return;
+        if (!confirm('¿Abrir esta consulta ahora? Los representantes podrán votar desde este momento.')) return;
         DB.updatePoll(id, { publicada: true, apertura: new Date(DB.ahora()).toISOString(), ocultaHastaApertura: false }, `Consulta abierta manualmente: ${p.titulo}`);
-        showToast('Consulta abierta. Los afiliados ya pueden votar.', 'success');
+        showToast('Consulta abierta. Los representantes ya pueden votar.', 'success');
     }
     if (act === 'close') {
         if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;
@@ -724,8 +724,8 @@ function renderAfiliados() {
         : ver.startsWith('p:') ? provinciaDe(a.provincia) === ver.slice(2) : a.provincia === ver.slice(2));
     const list = todos.filter(a => enFiltro(a) && (!q || a.nombre.toLowerCase().includes(q) || a.cedula.includes(q) || (a.provincia || '').toLowerCase().includes(q) || provinciaDe(a.provincia).toLowerCase().includes(q)));
     const viejas = todos.filter(a => filialVieja(a.provincia)).length;
-    $('afiliados-list').innerHTML = `<p class="text-sm text-gray-500">${todos.length} afiliado(s) registrado(s)${q || ver ? ` · ${list.length} coincidencia(s)` : ''}</p>`
-        + (viejas && ver !== 'vieja' ? `<p class="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"><i class="fa-solid fa-circle-info mr-1"></i>${viejas} afiliado(s) tienen una filial que ya no está en la lista (de cuando se usaban provincias). Elija «Filial vieja (revisar)» arriba para verlos y asignarles su filial, o vuelva a importarlos con «Actualizar su nombre, filial y teléfono».</p>` : '')
+    $('afiliados-list').innerHTML = `<p class="text-sm text-gray-500">${todos.length} representante(s) registrado(s)${q || ver ? ` · ${list.length} coincidencia(s)` : ''}</p>`
+        + (viejas && ver !== 'vieja' ? `<p class="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"><i class="fa-solid fa-circle-info mr-1"></i>${viejas} representante(s) tienen una filial que ya no está en la lista (de cuando se usaban provincias). Elija «Filial vieja (revisar)» arriba para verlos y asignarles su filial, o vuelva a importarlos con «Actualizar su nombre, filial y teléfono».</p>` : '')
         + (list.length ? list.slice(0, afMostrar).map(a => `
         <div class="bg-white rounded-2xl border-2 border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
@@ -749,7 +749,7 @@ function renderAfiliados() {
         </div>`).join('') + (list.length > afMostrar
             ? `<div class="text-center space-y-2 py-2"><p class="text-sm text-gray-500">Se muestran ${afMostrar} de ${list.length}. Para encontrar a alguien, use el buscador de arriba.</p>
                 <button type="button" id="af-mas" class="px-4 py-3 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200 font-bold text-sm">Mostrar ${Math.min(AF_PAGINA, list.length - afMostrar)} más</button></div>` : '')
-        : '<p class="text-base text-gray-500 text-center py-8">No hay afiliados que mostrar.</p>');
+        : '<p class="text-base text-gray-500 text-center py-8">No hay representantes que mostrar.</p>');
 }
 let afEspera = null;
 $('af-buscar').addEventListener('input', () => { clearTimeout(afEspera); afEspera = setTimeout(() => { afMostrar = AF_PAGINA; renderAfiliados(); }, 250); });
@@ -762,13 +762,13 @@ function showCredentials(cedula, pin, filial) {
     const box = $('af-nueva');
     const a = DB.afiliados().find(x => x.cedula === cedula) || { cedula, nombre: '' };
     box.classList.remove('hidden');
-    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al afiliado (la clave no se vuelve a mostrar):</p>
+    box.innerHTML = `<p class="font-bold text-amber-800 mb-1">Entregue estos datos al representante (la clave no se vuelve a mostrar):</p>
         <p>Cédula: <strong class="font-mono text-base">${esc(cedula)}</strong></p>
         ${filial ? `<p>Filial: <strong>${esc(filial)}</strong></p>` : ''}
         <p>Código de activación: <strong class="font-mono text-2xl tracking-widest">${esc(pin)}</strong></p>
         ${a.telefono ? `<div class="mt-3">${botonWhatsApp(a, pin)}<p class="text-amber-800 mt-2">Se abrirá WhatsApp con el mensaje listo para ${esc(telefonoTxt(a.telefono))}. Después de enviarlo, borre el mensaje de su chat.</p></div>`
-            : '<p class="text-amber-800 mt-2"><i class="fa-brands fa-whatsapp mr-1"></i>Para enviarla por WhatsApp, agregue el teléfono del afiliado con el botón «Teléfono».</p>'}
-        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>La primera vez, el afiliado escribe su cédula, toca «Continuar», escribe este código y crea su propia clave. El código sirve una sola vez.</p>`;
+            : '<p class="text-amber-800 mt-2"><i class="fa-brands fa-whatsapp mr-1"></i>Para enviarla por WhatsApp, agregue el teléfono del representante con el botón «Teléfono».</p>'}
+        <p class="text-amber-800 mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>La primera vez, el representante escribe su cédula, toca «Continuar», escribe este código y crea su propia clave. El código sirve una sola vez.</p>`;
 }
 
 if ($('af-filial')) $('af-filial').insertAdjacentHTML('beforeend', opcionesFilial(''));
@@ -777,13 +777,13 @@ $('form-afiliado').addEventListener('submit', async e => {
     const nombre = $('af-nombre').value.trim(), cedula = $('af-cedula').value.replace(/\D/g, ''), filial = $('af-filial').value;
     const telTxt = $('af-telefono').value.trim(), telefono = telefonoWA(telTxt);
     if (!nombre || cedula.length < 9) return showToast('Ingrese el nombre y la cédula (mínimo 9 números).');
-    if (!filial) return showToast('Seleccione la filial del afiliado.');
+    if (!filial) return showToast('Seleccione la filial del representante.');
     if (telTxt && !telefono) return showToast('El teléfono debe tener 8 números (o incluir el código de país).');
     const res = await DB.addAfiliado({ nombre, cedula, provincia: filial, telefono });
     if (res.error) return showToast(res.error);
     $('form-afiliado').reset();
     $('af-nueva').classList.add('hidden');
-    showToast('Afiliado creado. Entra con su cédula y el código de ingreso.', 'success');
+    showToast('Representante creado. Entra con su cédula y el código de ingreso.', 'success');
     renderAfiliados();
 });
 
@@ -813,7 +813,7 @@ $('afiliados-list').addEventListener('click', async e => {
         showToast(tel ? 'Teléfono guardado.' : 'Teléfono borrado.', 'success');
     }
     if (b.dataset.af === 'del') {
-        if (!confirm('¿Eliminar a este afiliado?')) return;
+        if (!confirm('¿Eliminar a este representante?')) return;
         DB.deleteAfiliado(id, user);
     }
     renderAfiliados();
@@ -949,7 +949,9 @@ if (user) {
     $('user-name').innerText = partes.slice(0, 2).join(' ');
     $('user-name').title = user.nombre;
     $('user-avatar').innerText = (partes[0][0] + (partes[1] ? partes[1][0] : '')).toUpperCase();
-    $('user-role').innerText = (!isAdmin && user.provincia) ? `${user.rol} · ${user.provincia}` : user.rol;
+    // El rol interno sigue siendo «Afiliado»; en pantalla se muestra «Representante»
+    const rolTxt = isAdmin ? user.rol : 'Representante';
+    $('user-role').innerText = (!isAdmin && user.provincia) ? `${rolTxt} · ${user.provincia}` : rolTxt;
     document.querySelectorAll('[data-rol]').forEach(t => { if (t.dataset.rol !== user.rol) t.remove(); });
     switchTab('votacion');
     // Temporizador: se actualiza cada segundo (sin redibujar las tarjetas)

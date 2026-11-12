@@ -336,7 +336,7 @@
             ad: [
                 "Resumen general",
                 [
-                    "Las tarjetas muestran los afiliados activos, las votaciones abiertas, la participación y los votos de hoy.",
+                    "Las tarjetas muestran los representantes activos, las votaciones abiertas, la participación y los votos de hoy.",
                     "Abajo verá la participación de cada filial. Puede verla por filial o por provincia, y elegir una consulta en la lista.",
                     "Use las pestañas de arriba para crear, gestionar y revisar votaciones.",
                     "Abajo, «Descargar respaldo completo» guarda una copia de todos los datos. Hágalo cada semana y después de cada votación.",
@@ -356,7 +356,7 @@
             ad: [
                 "Votaciones publicadas",
                 [
-                    "Así ven las votaciones los afiliados. Los administradores no votan.",
+                    "Así ven las votaciones los representantes. Los administradores no votan.",
                     "Para publicar, retirar o cerrar una consulta vaya a «Gestionar».",
                 ],
             ],
@@ -376,7 +376,7 @@
                 "Resultados en vivo",
                 [
                     "Vea en vivo cuántos votos lleva cada opción.",
-                    "La barra amarilla muestra cuántos afiliados ya participaron.",
+                    "La barra amarilla muestra cuántos representantes ya participaron.",
                     "Abajo, en «Verificar un comprobante», escriba su código para confirmar que su voto fue contado.",
                 ],
             ],
@@ -414,12 +414,12 @@
         },
         afiliados: {
             ad: [
-                "Afiliados",
+                "Representantes",
                 [
-                    "Registre al afiliado con su nombre, cédula, filial y teléfono.",
-                    "Arriba, en «Código de ingreso», genere un código para todos y compártalo. El afiliado escribe su cédula y ese código, y su celular queda recordado.",
+                    "Registre al representante con su nombre, cédula, filial y teléfono.",
+                    "Arriba, en «Código de ingreso», genere un código para todos y compártalo. El representante escribe su cédula y ese código, y su celular queda recordado.",
                     "Cada cédula entra desde un solo celular. Si alguien intenta usar la cédula de otro, aparece en «Intentos bloqueados».",
-                    "Si un afiliado cambia de celular, use «Liberar cédula» y que vuelva a entrar con el código.",
+                    "Si un representante cambia de celular, use «Liberar cédula» y que vuelva a entrar con el código.",
                     "Si quiere más control, marque «Aprobar a mano cada ingreso nuevo».",
                 ],
             ],

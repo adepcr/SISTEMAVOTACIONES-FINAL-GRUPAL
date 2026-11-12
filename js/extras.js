@@ -140,7 +140,7 @@
             </div>
             <div class="xt-box space-y-3">
                 <h3 class="font-extrabold text-lg text-gray-900"><i class="fa-solid fa-shield-halved text-adep-green mr-1"></i> Respaldo de datos</h3>
-                <p class="text-gray-600">Supabase (plan gratuito) no guarda copias automáticas. Descargue un respaldo completo cada semana y después de cada votación, y guárdelo en un lugar seguro (por ejemplo, Google Drive de ADEP). Contiene datos personales de los afiliados: no lo comparta.</p>
+                <p class="text-gray-600">Supabase (plan gratuito) no guarda copias automáticas. Descargue un respaldo completo cada semana y después de cada votación, y guárdelo en un lugar seguro (por ejemplo, Google Drive de ADEP). Contiene datos personales de los representantes: no lo comparta.</p>
                 <button type="button" id="xt-respaldo" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold px-4 py-3 rounded-xl"><i class="fa-solid fa-download mr-1"></i> Descargar respaldo completo</button>
                 <p id="xt-respaldo-info" class="text-sm text-gray-500"></p>
             </div>`;
@@ -205,7 +205,7 @@
             + DB.votes().filter(v => v.cedula && String(v.fecha).startsWith(hoy)).length;
         const card = (ic, n, l, cls) => `<div class="xt-card ${cls || ""}"><i class="fa-solid ${ic}"></i><div class="n">${n}</div><div class="l">${l}</div></div>`;
         q("xt-cards").innerHTML =
-            card("fa-users", padron, "Afiliados activos") +
+            card("fa-users", padron, "Representantes activos") +
             card("fa-square-poll-vertical", abiertas, abiertas === 1 ? "Votación abierta" : "Votaciones abiertas", "rojo") +
             card("fa-percent", prom, "Participación promedio", "oro") +
             card("fa-calendar-day", hoyN, hoyN === 1 ? "Voto de hoy" : "Votos de hoy");
@@ -237,11 +237,11 @@
             const posibles = m.length * ps.length;
             return { f: f || (porProv ? "Sin provincia" : "Sin filial"), n: m.length, votos, posibles, pct: Math.min(100, Math.round(votos * 100 / posibles)) };
         }).filter(Boolean).sort((a, b) => b.pct - a.pct);
-        if (!filas.length) { cont.innerHTML = '<p class="text-gray-500">Aún no hay afiliados registrados con filial.</p>'; return; }
+        if (!filas.length) { cont.innerHTML = '<p class="text-gray-500">Aún no hay representantes registrados con filial.</p>'; return; }
 
         const uno = ps.length === 1;
         cont.innerHTML = filas.map(r => `<div>
-            <div class="flex justify-between gap-2 font-semibold text-gray-800 flex-wrap"><span>${E(r.f)} <span class="text-gray-500 font-normal">· ${r.n} afiliado${r.n === 1 ? "" : "s"}</span></span>
+            <div class="flex justify-between gap-2 font-semibold text-gray-800 flex-wrap"><span>${E(r.f)} <span class="text-gray-500 font-normal">· ${r.n} representante${r.n === 1 ? "" : "s"}</span></span>
             <span>${uno ? `${r.votos} de ${r.posibles}` : `${r.votos} votos de ${r.posibles} posibles`} (${r.pct}%)</span></div>
             <div class="h-4 bg-slate-100 rounded-full overflow-hidden mt-1"><div class="bar-fill h-full bg-adep-green rounded-full" style="width:${r.pct}%"></div></div></div>`).join("")
             + `<p class="text-sm text-gray-500">Mayor participación: <strong>${E(filas[0].f)}</strong> (${filas[0].pct}%).${uno ? "" : " Se promedian todas las consultas abiertas y cerradas."}</p>`;
@@ -275,7 +275,7 @@
     /* ---------- Exportar resultados ---------- */
     function exportarResultados() {
         const padron = DB.padron();
-        const filas = [["Consulta", "Categoría", "Modalidad", "Estado", "Opción", "Votos", "% de votos", "Total de votos", "Afiliados activos", "% participación"]];
+        const filas = [["Consulta", "Categoría", "Modalidad", "Estado", "Opción", "Votos", "% de votos", "Total de votos", "Representantes activos", "% participación"]];
         DB.polls().forEach(p => {
             const votes = DB.votes().filter(v => v.pollId === p.id), total = DB.participantes(p.id);
             p.opciones.forEach(o => {
@@ -426,7 +426,7 @@
         doc.setFont("helvetica", "bold"); doc.setFontSize(11);
         doc.text(`Total de votos emitidos: ${total}`, 20, y); y += 6;
         if (DB.estado(p) === "cerrada") { doc.text(`Votos nulos (no votaron): ${Math.max(0, padron - total)} - no se cuentan en el resultado`, 20, y); y += 6; }
-        doc.text(`Participación: ${total} de ${padron} afiliados activos (${padron ? Math.min(100, Math.round(total * 100 / padron)) : 0}%)`, 20, y); y += 7;
+        doc.text(`Participación: ${total} de ${padron} representantes activos (${padron ? Math.min(100, Math.round(total * 100 / padron)) : 0}%)`, 20, y); y += 7;
         const lid = p.opciones.filter(o => max > 0 && votes.filter(v => v.opcion === o).length === max);
         doc.setTextColor(0, 107, 53);
         const res = !total ? "Sin votos registrados." : lid.length > 1 ? `Resultado: EMPATE entre ${lid.join(", ")}.` : `Opción con más votos: ${lid[0]}.`;
@@ -453,7 +453,7 @@
             const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, "es");
             if (y > 235) { doc.addPage(); marco(); y = 24; }
             doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 107, 53);
-            doc.text(p.publica ? "Votantes por opción" : "Afiliados que votaron", 20, y); y += 7;
+            doc.text(p.publica ? "Votantes por opción" : "Representantes que votaron", 20, y); y += 7;
             doc.setTextColor(0, 0, 0); doc.setFontSize(10);
             if (p.publica) {
                 p.opciones.forEach(o => {
@@ -471,7 +471,7 @@
             }
         }
         doc.setTextColor(60, 60, 60); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-        const nota = p.publica ? "Esta consulta fue de voto público." : "Esta consulta fue de voto secreto: el sistema no guarda qué eligió cada afiliado.";
+        const nota = p.publica ? "Esta consulta fue de voto público." : "Esta consulta fue de voto secreto: el sistema no guarda qué eligió cada representante.";
         doc.text(doc.splitTextToSize(nota + " Los resultados corresponden al momento de emisión de esta minuta.", 170), 20, y);
 
         // Firmas

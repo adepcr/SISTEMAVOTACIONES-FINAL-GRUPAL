@@ -21,17 +21,17 @@
     /* ---------- Caja en la pestaña Afiliados ---------- */
     host.insertAdjacentHTML("beforebegin", `
         <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
-            <h3 class="font-bold text-base text-gray-900"><i class="fa-solid fa-file-import text-adep-green mr-1"></i> Cargar afiliados</h3>
-            <p class="text-sm text-gray-500">Importe el padrón desde un archivo de Excel. Después, cada afiliado entra con su cédula y el código de ingreso.</p>
+            <h3 class="font-bold text-base text-gray-900"><i class="fa-solid fa-file-import text-adep-green mr-1"></i> Cargar representantes</h3>
+            <p class="text-sm text-gray-500">Importe el padrón desde un archivo de Excel. Después, cada representante entra con su cédula y el código de ingreso.</p>
             <div class="flex flex-wrap gap-2">
-                <button type="button" id="xi-imp" class="${btnP}"><i class="fa-solid fa-file-import mr-1"></i> Importar afiliados (Excel)</button>
+                <button type="button" id="xi-imp" class="${btnP}"><i class="fa-solid fa-file-import mr-1"></i> Importar representantes (Excel)</button>
                 <button type="button" id="xi-tpl" class="${btnG}"><i class="fa-solid fa-file-excel mr-1"></i> Descargar plantilla de Excel</button>
-                <button type="button" id="xi-borrar" class="${btnR}"><i class="fa-solid fa-trash-can mr-1"></i> Borrar todos los afiliados</button>
+                <button type="button" id="xi-borrar" class="${btnR}"><i class="fa-solid fa-trash-can mr-1"></i> Borrar todos los representantes</button>
             </div>
         </div>
         <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
-            <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i> WhatsApp de ayuda para afiliados</h3>
-            <p class="text-sm text-gray-500">En la pantalla de ingreso, los afiliados verán un botón para escribir a este número si necesitan ayuda.</p>
+            <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-whatsapp text-adep-green mr-1"></i> WhatsApp de ayuda para representantes</h3>
+            <p class="text-sm text-gray-500">En la pantalla de ingreso, los representantes verán un botón para escribir a este número si necesitan ayuda.</p>
             <div class="flex flex-col sm:flex-row gap-2">
                 <input id="xi-wa" type="tel" inputmode="tel" placeholder="Número de WhatsApp de ADEP (8 números)" class="flex-1 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold">
                 <button type="button" id="xi-wa-ok" class="${btnP}"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar</button>
@@ -40,7 +40,7 @@
     host.insertAdjacentHTML("beforebegin", `
         <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
             <h3 class="font-bold text-base text-gray-900"><i class="fa-brands fa-android text-adep-green mr-1"></i> Enlace del archivo APK (opcional)</h3>
-            <p class="text-sm text-gray-500">No hace falta: en la pantalla de ingreso y dentro del sistema, los afiliados ya ven el botón «Instalar la app en este celular», que la instala con un toque sin descargar archivos. Si aun así quiere ofrecer el APK, súbalo a Google Drive, compártalo como «Cualquier persona con el enlace» y pegue aquí el enlace: aparecerá como opción secundaria.</p>
+            <p class="text-sm text-gray-500">No hace falta: en la pantalla de ingreso y dentro del sistema, los representantes ya ven el botón «Instalar la app en este celular», que la instala con un toque sin descargar archivos. Si aun así quiere ofrecer el APK, súbalo a Google Drive, compártalo como «Cualquier persona con el enlace» y pegue aquí el enlace: aparecerá como opción secundaria.</p>
             <div class="flex flex-col sm:flex-row gap-2">
                 <input id="xi-apk" type="url" placeholder="https://drive.google.com/..." class="flex-1 border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold">
                 <button type="button" id="xi-apk-ok" class="${btnP}"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar</button>
@@ -121,7 +121,7 @@
 
     /* ---------- Plantilla ---------- */
     q("xi-tpl").addEventListener("click", () => {
-        bajarExcel("Plantilla_afiliados_ADEP.xlsx", "Afiliados", [["Nombre", "Cédula", "Filial", "Teléfono"], ["María Fernández Rojas", "102340567", "Barva", "8888-1234"], ["José Mora Vargas", "203450678", "San Ramón", ""]]);
+        bajarExcel("Plantilla_representantes_ADEP.xlsx", "Representantes", [["Nombre", "Cédula", "Filial", "Teléfono"], ["María Fernández Rojas", "102340567", "Barva", "8888-1234"], ["José Mora Vargas", "203450678", "San Ramón", ""]]);
     });
 
     /* ---------- Borrar todos los afiliados ---------- */
@@ -129,26 +129,26 @@
         ...DB.afiliados().map(a => [a.nombre, a.cedula, a.provincia || "", telefonoTxt(a.telefono || "")])];
     q("xi-borrar").addEventListener("click", () => {
         const n = DB.afiliados().length;
-        if (!n) return showToast("No hay afiliados registrados.");
+        if (!n) return showToast("No hay representantes registrados.");
         const abiertas = DB.polls().filter(p => DB.estado(p) === "abierta").length;
-        abrir("Borrar todos los afiliados", `
-            <p class="text-base font-bold" style="color:#9b1c18"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Se borrarán los ${n} afiliado(s) registrados. Esto no se puede deshacer.</p>
-            ${abiertas ? `<p class="text-sm font-bold rounded-xl p-3" style="background:#fdf0f0;border:2px solid #fecaca;color:#9b1c18">Hay ${abiertas} consulta(s) abierta(s): los afiliados ya no podrán votar en ellas.</p>` : ""}
+        abrir("Borrar todos los representantes", `
+            <p class="text-base font-bold" style="color:#9b1c18"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Se borrarán los ${n} representante(s) registrados. Esto no se puede deshacer.</p>
+            ${abiertas ? `<p class="text-sm font-bold rounded-xl p-3" style="background:#fdf0f0;border:2px solid #fecaca;color:#9b1c18">Hay ${abiertas} consulta(s) abierta(s): los representantes ya no podrán votar en ellas.</p>` : ""}
             <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
                 <li>Quien tenga la sesión abierta saldrá en ese momento.</li>
                 <li>Los votos ya emitidos y los resultados <strong>no</strong> se borran.</li>
-                <li>Para volver a cargarlos, use «Importar afiliados».</li>
+                <li>Para volver a cargarlos, use «Importar representantes».</li>
             </ul>
             <button type="button" id="xi-b-xls" class="${btnG} w-full"><i class="fa-solid fa-file-excel mr-1"></i> Descargar la lista en Excel antes de borrar</button>
             <label for="xi-b-txt" class="block text-sm font-bold text-gray-700">Para confirmar, escriba <span class="font-mono">BORRAR</span>:</label>
             <input id="xi-b-txt" type="text" autocomplete="off" class="w-full border-2 border-gray-300 rounded-xl p-3 text-base font-bold uppercase">
             <div class="grid gap-2">
-                <button type="button" id="xi-b-ok" class="bg-adep-red hover:bg-adep-redDark text-white font-bold px-4 py-4 rounded-xl text-base" disabled style="opacity:.45">Borrar los ${n} afiliado(s)</button>
+                <button type="button" id="xi-b-ok" class="bg-adep-red hover:bg-adep-redDark text-white font-bold px-4 py-4 rounded-xl text-base" disabled style="opacity:.45">Borrar los ${n} representante(s)</button>
                 <button type="button" id="xi-b-c" class="${btnG}">Cancelar</button>
             </div>`);
         const ok = q("xi-b-ok");
         q("xi-b-c").onclick = () => cerrar();
-        q("xi-b-xls").onclick = () => bajarExcel(`Afiliados_ADEP_${new Date().toISOString().slice(0, 10)}.xlsx`, "Afiliados", listaExcel());
+        q("xi-b-xls").onclick = () => bajarExcel(`Representantes_ADEP_${new Date().toISOString().slice(0, 10)}.xlsx`, "Representantes", listaExcel());
         q("xi-b-txt").addEventListener("input", e => {
             ok.disabled = e.target.value.trim().toUpperCase() !== "BORRAR";
             ok.style.opacity = ok.disabled ? ".45" : "1";
@@ -159,14 +159,14 @@
             try {
                 const total = await DB.borrarTodosAfiliados(user);
                 cerrar(); renderAll();
-                showToast(`Se borraron ${total} afiliado(s).`, "success");
-            } catch (err) { console.error(err); DB._falla(err, "No se pudieron borrar todos los afiliados."); cerrar(); }
+                showToast(`Se borraron ${total} representante(s).`, "success");
+            } catch (err) { console.error(err); DB._falla(err, "No se pudieron borrar todos los representantes."); cerrar(); }
         };
     });
 
     /* ---------- 1) Importar ---------- */
     q("xi-imp").addEventListener("click", () => {
-        const m = abrir("Importar afiliados", `
+        const m = abrir("Importar representantes", `
             <ol class="list-decimal pl-5 space-y-1 text-base text-gray-700">
                 <li>Use la <strong>plantilla de Excel</strong>, con las columnas <strong>Nombre, Cédula, Filial</strong> y <strong>Teléfono</strong> (opcional).</li>
                 <li>Guarde el archivo como siempre (.xlsx). También se aceptan archivos CSV.</li>
@@ -281,11 +281,11 @@
         const viejos = exist.map(f => ({ f, k: DB._norm(f.cedula) })).filter(x => actuales[x.k] && actuales[x.k].rol === "Afiliado");
         if (o.actualizar) await DB.actualizarAfiliados(viejos.map(({ f, k }) => ({ cedula: k, cambios: { nombre: f.nombre, ...(f.filial ? { provincia: f.filial } : {}), ...(f.telefono ? { telefono: f.telefono } : {}) } })));
         const cre = creados.length, act = o.actualizar ? viejos.length : 0;
-        DB.log("Importación de afiliados", `${cre} nuevo(s), ${act} actualizado(s)`);
+        DB.log("Importación de representantes", `${cre} nuevo(s), ${act} actualizado(s)`);
         renderAll();
         abrir("Importación terminada", `
             <p class="text-base font-bold text-adep-green"><i class="fa-solid fa-circle-check mr-1"></i>${cre} cuenta(s) creada(s)${act ? `, ${act} actualizada(s)` : ""}.</p>
-            <p class="text-sm text-gray-600">Los afiliados entran con su cédula y el código de ingreso (arriba, en «Código de ingreso para afiliados»).</p>
+            <p class="text-sm text-gray-600">Los representantes entran con su cédula y el código de ingreso (arriba, en «Código de ingreso para representantes»).</p>
             <button type="button" id="xi-fin" class="${btnP} w-full">Cerrar</button>`);
         q("xi-fin").onclick = () => cerrar();
     }

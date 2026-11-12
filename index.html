@@ -104,7 +104,7 @@
                 </button>
                 <button onclick="switchTab('afiliados')" id="tab-afiliados" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
                     <i class="fa-solid fa-users text-base"></i>
-                    <span>Afiliados</span>
+                    <span>Representantes</span>
                 </button>
                 <button onclick="switchTab('admins')" id="tab-admins" data-rol="Administrador" class="nav-tab flex-1 py-3 px-3 text-center text-xs sm:text-sm font-semibold text-gray-600 hover:text-adep-green whitespace-nowrap flex items-center justify-center gap-2">
                     <i class="fa-solid fa-user-shield text-base"></i>
@@ -160,7 +160,7 @@
                 <div class="flex items-center justify-between border-b border-gray-200 pb-3 gap-2 flex-wrap">
                     <div>
                         <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Escrutinio General en Tiempo Real</h2>
-                        <p class="text-sm text-gray-500">Avance porcentualizado y participación de los afiliados. Se actualiza solo.</p>
+                        <p class="text-sm text-gray-500">Avance porcentualizado y participación de los representantes. Se actualiza solo.</p>
                     </div>
                 </div>
                 <div id="results-list" class="space-y-5"></div>
@@ -190,8 +190,8 @@
             <!-- AFILIADOS (ADMIN) -->
             <section id="sec-afiliados" class="hidden space-y-5">
                 <div class="border-b border-gray-200 pb-3">
-                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Afiliados</h2>
-                    <p class="text-sm text-gray-500">Registre afiliados con su cédula y entrégueles en persona la clave temporal generada. Al ingresar por primera vez, cada afiliado crea su propia clave.</p>
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Representantes</h2>
+                    <p class="text-sm text-gray-500">Registre representantes con su cédula y entrégueles en persona la clave temporal generada. Al ingresar por primera vez, cada representante crea su propia clave.</p>
                 </div>
                 <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-3">
                     <form id="form-afiliado" class="grid sm:grid-cols-2 gap-3" novalidate>
@@ -201,13 +201,13 @@
                         <select id="af-filial" aria-label="Filial" class="border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none bg-white">
                             <option value="">Filial...</option>
                         </select>
-                        <button type="submit" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3"><i class="fa-solid fa-user-plus mr-1"></i> Crear afiliado</button>
+                        <button type="submit" class="bg-adep-green hover:bg-adep-greenDark text-white font-bold rounded-xl text-sm py-3"><i class="fa-solid fa-user-plus mr-1"></i> Crear representante</button>
                     </form>
                     <div id="af-nueva" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm"></div>
                 </div>
-                <input id="af-buscar" type="search" placeholder="Buscar nombre, cédula o filial..." aria-label="Buscar afiliado"
+                <input id="af-buscar" type="search" placeholder="Buscar nombre, cédula o filial..." aria-label="Buscar representante"
                     class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none">
-                <select id="af-ver-filial" aria-label="Mostrar afiliados de" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none bg-white">
+                <select id="af-ver-filial" aria-label="Mostrar representantes de" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold focus:border-adep-green focus:outline-none bg-white">
                     <option value="">Todas las filiales</option>
                 </select>
                 <div id="afiliados-list" class="space-y-3"></div>
@@ -253,7 +253,7 @@
             <section id="sec-crear" class="hidden space-y-5">
                 <div class="border-b border-gray-200 pb-3">
                     <h2 class="text-lg sm:text-xl font-bold text-gray-900 font-heading">Módulo de Administración ADEP</h2>
-                    <p class="text-sm text-gray-500">Publicación de nuevas mociones o consultas para los afiliados.</p>
+                    <p class="text-sm text-gray-500">Publicación de nuevas mociones o consultas para los representantes.</p>
                 </div>
 
                 <div class="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm max-w-xl mx-auto space-y-4">
@@ -298,7 +298,7 @@
                         </div>
 
                         <label class="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" id="new-poll-public" class="w-5 h-5 accent-adep-green"> Voto público (mostrar el nombre de quien vota). Si no se marca, el voto es secreto.</label>
-                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" id="new-poll-publish" class="w-5 h-5 accent-adep-green"> Publicar de inmediato (queda visible para los afiliados). Si tiene fecha de apertura y no se marca, aparecerá sola a esa hora.</label>
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" id="new-poll-publish" class="w-5 h-5 accent-adep-green"> Publicar de inmediato (queda visible para los representantes). Si tiene fecha de apertura y no se marca, aparecerá sola a esa hora.</label>
                         <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm">
                             <i class="fa-solid fa-circle-plus"></i> Guardar consulta
                         </button>
@@ -409,7 +409,7 @@
                 </div>
                 <div class="p-6 space-y-4">
                     <p id="rs-who" class="font-bold text-gray-900 text-center"></p>
-                    <p class="text-sm text-gray-600">Este voto es secreto. Pregunte al afiliado qué opción eligió por error; se quitará un voto de esa opción y podrá votar de nuevo.</p>
+                    <p class="text-sm text-gray-600">Este voto es secreto. Pregunte al representante qué opción eligió por error; se quitará un voto de esa opción y podrá votar de nuevo.</p>
                     <select id="rs-opcion" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-semibold bg-white"></select>
                     <div class="grid gap-3">
                         <button id="rs-ok" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-bold py-3 rounded-xl">Restaurar voto</button>

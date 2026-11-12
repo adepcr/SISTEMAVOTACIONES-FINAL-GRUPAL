@@ -358,7 +358,7 @@ $$;
 create or replace function public.vota_perfil(p_cedula text) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('uid', a.cedula, 'rol', 'Afiliado', 'cedula', a.cedula,
-           'nombre', coalesce(nullif(a.nombre, ''), 'Afiliado ' || a.cedula),
+           'nombre', coalesce(nullif(a.nombre, ''), 'Representante ' || a.cedula),
            'provincia', coalesce(a.filial, ''), 'telefono', coalesce(c.telefono, ''),
            'pendiente', coalesce(c.pendiente, false))
   from public.vota_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula
@@ -627,7 +627,7 @@ begin
   end if;
   if publica then
     insert into public.vota_votos (poll_id, cedula, nombre, filial, opcion, idx, codigo, fecha)
-    values (p_poll, ced, coalesce(nullif(a.nombre, ''), 'Afiliado ' || ced), coalesce(a.filial, ''), opcion, p_idx, cod, left(p_fecha, 40));
+    values (p_poll, ced, coalesce(nullif(a.nombre, ''), 'Representante ' || ced), coalesce(a.filial, ''), opcion, p_idx, cod, left(p_fecha, 40));
   end if;
   return jsonb_build_object('codigo', cod, 'fecha', left(p_fecha, 40));
 end;
@@ -823,7 +823,7 @@ begin
   perform public.vota_exigir_admin();
   return coalesce((
     select jsonb_agg(jsonb_build_object(
-      'cedula', a.cedula, 'nombre', coalesce(nullif(a.nombre, ''), 'Afiliado ' || a.cedula), 'provincia', coalesce(a.filial, ''),
+      'cedula', a.cedula, 'nombre', coalesce(nullif(a.nombre, ''), 'Representante ' || a.cedula), 'provincia', coalesce(a.filial, ''),
       'telefono', coalesce(c.telefono, ''), 'activo', a.activo and not coalesce(c.bloqueado, false),
       'enLista', a.activo, 'activado', coalesce(c.activado, false), 'pendiente', coalesce(c.pendiente, false),
       'dispositivo', coalesce(c.dispositivo, ''), 'uid', case when c.tipo is not null then a.cedula end,
@@ -946,19 +946,19 @@ begin
   if p.id is null then return jsonb_build_object('error', 'Consulta no encontrada.'); end if;
   if not public.vota_abierta(p.datos) then return jsonb_build_object('error', 'Solo se puede restaurar un voto mientras la consulta está abierta.'); end if;
   select * into r from public.vota_participacion where poll_id = p_poll and cedula = p_cedula for update;
-  if r.cedula is null then return jsonb_build_object('error', 'Este afiliado no ha votado.'); end if;
+  if r.cedula is null then return jsonb_build_object('error', 'Este representante no ha votado.'); end if;
   publica := coalesce((p.datos ->> 'publica')::boolean, false);
   perform public.vota_purgar_restaurables();
   if publica then
     select idx into i from public.vota_votos where poll_id = p_poll and cedula = p_cedula;
-    if i is null then return jsonb_build_object('error', 'No se encontró el voto de este afiliado.'); end if;
+    if i is null then return jsonb_build_object('error', 'No se encontró el voto de este representante.'); end if;
   else
     select idx into i from public.vota_restaurables where poll_id = p_poll and cedula = p_cedula;
     if i is null then i := p_idx; end if;
-    if i is null then return jsonb_build_object('error', 'Este voto se emitió antes de la actualización: indique qué opción marcó el afiliado.', 'pedirOpcion', true); end if;
+    if i is null then return jsonb_build_object('error', 'Este voto se emitió antes de la actualización: indique qué opción marcó el representante.', 'pedirOpcion', true); end if;
   end if;
   if i is null or i < 0 or i >= 10 or (select c[i + 1] from public.vota_conteos where poll_id = p_poll) < 1 then
-    return jsonb_build_object('error', 'No se pudo restaurar: la opción elegida no tiene votos. Revise con el afiliado qué opción eligió.');
+    return jsonb_build_object('error', 'No se pudo restaurar: la opción elegida no tiene votos. Revise con el representante qué opción eligió.');
   end if;
   update public.vota_conteos set c[i + 1] = c[i + 1] - 1, total = total - 1 where poll_id = p_poll;
   delete from public.vota_participacion where poll_id = p_poll and cedula = p_cedula;
@@ -1024,7 +1024,7 @@ begin
   if s.cedula is null then return jsonb_build_object('error', 'El pedido ya no existe.'); end if;
   if p_aprobar then
     if not exists (select 1 from public.vota_afiliados where cedula = p_cedula) then
-      return jsonb_build_object('error', 'Esa cédula ya no está en la lista de afiliados.');
+      return jsonb_build_object('error', 'Esa cédula ya no está en la lista de representantes.');
     end if;
     update public.vota_afiliados set nombre = s.nombre, filial = nullif(s.provincia, ''), actualizado = now() where cedula = p_cedula;
     insert into public.vota_cuentas (cedula) values (p_cedula) on conflict do nothing;
