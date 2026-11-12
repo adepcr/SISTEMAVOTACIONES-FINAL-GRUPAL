@@ -1,6 +1,6 @@
 # Cada vez que se sube un cambio a main, arma la app de Android (.apk).
 # Queda en "Actions" → la ejecución → "Artifacts" → ADEP-Vota-android. Es opcional (ver PUBLICAR.md).
-# La página NO se publica aquí: la publica Vercel solo, conectado a este repositorio.
+# La página se publica en GitHub Pages con el flujo «Publicar página» (pagina.yml).
 name: Armar app Android
 
 on:

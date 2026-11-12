@@ -1,32 +1,28 @@
 # Publicar ADEP Vota (página + app)
 
 - **Datos y cuentas:** Supabase (proyecto `inventario-archivo` de ADEP). Ver [SEGURIDAD.md](SEGURIDAD.md).
-- **Página:** Vercel, conectado a este repositorio. Cada cambio que se sube a `main` se publica solo en
-  **https://sistemavotaciones-final-grupal.vercel.app** (en 1 o 2 minutos).
+- **Página:** GitHub Pages, desde este mismo repositorio. Cada cambio que se sube a `main` se publica solo en
+  **https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/** (en 1 o 2 minutos). Lo hace el flujo **Actions → Publicar página** (`.github/workflows/pagina.yml`).
 
-No se usa Firebase para nada.
+No se usa Firebase ni Vercel.
 
-## Conectar Vercel (una sola vez)
-1. Entre a https://vercel.com y toque **Sign Up / Log In → Continue with GitHub**.
-2. **Add New… → Project** → busque **SISTEMAVOTACIONES-FINAL-GRUPAL** → **Import**.
-   (Si no aparece: **Adjust GitHub App Permissions** y dele acceso a ese repositorio de la organización `adepcr`.)
-3. No cambie nada: el archivo `vercel.json` ya dice cómo armar la página
-   (copia `index.html`, `login.html`, `css`, `js`, `img`… a la carpeta `www` y publica esa carpeta).
-4. Toque **Deploy**. Al terminar, Vercel muestra la dirección de la página.
-
-> Si la dirección que le dio Vercel **no** es `https://sistemavotaciones-final-grupal.vercel.app`,
-> cámbiela en `js/db.js` (`URL_PUBLICADA`), en el README y en Supabase (paso siguiente).
+## Activar GitHub Pages (una sola vez)
+1. En GitHub, abra el repositorio → **Settings** → **Pages** (menú de la izquierda).
+2. En **Build and deployment → Source**, elija **GitHub Actions**. No hay que guardar nada más.
+3. Vaya a **Actions → Publicar página → Run workflow → Run workflow**.
+4. En 1 o 2 minutos la página queda en **https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/**
+   (al terminar, la ejecución muestra el enlace).
 
 ## Avisarle a Supabase la dirección de la página (una sola vez)
 Supabase → **Authentication → URL Configuration**:
-- **Site URL:** `https://sistemavotaciones-final-grupal.vercel.app`
-- **Redirect URLs:** agregue `https://sistemavotaciones-final-grupal.vercel.app/**`
+- **Site URL:** `https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/`
+- **Redirect URLs:** agregue `https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/**`
 
 Así el enlace de «Olvidé mi contraseña» de los administradores vuelve a esta página.
 
 ## Cuando cambia la base de datos
 Si cambia `supabase/votaciones.sql`, péguelo completo en Supabase → **SQL Editor** → **Run**
-(se puede correr varias veces sin perder datos). Vercel no toca la base de datos.
+(se puede correr varias veces sin perder datos). Publicar la página no toca la base de datos.
 
 ## Cómo reciben la app los afiliados
 En la pantalla de ingreso (y dentro del sistema) aparece el botón **«Instalar la app en este celular»** (`js/instalar.js`).

@@ -1,0 +1,37 @@
+# Cada vez que se sube un cambio a main, publica la página en GitHub Pages:
+#   https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/
+# Una sola vez: Settings → Pages → Source: «GitHub Actions» (ver PUBLICAR.md).
+name: Publicar página
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Copia solo los archivos de la página (index, login, css, js, img…) a www/
+      - run: node scripts/copiar-web.js
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: www
+      - id: despliegue
+        uses: actions/deploy-pages@v4
