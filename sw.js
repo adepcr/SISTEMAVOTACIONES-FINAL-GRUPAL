@@ -1,7 +1,7 @@
 // Service worker de la PWA: permite instalar la página como app.
 // Primero intenta la red (para tener siempre la versión nueva) y si no hay internet usa la copia guardada.
 // Solo guarda los archivos de esta página; los votos siguen yendo directo a la base de datos (Supabase).
-const CACHE = "adep-vota-v3";
+const CACHE = "adep-vota-v5";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => {
