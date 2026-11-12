@@ -69,7 +69,6 @@ function switchTab(tab) {
     document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
     document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
     $(`sec-${tab}`).classList.remove('hidden');
-    document.body.dataset.tab = tab;   // para el estilo (p. ej. el saludo solo en Resumen y Votaciones)
     $(`tab-${tab}`).classList.add('active');
     renderAll();
     window.scrollTo({ top: 0 });
@@ -914,9 +913,7 @@ function renderBienvenida() {
         b.id = 'bienvenida';
         document.querySelector('main').before(b);
     }
-    // Primera palabra del nombre con mayúscula inicial («QUIROS» → «Quiros»)
-    const pal = user.nombre.trim().split(/\s+/)[0] || '';
-    const nombre = esc(pal.charAt(0).toLocaleUpperCase('es') + pal.slice(1).toLocaleLowerCase('es'));
+    const nombre = esc(user.nombre.split(' ')[0]);
     const f = new Date().toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long' });
     const hoy = f.charAt(0).toUpperCase() + f.slice(1);
     let detalle, accion = '';
@@ -930,7 +927,7 @@ function renderBienvenida() {
     }
     b.innerHTML = `<div class="bv-txt">
             <p class="bv-fecha">${esc(hoy)}</p>
-            <h2 class="bv-hola">${saludo()}, ${nombre}</h2>
+            <h2 class="bv-hola">${saludo()}, ${nombre} <span aria-hidden="true">👋</span></h2>
             <p class="bv-det">Bienvenido(a) a ADEP Vota. ${detalle}</p>
         </div>${accion}`;
 }
