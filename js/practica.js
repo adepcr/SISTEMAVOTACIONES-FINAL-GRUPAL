@@ -45,6 +45,10 @@
     q("polls-list").before(box);
 
     function render() {
+        // Si hay votaciones de verdad, la práctica va al final; si no, arriba
+        const lista = q("polls-list");
+        if (DB.polls().some(p => DB.visible(p))) { if (lista.nextElementSibling !== box) lista.after(box); }
+        else if (lista.previousElementSibling !== box) lista.before(box);
         let html = "";
         if (activa()) {
             const opts = OPCIONES.map((o, i) => `
@@ -59,7 +63,7 @@
                    </div>`
                 : `<button type="button" data-xp="enviar" class="w-full sm:w-auto bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 px-7 rounded-2xl text-lg flex items-center justify-center gap-2 shadow-md"><i class="fa-solid fa-paper-plane"></i> Revisar y enviar voto (práctica)</button>`;
             html = `
-            <div id="poll-card-practica" class="bg-white rounded-2xl shadow-sm border-2 border-amber-300 overflow-hidden mb-5" style="border-top-color:#f59e0b">
+            <div id="poll-card-practica" class="bg-white rounded-2xl shadow-sm border-2 border-amber-300 overflow-hidden my-5" style="border-top-color:#f59e0b">
                 <div class="p-4 flex justify-between items-center gap-2" style="background:#fef3c7;color:#78350f">
                     <span class="text-sm font-bold"><i class="fa-solid fa-graduation-cap mr-1"></i> Práctica · Aprenda a votar</span>
                     <span class="text-xs font-bold px-2.5 py-1 rounded-full" style="background:#78350f;color:#fff">No cuenta</span>
@@ -87,11 +91,11 @@
         cerrar();
         const m = document.createElement("div");
         m.id = "xt-pm";
-        m.className = "fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4";
+        m.className = "fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-3 sm:p-4";
         m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true");
         m.innerHTML = `<div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl max-h-full overflow-y-auto">${inner}</div>`;
         document.body.appendChild(m);
-        const f = m.querySelector("[data-xpm-focus]"); if (f) f.focus();
+        const f = m.querySelector("[data-xpm-focus]"); if (f) f.focus({ preventScroll: true });
     }
     function confirmar() {
         modal(`

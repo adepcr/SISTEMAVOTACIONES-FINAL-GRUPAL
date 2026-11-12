@@ -135,10 +135,6 @@
                             </button>
                         </div>
                     </div>
-                    <label class="flex items-center gap-3 text-base font-semibold text-gray-700 cursor-pointer">
-                        <input type="checkbox" id="a-recordar" class="w-6 h-6 accent-adep-green" checked>
-                        Recordar mi cédula en este equipo
-                    </label>
                 </div>
 
                 <!-- Paso 3: código de ingreso general (el mismo para todos, lo da ADEP) -->
@@ -151,7 +147,7 @@
                         <label for="a-codigo" class="block text-base font-bold text-gray-800 mb-1">Código de ingreso que le dio ADEP</label>
                         <input id="a-codigo" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="••••••"
                             class="big-input pin-input w-full border-gray-300 border rounded-2xl focus:border-adep-green focus:outline-none">
-                        <p class="text-sm text-gray-500 mt-1">Son 6 números. Solo se pide la primera vez: después, este celular queda recordado.</p>
+                        <p class="text-sm text-gray-500 mt-1">Son 6 números.</p>
                     </div>
                     <button type="button" id="a-tengo-act" class="text-base font-bold text-gray-600 underline py-1">Tengo un código personal de activación</button>
                 </div>
@@ -162,6 +158,14 @@
                     <p class="text-lg font-extrabold" style="color:#78350f">Esperando la aprobación de ADEP</p>
                     <p class="text-base text-gray-800">Hola <strong id="espera-nombre"></strong>. Un administrador debe aprobar su ingreso. Deje esta pantalla abierta: entrará solo en cuanto lo aprueben.</p>
                     <button type="button" id="espera-cancelar" class="text-base font-bold text-gray-600 underline py-2">Cancelar</button>
+                </div>
+
+                <div id="a-guardar-caja" class="hidden">
+                    <label class="flex items-start gap-3 text-base font-semibold text-gray-800 cursor-pointer rounded-2xl p-3 border-2 border-gray-200 bg-white">
+                        <input type="checkbox" id="a-guardar" class="w-6 h-6 mt-0.5 shrink-0 accent-adep-green">
+                        <span>Guardar la sesión en este dispositivo
+                            <span class="block text-sm font-normal text-gray-600">Márquelo solo en su propio celular. Si no lo marca, deberá escribir el código (o su clave) cada vez que entre.</span></span>
+                    </label>
                 </div>
 
                 <p id="a-error" role="alert" aria-live="assertive"
@@ -223,6 +227,11 @@
                 </div>
                 <button type="button" id="c-ver" class="text-base font-bold text-adep-green underline py-2 px-1"><i class="fa-solid fa-eye mr-1"></i><span>Ver claves</span></button>
                 <p class="text-sm text-gray-600 bg-slate-50 border border-slate-200 rounded-xl p-3"><i class="fa-solid fa-lightbulb text-adep-gold mr-1"></i>No use números fáciles como 123456 o 111111, ni su fecha de nacimiento. Anótela en un lugar seguro.</p>
+                <label class="flex items-start gap-3 text-base font-semibold text-gray-800 cursor-pointer rounded-2xl p-3 border-2 border-gray-200 bg-white">
+                    <input type="checkbox" id="act-guardar" class="w-6 h-6 mt-0.5 shrink-0 accent-adep-green">
+                    <span>Guardar la sesión en este dispositivo
+                        <span class="block text-sm font-normal text-gray-600">Márquelo solo en su propio celular. Si no lo marca, deberá escribir su clave cada vez que entre.</span></span>
+                </label>
                 <p id="c-error" role="alert" aria-live="assertive" class="hidden text-base font-bold text-adep-red bg-adep-redLight border-2 border-red-200 rounded-xl p-3"></p>
                 <button type="submit" class="w-full bg-adep-green hover:bg-adep-greenDark text-white font-extrabold py-4 rounded-2xl text-xl shadow-md flex items-center justify-center gap-3">
                     <i class="fa-solid fa-check"></i> Activar mi cuenta y entrar
@@ -397,6 +406,7 @@
             $('paso-codigo').classList.toggle('hidden', n !== 3);
             $('paso-espera').classList.toggle('hidden', n !== 4);
             $('a-boton').classList.toggle('hidden', n === 4);
+            $('a-guardar-caja').classList.toggle('hidden', n !== 2 && n !== 3);
             $('a-olvide').classList.toggle('hidden', n !== 2);
             $('ayuda-olvido').classList.add('hidden');
             $('a-boton').querySelector('span').textContent = n === 1 ? 'Continuar' : 'Ingresar';
@@ -432,6 +442,8 @@
             catch (e) { console.error(e); return showErr('a-error', 'No hay conexión. Revise su internet e intente de nuevo.'); }
             if (estado === 'activa') return irPaso(2);
             if (estado === 'dispositivo') {
+                // Este celular tiene la cédula pero no guardó la sesión: pide el código otra vez
+                if (!DB.guardadoEn(ced) && DB.tieneLlave(ced)) return irPaso(3);
                 if (auto) { $('a-boton').focus(); return; }
                 const p = await DB.entrarDispositivo(ced);
                 if (p) { DB._set('recordar', ced); return dentro(p); }
@@ -497,21 +509,23 @@
                     const ced = soloNumeros(cedula.value), cod = $('a-codigo').value;
                     if (cod.length !== 6) { $('a-codigo').focus(); return showErr('a-error', 'El código de ingreso tiene 6 números.'); }
                     showErr('a-error', 'Ingresando…');
+                    DB.guardar = $('a-guardar').checked;
                     const r = await DB.ingresarConCodigo(ced, cod);
                     if (r.error) { $('a-codigo').focus(); return showErr('a-error', r.error); }
-                    DB._set('recordar', ced);
+                    if (DB.guardar) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
                     return dentro(r);
                 }
                 const ced = soloNumeros(cedula.value), clave = soloNumeros(pin.value);
                 if (clave.length < 6) { pin.focus(); return showErr('a-error', `Su clave tiene 6 números. Le faltan ${6 - clave.length}.`); }
                 showErr('a-error', '');
+                DB.guardar = $('a-guardar').checked;
                 const res = await DB.loginAfiliado(ced, clave);
                 if (res.error) {
                     pin.value = ''; pintarPuntos(); pin.focus();
                     if (/no son correctas/.test(res.error)) $('a-olvide').classList.remove('hidden');
                     return showErr('a-error', res.error);
                 }
-                if ($('a-recordar').checked) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
+                if (DB.guardar) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
                 entrar();
             });
         });
@@ -541,9 +555,10 @@
                 if (FACILES.test(nueva)) { $('c-nueva').focus(); return showErr('c-error', 'Esa clave es muy fácil de adivinar. Elija otros números.'); }
                 if (nueva !== repite) { $('c-repite').value = ''; $('c-repite').focus(); return showErr('c-error', 'Las dos claves no son iguales. Escríbala otra vez.'); }
                 showErr('c-error', 'Activando su cuenta…');
+                DB.guardar = $('act-guardar').checked;
                 const r = await DB.activar(ced, cod, nueva);
                 if (r.error) return showErr('c-error', r.error);
-                DB._set('recordar', ced);
+                if (DB.guardar) DB._set('recordar', ced); else localStorage.removeItem('adep_recordar');
                 entrar();
             });
         });

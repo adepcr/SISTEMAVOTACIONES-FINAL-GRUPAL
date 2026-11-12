@@ -115,8 +115,12 @@ function timerHtml(p, kind) {
         <span class="cd-time font-mono text-xl font-black">${fmtRestante(left)}</span>
     </div>`;
 }
+let firmaEstados = '';
 function tickTimers() {
     let refrescar = false;
+    // Una consulta programada que abre, o una abierta que cierra, se ve al instante (sin recargar)
+    const firma = DB.polls().map(p => p.id + ':' + DB.estado(p) + ':' + DB.visible(p)).join();
+    if (firma !== firmaEstados) { if (firmaEstados) refrescar = true; firmaEstados = firma; }
     // Si la consulta se cierra mientras el afiliado revisa su voto, la ventana se cierra sola
     if (pendingPoll !== null) {
         const pp = DB.polls().find(x => x.id === pendingPoll);
@@ -132,7 +136,7 @@ function tickTimers() {
         if (left <= 0 || !vigente) { refrescar = true; return; }
         const t = el.querySelector('.cd-time'); if (t) t.textContent = fmtRestante(left);
     });
-    if (refrescar) { renderPolls(); if (isAdmin) { renderManage(); renderResults(); } }
+    if (refrescar) { renderPolls(); renderResults(); if (isAdmin) renderManage(); }
 }
 
 // ===== Votaciones habilitadas =====
@@ -168,7 +172,7 @@ function renderPolls() {
         return `
         <div id="poll-card-${p.id}" class="bg-white rounded-2xl shadow-sm border-2 ${voted ? 'border-emerald-500' : 'border-gray-200'} overflow-hidden">
             <div class="bg-gradient-to-r from-adep-green to-emerald-800 p-4 text-white flex justify-between items-center gap-2">
-                <span class="text-sm font-bold">Consulta #${n + 1} · ${esc(p.categoria)}</span>
+                <span class="text-sm font-bold">Consulta #${polls.length - n} · ${esc(p.categoria)}</span>
                 <span class="text-xs bg-emerald-900/60 font-bold px-2.5 py-1 rounded-full">${etiqueta}</span>
             </div>
             <div class="p-4 sm:p-6 space-y-4">
@@ -240,7 +244,8 @@ function startConfirm(pid) {
     si.disabled = true;
     clearTimeout(confirmEspera);
     confirmEspera = setTimeout(() => { si.disabled = false; }, 700);
-    $('c-no').focus();
+    $('c-no').focus({ preventScroll: true });
+    $('modal-confirm').firstElementChild.scrollTop = 0;
 }
 let confirmEspera = null;
 function closeConfirm() { clearTimeout(confirmEspera); $('modal-confirm').classList.add('hidden'); pendingPoll = null; }
@@ -625,6 +630,7 @@ function renderManage() {
             ${p.ocultaHastaApertura && est === 'programada' ? '<p class="text-sm font-semibold text-amber-700"><i class="fa-regular fa-clock mr-1"></i>Se mostrará a los afiliados automáticamente a la hora de apertura.</p>' : ''}
             <div class="flex flex-wrap gap-2 text-sm font-bold">
                 <button data-act="pub" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-green text-white">${p.publicada ? 'Retirar' : 'Publicar'}</button>
+                ${est === 'programada' ? `<button data-act="open" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-green text-white"><i class="fa-solid fa-play mr-1"></i>Abrir ahora</button>` : ''}
                 ${est === 'abierta' ? `<button data-act="close" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-lock mr-1"></i>Cerrar ahora</button>` : ''}
                 <button data-act="priv" data-id="${p.id}" class="px-3 py-2 rounded-xl bg-adep-greenLight text-adep-green border border-emerald-200 ${n ? 'opacity-60' : ''}"><i class="fa-solid ${n ? 'fa-lock' : p.publica ? 'fa-eye' : 'fa-eye-slash'} mr-1"></i>${p.publica ? 'Votos públicos (con nombre)' : 'Votos anónimos'}</button>
                 <button data-act="res" class="px-3 py-2 rounded-xl bg-slate-100 text-gray-700">Ver resultados</button>
@@ -643,6 +649,11 @@ $('manage-list').addEventListener('click', e => {
     if (act === 'priv') {
         if (DB.participantes(id)) return showToast('No se puede cambiar la modalidad: la consulta ya tiene votos.');
         DB.updatePoll(id, { publica: !p.publica }, `Modalidad cambiada a ${p.publica ? 'anónima' : 'pública'}: ${p.titulo}`);
+    }
+    if (act === 'open') {
+        if (!confirm('¿Abrir esta consulta ahora? Los afiliados podrán votar desde este momento.')) return;
+        DB.updatePoll(id, { publicada: true, apertura: new Date(DB.ahora()).toISOString(), ocultaHastaApertura: false }, `Consulta abierta manualmente: ${p.titulo}`);
+        showToast('Consulta abierta. Los afiliados ya pueden votar.', 'success');
     }
     if (act === 'close') {
         if (!confirm('¿Cerrar esta consulta ahora? Ya nadie podrá votar.')) return;

@@ -3,8 +3,7 @@
 --
 --  Cómo usarlo: en Supabase (proyecto inventario-archivo), abra "SQL Editor",
 --  pegue TODO este archivo y toque "Run". Se puede correr más de una vez sin
---  perder datos. Antes debe haberse corrido basedatos/supabase.sql del carnet
---  (crea la lista compartida de afiliados).
+--  perder datos. No depende del carnet: tiene su propia lista de afiliados.
 --
 --  Todas las tablas empiezan con "vota_" para convivir con el inventario y
 --  el carnet en el mismo proyecto sin mezclarse.
@@ -18,19 +17,24 @@
 --     Todo lo que hace pasa por las funciones vota_* de abajo, que revisan esa
 --     sesión. Las tablas no se pueden leer ni escribir directamente.
 --
---  Lista de afiliados: es la MISMA del carnet (public.carnet_afiliados), que
---  se reemplaza cada mes con el reporte de ADEP. Este sistema solo agrega lo
---  suyo (clave, celular, teléfono) en vota_cuentas.
+--  Lista de afiliados: es PROPIA de este sistema (public.vota_afiliados), así
+--  cambiarla no toca la lista del carnet. Lo demás de cada afiliado (clave,
+--  celular, teléfono) está en vota_cuentas.
 -- =====================================================================
 
 create extension if not exists pgcrypto with schema extensions;
 
 
 -- ---------------------------------------------------------------------
--- 1. Lista compartida de afiliados (la del carnet): nombre y filial
+-- 1. Lista de afiliados de ADEP Vota (propia: no es la del carnet)
 -- ---------------------------------------------------------------------
-alter table public.carnet_afiliados add column if not exists nombre text;
-alter table public.carnet_afiliados add column if not exists filial text;
+create table if not exists public.vota_afiliados (
+  cedula      text primary key check (cedula ~ '^[0-9]{9,12}$'),   -- cédula (9) o residente (10-12), sin guiones
+  activo      boolean not null default true,
+  nombre      text,
+  filial      text,
+  actualizado timestamptz not null default now()
+);
 
 
 -- ---------------------------------------------------------------------
@@ -46,7 +50,7 @@ create table if not exists public.vota_admins (
   creada  timestamptz not null default now()
 );
 
--- Cuenta de cada afiliado en este sistema (lo que no está en la lista compartida)
+-- Cuenta de cada afiliado en este sistema (clave, celular, teléfono)
 create table if not exists public.vota_cuentas (
   cedula          text primary key,
   telefono        text not null default '',
@@ -211,12 +215,13 @@ alter table public.vota_alertas       enable row level security;
 alter table public.vota_eliminados    enable row level security;
 alter table public.vota_intentos      enable row level security;
 alter table public.vota_ayuda         enable row level security;
+alter table public.vota_afiliados     enable row level security;
 alter table public.vota_solicitudes   enable row level security;
 
 revoke all on public.vota_admins, public.vota_cuentas, public.vota_sesiones, public.vota_config,
               public.vota_polls, public.vota_conteos, public.vota_participacion, public.vota_votos,
               public.vota_codigos, public.vota_auditoria, public.vota_alertas, public.vota_eliminados,
-              public.vota_intentos, public.vota_ayuda, public.vota_solicitudes
+              public.vota_intentos, public.vota_ayuda, public.vota_solicitudes, public.vota_afiliados
   from anon, authenticated;
 
 -- ¿La cuenta de Supabase conectada es un administrador activo de ADEP Vota?
@@ -254,7 +259,7 @@ grant usage on schema public to service_role;
 grant select, insert, update, delete on public.vota_admins, public.vota_cuentas, public.vota_sesiones,
   public.vota_config, public.vota_polls, public.vota_conteos, public.vota_participacion, public.vota_votos,
   public.vota_codigos, public.vota_auditoria, public.vota_alertas, public.vota_eliminados, public.vota_intentos,
-  public.vota_ayuda, public.vota_solicitudes
+  public.vota_ayuda, public.vota_solicitudes, public.vota_afiliados
   to service_role;
 
 
@@ -310,10 +315,11 @@ begin
 end;
 $$;
 
--- Afiliado de la lista compartida, activo y sin bloqueo para votar (null si no puede entrar)
-create or replace function public.vota_afiliado(p_cedula text) returns public.carnet_afiliados
+-- Afiliado de la lista, activo y sin bloqueo para votar (null si no puede entrar)
+drop function if exists public.vota_afiliado(text);
+create or replace function public.vota_afiliado(p_cedula text) returns public.vota_afiliados
 language sql stable security definer set search_path = '' as $$
-  select a.* from public.carnet_afiliados a
+  select a.* from public.vota_afiliados a
   left join public.vota_cuentas c on c.cedula = a.cedula
   where a.cedula = p_cedula and a.activo and not coalesce(c.bloqueado, false);
 $$;
@@ -343,7 +349,7 @@ language sql stable security definer set search_path = '' as $$
            'nombre', coalesce(nullif(a.nombre, ''), 'Afiliado ' || a.cedula),
            'provincia', coalesce(a.filial, ''), 'telefono', coalesce(c.telefono, ''),
            'pendiente', coalesce(c.pendiente, false))
-  from public.carnet_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula
+  from public.vota_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula
   where a.cedula = p_cedula;
 $$;
 
@@ -453,8 +459,11 @@ begin
 end;
 $$;
 
--- Ingreso con el código general (6 números): la cédula queda amarrada a este celular
-create or replace function public.vota_ingresar_codigo(p_cedula text, p_codigo text, p_dispositivo text) returns jsonb
+-- Ingreso con el código general (6 números): la cédula queda amarrada a este celular.
+-- p_llave: la sesión que este celular ya tenía con esa cédula. Si el afiliado no guardó la sesión
+-- en el celular, vuelve a escribir el código cada vez y la llave prueba que es el mismo celular.
+drop function if exists public.vota_ingresar_codigo(text, text, text);
+create or replace function public.vota_ingresar_codigo(p_cedula text, p_codigo text, p_dispositivo text, p_llave text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare g jsonb; c public.vota_cuentas;
 begin
@@ -471,6 +480,11 @@ begin
   insert into public.vota_cuentas (cedula) values (p_cedula) on conflict do nothing;
   select * into c from public.vota_cuentas where cedula = p_cedula for update;
   if c.tipo = 'dispositivo' then
+    if p_llave is not null and exists (select 1 from public.vota_sesiones
+        where huella = public.vota_huella(p_llave) and cedula = p_cedula and tipo = 'dispositivo') then
+      update public.vota_cuentas set ultimo_ingreso = now() where cedula = p_cedula;
+      return jsonb_build_object('token', p_llave, 'perfil', public.vota_perfil(p_cedula));
+    end if;
     return jsonb_build_object('error', 'Esta cédula ya se está usando en otro celular. Si no fue usted, comuníquese con ADEP.', 'enUso', true);
   end if;
   if c.tipo is not null then
@@ -545,7 +559,7 @@ begin
                        from public.vota_ayuda y where y.cedula = ced), '[]'::jsonb),
     'solicitud', (select jsonb_build_object('cedula', s.cedula, 'nombre', s.nombre, 'provincia', s.provincia, 'telefono', s.telefono,
                          'nota', s.nota, 'fecha', s.fecha) from public.vota_solicitudes s where s.cedula = ced),
-    'padron', (select count(*) from public.carnet_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula
+    'padron', (select count(*) from public.vota_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula
                where a.activo and not coalesce(c.bloqueado, false))
   );
 end;
@@ -556,7 +570,7 @@ create or replace function public.vota_votar(p_token text, p_poll bigint, p_idx 
 language plpgsql security definer set search_path = '' as $$
 declare
   ced text := public.vota_cedula_sesion(p_token);
-  p public.vota_polls; a public.carnet_afiliados; cod text; publica boolean; opcion text;
+  p public.vota_polls; a public.vota_afiliados; cod text; publica boolean; opcion text;
 begin
   if ced is null then return jsonb_build_object('error', 'Su sesión terminó. Vuelva a ingresar.'); end if;
   if (select pendiente from public.vota_cuentas where cedula = ced) then
@@ -790,7 +804,7 @@ begin
       'enLista', a.activo, 'activado', coalesce(c.activado, false), 'pendiente', coalesce(c.pendiente, false),
       'dispositivo', coalesce(c.dispositivo, ''), 'uid', case when c.tipo is not null then a.cedula end,
       'ultimoIngreso', c.ultimo_ingreso, 'creada', coalesce(c.creada, a.actualizado)) order by a.cedula)
-    from public.carnet_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula), '[]'::jsonb);
+    from public.vota_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula), '[]'::jsonb);
 end;
 $$;
 
@@ -806,11 +820,11 @@ begin
     if ced !~ '^[0-9]{9,12}$' then
       raise exception 'Cédula inválida: % (debe tener de 9 a 12 números)', ced;
     end if;
-    insert into public.carnet_afiliados (cedula, activo, nombre, filial)
+    insert into public.vota_afiliados (cedula, activo, nombre, filial)
     values (ced, true, nullif(trim(x ->> 'nombre'), ''), nullif(trim(x ->> 'provincia'), ''))
     on conflict (cedula) do update set
-      nombre = coalesce(nullif(trim(x ->> 'nombre'), ''), public.carnet_afiliados.nombre),
-      filial = case when x ? 'provincia' then nullif(trim(x ->> 'provincia'), '') else public.carnet_afiliados.filial end,
+      nombre = coalesce(nullif(trim(x ->> 'nombre'), ''), public.vota_afiliados.nombre),
+      filial = case when x ? 'provincia' then nullif(trim(x ->> 'provincia'), '') else public.vota_afiliados.filial end,
       actualizado = now();
     insert into public.vota_cuentas (cedula) values (ced) on conflict do nothing;
     if x ? 'telefono' then update public.vota_cuentas set telefono = coalesce(x ->> 'telefono', '') where cedula = ced; end if;
@@ -827,13 +841,13 @@ end;
 $$;
 
 -- Cambiar un afiliado: {provincia?, telefono?, activo?, pendiente?}
--- "activo" solo bloquea o desbloquea para votar (no toca la lista compartida ni el carnet).
+-- "activo" solo bloquea o desbloquea para votar (no lo quita de la lista).
 create or replace function public.vota_cambiar_afiliado(p_cedula text, p_cambios jsonb) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
   perform public.vota_exigir_admin();
   if p_cambios ? 'provincia' then
-    update public.carnet_afiliados set filial = nullif(trim(p_cambios ->> 'provincia'), ''), actualizado = now() where cedula = p_cedula;
+    update public.vota_afiliados set filial = nullif(trim(p_cambios ->> 'provincia'), ''), actualizado = now() where cedula = p_cedula;
   end if;
   insert into public.vota_cuentas (cedula) values (p_cedula) on conflict do nothing;
   update public.vota_cuentas set
@@ -855,7 +869,7 @@ begin
 end;
 $$;
 
--- Quitar un afiliado de la lista compartida (también deja de tener carnet). Queda copia en vota_eliminados.
+-- Quitar un afiliado de la lista de ADEP Vota (no toca el carnet). Queda copia en vota_eliminados.
 create or replace function public.vota_eliminar_afiliado(p_cedula text, p_fecha text) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -863,13 +877,13 @@ begin
   insert into public.vota_eliminados (tipo, datos, fecha, eliminado_por)
   select 'Afiliado', jsonb_build_object('cedula', a.cedula, 'nombre', a.nombre, 'provincia', a.filial, 'telefono', c.telefono),
          left(p_fecha, 40), (select nombre from public.vota_admins where uid = auth.uid())
-  from public.carnet_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula where a.cedula = p_cedula;
+  from public.vota_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula where a.cedula = p_cedula;
   delete from public.vota_cuentas where cedula = p_cedula;
-  delete from public.carnet_afiliados where cedula = p_cedula;
+  delete from public.vota_afiliados where cedula = p_cedula;
 end;
 $$;
 
--- Borra TODA la lista compartida y las cuentas de este sistema. Los votos ya emitidos no se tocan.
+-- Borra TODA la lista de afiliados de ADEP Vota y sus cuentas (no toca el carnet). Los votos ya emitidos no se tocan.
 create or replace function public.vota_eliminar_todos(p_fecha text) returns int
 language plpgsql security definer set search_path = '' as $$
 declare n int;
@@ -878,10 +892,10 @@ begin
   insert into public.vota_eliminados (tipo, datos, fecha, eliminado_por)
   select 'Afiliado', jsonb_build_object('cedula', a.cedula, 'nombre', a.nombre, 'provincia', a.filial, 'telefono', c.telefono),
          left(p_fecha, 40), (select nombre from public.vota_admins where uid = auth.uid())
-  from public.carnet_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula;
+  from public.vota_afiliados a left join public.vota_cuentas c on c.cedula = a.cedula;
   get diagnostics n = row_count;
   delete from public.vota_cuentas where true;
-  delete from public.carnet_afiliados where true;
+  delete from public.vota_afiliados where true;
   return n;
 end;
 $$;
@@ -979,10 +993,10 @@ begin
   select * into s from public.vota_solicitudes where cedula = p_cedula for update;
   if s.cedula is null then return jsonb_build_object('error', 'El pedido ya no existe.'); end if;
   if p_aprobar then
-    if not exists (select 1 from public.carnet_afiliados where cedula = p_cedula) then
+    if not exists (select 1 from public.vota_afiliados where cedula = p_cedula) then
       return jsonb_build_object('error', 'Esa cédula ya no está en la lista de afiliados.');
     end if;
-    update public.carnet_afiliados set nombre = s.nombre, filial = nullif(s.provincia, ''), actualizado = now() where cedula = p_cedula;
+    update public.vota_afiliados set nombre = s.nombre, filial = nullif(s.provincia, ''), actualizado = now() where cedula = p_cedula;
     insert into public.vota_cuentas (cedula) values (p_cedula) on conflict do nothing;
     update public.vota_cuentas set telefono = s.telefono where cedula = p_cedula;
   end if;
@@ -997,7 +1011,7 @@ language plpgsql stable security definer set search_path = '' as $$
 begin
   perform public.vota_exigir_admin();
   return jsonb_build_object(
-    'afiliados',     coalesce((select jsonb_agg(to_jsonb(a)) from public.carnet_afiliados a), '[]'),
+    'afiliados',     coalesce((select jsonb_agg(to_jsonb(a)) from public.vota_afiliados a), '[]'),
     'cuentas',       coalesce((select jsonb_agg(to_jsonb(c) - 'pin_hash' - 'act_hash') from public.vota_cuentas c), '[]'),
     'admins',        coalesce((select jsonb_agg(to_jsonb(x)) from public.vota_admins x), '[]'),
     'config',        coalesce((select jsonb_object_agg(clave, valor) from public.vota_config), '{}'),
@@ -1023,7 +1037,7 @@ declare f text;
 begin
   -- Pantalla de ingreso y afiliados (sin cuenta de Supabase)
   foreach f in array array['vota_publico()', 'vota_estado_cedula(text)', 'vota_activar(text, text, text)',
-    'vota_login(text, text)', 'vota_ingresar_codigo(text, text, text)', 'vota_avisar_intento(text)',
+    'vota_login(text, text)', 'vota_ingresar_codigo(text, text, text, text)', 'vota_avisar_intento(text)',
     'vota_yo(text)', 'vota_datos(text)', 'vota_votar(text, bigint, int, text, text)', 'vota_salir(text)',
     'vota_verificar(text, text)', 'vota_log(text, text, text)', 'vota_hora()',
     'vota_pedir_ayuda(text, bigint, text, text)', 'vota_cancelar_ayuda(text, bigint)',

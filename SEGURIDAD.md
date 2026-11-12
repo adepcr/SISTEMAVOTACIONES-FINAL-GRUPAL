@@ -17,26 +17,28 @@ Todo lo de este sistema está definido en **`supabase/votaciones.sql`** (tablas 
 | Borrar huellas | La bitácora solo la leen y borran los administradores; cada registro guarda el nombre real de quien lo hizo y la hora del servidor. |
 
 ### Cómo ingresan los afiliados
-1. La lista de afiliados es **la misma del carnet** (`carnet_afiliados`): se actualiza cada mes con el reporte de ADEP (ver la guía del carnet, `GUIA-TI.md` → *Rutina mensual*). Trae cédula, nombre y filial.
+1. La lista de afiliados es **propia de ADEP Vota** (`vota_afiliados`): cambiarla no toca la lista del carnet. Hoy son los representantes de la
+   Junta Directiva Central; se cargan con un SQL aparte (con datos personales: no se sube a GitHub) o desde **Afiliados → Importar**.
 2. Hay dos formas de entrar:
    - **Código de activación** (8 caracteres, por ejemplo `K7P2-9QXM`): el administrador lo genera en **Afiliados → Nuevo código** y se muestra **una sola vez**. El afiliado escribe su cédula, el código, y **crea su propia clave de 6 números**. Después entra siempre con cédula y clave.
    - **Código general de ingreso** (6 números, vence solo): la cédula queda amarrada al primer celular que lo use (una cédula, un celular). Si cambia de celular, el administrador pulsa **«Liberar cédula»**.
+   - **«Guardar la sesión en este dispositivo»**: si el afiliado la marca, la próxima vez entra directo. Si no, la sesión dura solo
+     mientras la página esté abierta y al volver debe escribir de nuevo el código (o su clave). El celular sigue reconocido por una
+     «llave» guardada en él, así que nadie más puede usar esa cédula desde otro celular.
 3. ¿Olvidó la clave? El administrador pulsa **«Nuevo código»**: la cuenta anterior deja de funcionar.
 
 De la base de datos no se puede sacar el código de activación: solo se guarda su huella (SHA-256).
 
-Quien sale de la lista mensual (o el administrador desactiva) pierde la sesión en ese momento. Desactivar en ADEP Vota
-solo impide votar: no le quita el carnet. **Eliminar** a un afiliado sí lo quita de la lista compartida (y del carnet,
-hasta que vuelva a aparecer en el reporte).
+Quien sale de la lista (o el administrador desactiva) pierde la sesión en ese momento. Desactivar solo impide votar;
+**Eliminar** lo quita de la lista de ADEP Vota (nunca de la del carnet).
 
 ---
 
 ## Instalar o actualizar la base de datos (una sola vez, y cada vez que cambie `supabase/votaciones.sql`)
 
 1. https://supabase.com/dashboard → proyecto **inventario-archivo** → **SQL Editor**.
-2. Si es la primera vez, primero debe estar corrido `basedatos/supabase.sql` del repositorio del carnet (crea la lista de afiliados).
-3. Pegue **todo** el archivo `supabase/votaciones.sql` y toque **Run**. Se puede correr varias veces sin perder datos.
-4. **Authentication → URL Configuration → Redirect URLs**: agregue `https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/**`
+2. Pegue **todo** el archivo `supabase/votaciones.sql` y toque **Run**. Se puede correr varias veces sin perder datos.
+3. **Authentication → URL Configuration → Redirect URLs**: agregue `https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/**`
    (y en **Site URL**, `https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/`)
    (para que el enlace de «Olvidé mi contraseña» de los administradores vuelva a esta página y no al inventario).
 
@@ -60,7 +62,7 @@ puede consultar el inventario como «lector», porque es la misma cuenta del per
 - 500 MB de base de datos para los tres sistemas (inventario, carnet y votaciones). ADEP Vota usa muy poco (no guarda fotos).
 - El proyecto se **pausa** si pasa 7 días sin uso. El carnet y el inventario ya lo mantienen despierto con una consulta diaria. Si aun así se pausa: Supabase → **Restore project** (no se pierde nada).
 - **No hay respaldos automáticos**: descargue el respaldo completo (**Respaldo** en el sistema) cada semana y después de cada votación.
-- La página revisa si hay cambios cada 10 segundos (no al instante).
+- La página revisa si hay cambios cada 3 segundos (el administrador, cada 5): todo aparece solo, sin recargar.
 
 ---
 
@@ -69,10 +71,10 @@ puede consultar el inventario como «lector», porque es la misma cuenta del per
 Las pruebas están en `supabase/pruebas/pruebas.sql` (votar dos veces, cédula de otro, consulta cerrada o sin publicar, opción inexistente,
 sesión inventada, clave por fuerza bruta, segundo celular, leer tablas sin permiso, hacerse administrador, firmar la bitácora como otro,
 lista mensual, pedir ayuda o cambios de datos sin sesión, aprobar pedidos sin ser administrador, crear administradores sin serlo,
-afiliados sin filial en la lista, etc.: 92 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
+afiliados sin filial en la lista, etc.: 96 comprobaciones). Corren en un PostgreSQL local que imita lo mínimo de Supabase (`supabase/pruebas/supabase-simulado.sql`), **nunca en Supabase**:
 
 ```bash
 PGHOST=localhost PGUSER=postgres sh supabase/pruebas/correr.sh
 ```
 
-Necesita PostgreSQL 15 o más nuevo y la carpeta del carnet al lado (`../carnet-adep`).
+Necesita PostgreSQL 15 o más nuevo.

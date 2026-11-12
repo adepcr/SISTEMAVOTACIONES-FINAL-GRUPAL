@@ -12,11 +12,12 @@ end $$;
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'admin@adepcr.org'),
   ('00000000-0000-0000-0000-00000000000b', 'inventario@adepcr.org');
-select public.carnet_reemplazar_listas(
-  '[{"cedula":"101110111","activo":true,"nombre":"ANA MORA","filial":"SAN JOSE"},
-    {"cedula":"202220222","activo":true,"nombre":"LUIS SOTO","filial":"HEREDIA"},
-    {"cedula":"303330333","activo":false,"nombre":"EVA ROJAS","filial":"CARTAGO"},
-    {"cedula":"404440444","activo":true}]'::jsonb, '["SAN JOSE","HEREDIA"]'::jsonb);
+insert into public.vota_afiliados (cedula, activo, nombre, filial) values
+  ('101110111', true, 'ANA MORA', 'SAN JOSE'), ('202220222', true, 'LUIS SOTO', 'HEREDIA'),
+  ('303330333', false, 'EVA ROJAS', 'CARTAGO'), ('404440444', true, null, null);
+-- La lista del carnet (otro sistema en el mismo Supabase): ADEP Vota nunca debe tocarla
+create table public.carnet_afiliados (cedula text primary key, activo boolean not null default true);
+insert into public.carnet_afiliados values ('999999999', true), ('101110111', true);
 
 select public.vota_huella_activacion('101110111', 'ABCD2345') as h1, public.vota_huella_activacion('303330333', 'ABCD2345') as h3 \gset
 
@@ -24,7 +25,7 @@ select public.vota_huella_activacion('101110111', 'ABCD2345') as h1, public.vota
 set role anon;
 select pg_temp.ok((select (public.vota_publico() ->> 'instalado')::boolean) = false, 'sin administradores, la página ofrece instalar');
 do $$ begin perform 1 from public.vota_cuentas; raise exception 'anon leyó vota_cuentas'; exception when insufficient_privilege then null; end $$;
-do $$ begin perform 1 from public.carnet_afiliados; raise exception 'anon leyó la lista'; exception when insufficient_privilege then null; end $$;
+do $$ begin perform 1 from public.vota_afiliados; raise exception 'anon leyó la lista'; exception when insufficient_privilege then null; end $$;
 do $$ begin perform 1 from public.vota_participacion; raise exception 'anon leyó participación'; exception when insufficient_privilege then null; end $$;
 do $$ begin perform public.vota_padron(); raise exception 'anon llamó vota_padron'; exception when insufficient_privilege then null; end $$;
 do $$ begin perform public.vota_afiliado('101110111'); raise exception 'anon llamó un ayudante interno'; exception when insufficient_privilege then null; end $$;
@@ -127,7 +128,7 @@ select pg_temp.ok((select total from public.vota_conteos where poll_id = 2) = 0,
 -- Bloquear a Luis para votar (no toca la lista compartida)
 select public.vota_cambiar_afiliado('202220222', '{"activo":false}');
 reset role;
-select pg_temp.ok((select activo from public.carnet_afiliados where cedula = '202220222'), 'bloquear para votar no quita el carnet');
+select pg_temp.ok((select activo from public.vota_afiliados where cedula = '202220222'), 'bloquear para votar no lo quita de la lista');
 
 set role anon;
 select pg_temp.ok(public.vota_yo(:'luis') is null, 'afiliado bloqueado pierde la sesión');
@@ -210,12 +211,12 @@ set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 select public.vota_resolver_cambio('404440444', false);
 reset role;
-select pg_temp.ok((select nombre from public.carnet_afiliados where cedula = '404440444') = 'Nombre Corregido' and not exists (select 1 from public.vota_solicitudes),
+select pg_temp.ok((select nombre from public.vota_afiliados where cedula = '404440444') = 'Nombre Corregido' and not exists (select 1 from public.vota_solicitudes),
   'rechazar borra el pedido sin cambiar los datos');
-update public.carnet_afiliados set nombre = 'NUEVO NOMBRE' where cedula = '404440444';
+update public.vota_afiliados set nombre = 'NUEVO NOMBRE' where cedula = '404440444';
 
 -- ---------- Afiliado sin filial ni nombre en la lista (caso común en la lista real) ----------
-insert into public.carnet_afiliados (cedula, activo) values ('606660666', true);
+insert into public.vota_afiliados (cedula, activo) values ('606660666', true);
 set role anon;
 select public.vota_ingresar_codigo('606660666', '123456', 'Android') ->> 'token' as sinf \gset
 select pg_temp.ok(public.vota_yo(:'sinf') is not null, 'afiliado sin filial ni nombre: su sesión vale después de entrar');
@@ -256,16 +257,26 @@ reset role;
 select pg_temp.ok((select por from public.vota_auditoria where accion = 'Prueba') = 'NUEVO NOMBRE', 'la bitácora queda con el nombre real');
 select pg_temp.ok(not exists (select 1 from public.vota_auditoria where accion = 'Falsa'), 'sin sesión válida no se escribe en la bitácora');
 
--- ---------- Reemplazo mensual de la lista (carnet) ----------
-select public.carnet_reemplazar_listas('[{"cedula":"404440444","activo":true},{"cedula":"505550555","activo":true,"nombre":"ROSA"}]'::jsonb, '["HEREDIA"]'::jsonb);
-select pg_temp.ok((select nombre from public.carnet_afiliados where cedula = '404440444') = 'NUEVO NOMBRE', 'si el reporte no trae nombre, se conserva el anterior');
+-- ---------- Reingreso con el código general sin haber guardado la sesión ----------
 set role anon;
-select pg_temp.ok(public.vota_yo(:'nuevo') is not null, 'sigue en la lista: su sesión sigue valiendo');
-select pg_temp.ok((public.vota_datos(:'nuevo') ->> 'padron')::int = 2, 'el padrón para el % de participación sale de la lista compartida');
+select pg_temp.ok(public.vota_ingresar_codigo('404440444', '123456', 'Android', :'nuevo') ->> 'token' = :'nuevo', 'el mismo celular vuelve a entrar con el código (sin haber guardado la sesión)');
+select pg_temp.ok(public.vota_ingresar_codigo('404440444', '000000', 'Android', :'nuevo') ? 'error', 'con el código equivocado no vuelve a entrar');
+select pg_temp.ok(public.vota_ingresar_codigo('404440444', '123456', 'Android', 'llave-falsa') ->> 'enUso' = 'true', 'otro celular (sin la llave) sigue bloqueado');
+select pg_temp.ok(public.vota_ingresar_codigo('404440444', '123456', 'Android', :'luis') ->> 'enUso' = 'true', 'la llave de otra cédula no sirve');
 reset role;
-select public.carnet_reemplazar_listas('[{"cedula":"505550555","activo":true}]'::jsonb, '["HEREDIA"]'::jsonb);
+
+-- ---------- La lista de ADEP Vota es propia: no toca la del carnet ----------
 set role anon;
-select pg_temp.ok(public.vota_yo(:'nuevo') is null, 'quien sale de la lista mensual ya no puede entrar a votar');
+select pg_temp.ok((public.vota_datos(:'nuevo') ->> 'padron')::int = 3, 'el padrón para el % de participación sale de la lista de ADEP Vota');
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.vota_eliminar_todos('hoy');
+reset role;
+select pg_temp.ok(not exists (select 1 from public.vota_afiliados), 'el administrador puede vaciar la lista de ADEP Vota');
+select pg_temp.ok((select count(*) from public.carnet_afiliados) = 2, 'vaciar la lista de ADEP Vota no toca la lista del carnet');
+set role anon;
+select pg_temp.ok(public.vota_yo(:'nuevo') is null, 'quien sale de la lista ya no puede entrar a votar');
 reset role;
 
 \echo 'Todas las pruebas pasaron.'

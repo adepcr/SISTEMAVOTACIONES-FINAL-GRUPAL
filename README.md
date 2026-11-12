@@ -1,7 +1,8 @@
 # ADEP Vota — Sistema de votación (proyecto final grupal)
 
 Prototipo del sistema de votación de ADEP (web, Android e iOS). Todo vive en **Supabase** (datos y cuentas de
-administrador, con la misma lista de afiliados del carnet) y la página se publica en **GitHub Pages**.
+administrador, con su propia lista de afiliados: hoy, los representantes de la Junta Directiva Central)
+y la página se publica en **GitHub Pages**.
 
 - **Página (GitHub Pages):** https://adepcr.github.io/SISTEMAVOTACIONES-FINAL-GRUPAL/
 - **Repositorio:** https://github.com/adepcr/SISTEMAVOTACIONES-FINAL-GRUPAL
@@ -14,7 +15,7 @@ Este proyecto reúne lo mejor de los tres sistemas de votación del grupo:
 
 | Proyecto | Qué aporta |
 |---|---|
-| **sistema-votaciones-Abigail-Avendano** (base) | Supabase con la lista compartida del carnet, voto secreto (solo conteo, sin cédula), códigos de activación y código general de ingreso, una cédula por celular, comprobantes verificables, minuta PDF, Excel, bitácora, modo práctica, accesibilidad (lectura en voz alta, letra grande), asistente Robi, app Android/iOS e instalable. |
+| **sistema-votaciones-Abigail-Avendano** (base) | Supabase, voto secreto (solo conteo, sin cédula), códigos de activación y código general de ingreso, una cédula por celular, comprobantes verificables, minuta PDF, Excel, bitácora, modo práctica, accesibilidad (lectura en voz alta, letra grande), asistente Robi, app Android/iOS e instalable. |
 | **votaciones-josue** | **Reloj del servidor** (`DB.ahora()`, función `vota_hora`): un celular con la hora mal puesta no ve «cerrada» una votación abierta. **Aviso de conexión** perdida/recuperada (`js/aviso-conexion.js`). **Confirmación del voto a prueba de toques accidentales**: «Sí, enviar» se activa tras 0,7 s, el foco empieza en «No, quiero cambiarlo», tocar fuera equivale a regresar y la ventana se cierra sola si la votación termina. **Cédula con formato** `1-1111-1111`. |
 | **proyecto-votaciones-Rashid** | **Pedidos de ayuda** durante la votación («me equivoqué de opción», «no alcancé a votar», «otro problema»), que el administrador atiende al momento: restaurar voto, +5 minutos, reabrir 5 minutos, WhatsApp, marcar atendido. **Pedidos de corrección de datos** (nombre, filial, teléfono) con aprobación. **Ocultar cifras** en Resultados para proyectar sin influir (`js/solicitudes.js`). |
 

@@ -114,16 +114,30 @@ const DB = {
     _fechaTexto() { return new Date().toLocaleString('es-CR'); },
 
     // ================= Sesión =================
+    // «Guardar en este dispositivo»: con la casilla marcada la sesión queda guardada (localStorage) y el
+    // afiliado entra directo la próxima vez. Sin marcar, dura solo mientras la página o la app estén
+    // abiertas (sessionStorage): al volver debe escribir de nuevo el código o su clave.
+    // La «llave» de un celular amarrado con el código general se guarda siempre: prueba que es el mismo
+    // celular cuando vuelve a escribir el código (sin ella, la cédula parecería estar en otro celular).
+    guardar: false,
     _guardarSesion(cedula, token, tipo) {
         this._token = token;
         try {
-            localStorage.setItem('adep_sesion', JSON.stringify({ cedula, token, tipo }));
+            const datos = JSON.stringify({ cedula, token, tipo });
+            localStorage.removeItem('adep_sesion'); sessionStorage.removeItem('adep_sesion');
+            (this.guardar ? localStorage : sessionStorage).setItem('adep_sesion', datos);
             if (tipo === 'dispositivo') localStorage.setItem('adep_llave_' + cedula, token);
+            if (this.guardar) localStorage.setItem('adep_guardado_' + cedula, '1'); else localStorage.removeItem('adep_guardado_' + cedula);
         } catch { }
     },
-    _sesionGuardada() { try { return JSON.parse(localStorage.getItem('adep_sesion')); } catch { return null; } },
-    _olvidarSesion() { this._token = null; try { localStorage.removeItem('adep_sesion'); } catch { } },
+    _sesionGuardada() {
+        try { return JSON.parse(sessionStorage.getItem('adep_sesion') || localStorage.getItem('adep_sesion')); } catch { return null; }
+    },
+    _olvidarSesion() { this._token = null; try { localStorage.removeItem('adep_sesion'); sessionStorage.removeItem('adep_sesion'); } catch { } },
     _llave(ced) { try { return localStorage.getItem('adep_llave_' + ced); } catch { return null; } },
+    // ¿Este celular guardó la sesión de esta cédula? (entonces entra sin pedir el código)
+    guardadoEn(ced) { try { return localStorage.getItem('adep_guardado_' + this._norm(ced)) === '1' && !!this._llave(this._norm(ced)); } catch { return false; } },
+    tieneLlave(ced) { return !!this._llave(this._norm(ced)); },
     async _perfilAdmin() {
         const { data } = await SB.auth.getSession();
         if (!data || !data.session) return null;
@@ -235,7 +249,8 @@ const DB = {
         let p;
         try { p = await this._rpc('vota_yo', { p_token: k }); }
         catch (e) { console.error(e); return null; }
-        if (!p) { try { localStorage.removeItem('adep_llave_' + ced); } catch { } return null; }
+        if (!p) { try { localStorage.removeItem('adep_llave_' + ced); localStorage.removeItem('adep_guardado_' + ced); } catch { } return null; }
+        this.guardar = true;   // solo entra solo quien guardó la sesión en este celular
         this._guardarSesion(ced, k, 'dispositivo');
         this.yo = p;
         if (!p.pendiente) await this.log('Ingreso al sistema', 'Afiliado (celular reconocido)');
@@ -249,7 +264,7 @@ const DB = {
         const ced = this._norm(cedula), cod = String(codigo || '').replace(/\D/g, '');
         if (cod.length !== 6) return { error: 'El código de ingreso tiene 6 números.' };
         let r;
-        try { r = await this._rpc('vota_ingresar_codigo', { p_cedula: ced, p_codigo: cod, p_dispositivo: this._dispositivo() }); }
+        try { r = await this._rpc('vota_ingresar_codigo', { p_cedula: ced, p_codigo: cod, p_dispositivo: this._dispositivo(), p_llave: this._llave(ced) }); }
         catch (e) { return { error: this._errAuth(e) }; }
         if (r.error) {
             if (r.enUso) this.avisarIntento(ced);
@@ -404,7 +419,7 @@ const DB = {
             return false;
         }
         let cambio = false;
-        cambio = this._poner('polls', d.polls, v => { this._polls = v.map(p => ({ ...p, id: Number(p.id) })).sort((a, b) => a.id - b.id); }) || cambio;
+        cambio = this._poner('polls', d.polls, v => { this._polls = v.map(p => ({ ...p, id: Number(p.id) })).sort((a, b) => b.id - a.id); }) || cambio;   // las más recientes primero
         cambio = this._poner('conteos', d.conteos, v => { this._conteos = v; }) || cambio;
         cambio = this._poner('part', d.participacion, v => { this._part = v.map(r => ({ ...r, pollId: Number(r.pollId) })); }) || cambio;
         cambio = this._poner('votos', d.votos, v => { this._votos = v.map(x => ({ ...x, pollId: Number(x.pollId) })); }) || cambio;
@@ -424,7 +439,7 @@ const DB = {
             this._todo('vota_ayuda', 'fecha'), this._todo('vota_solicitudes', 'fecha')
         ]);
         let cambio = false;
-        cambio = this._poner('polls', polls, v => { this._polls = v.map(p => ({ ...p.datos, id: Number(p.id) })); }) || cambio;
+        cambio = this._poner('polls', polls, v => { this._polls = v.map(p => ({ ...p.datos, id: Number(p.id) })).sort((a, b) => b.id - a.id); }) || cambio;   // las más recientes primero
         cambio = this._poner('conteos', conteos, v => { this._conteos = {}; v.forEach(c => { this._conteos[String(c.poll_id)] = this._conteo(c); }); }) || cambio;
         cambio = this._poner('part', part, v => { this._part = v.map(r => ({ pollId: Number(r.poll_id), cedula: r.cedula, fecha: r.fecha, codigo: r.codigo })); }) || cambio;
         cambio = this._poner('votos', votos, v => {
@@ -457,14 +472,16 @@ const DB = {
         this._iniciarReloj();
         const admin = this.yo.rol === 'Administrador';
         if (admin) await this._cargarAdmin(true); else await this._cargarAfiliado();
-        let vueltas = 0;
+        let vueltas = 0, ocupado = false;
         this._detener();
-        // Cada 10 segundos (la lista de afiliados, cada minuto); en pausa mientras la página no se ve
-        this._reloj = setInterval(() => {
-            if (document.hidden) return;
-            vueltas++;
-            this._refrescar(admin && vueltas % 6 === 0);
-        }, 10000);
+        // Revisa cambios cada 3 segundos (administrador cada 5; su lista de afiliados, cada minuto),
+        // así todo aparece solo, sin recargar la página. En pausa mientras la página no se ve.
+        const cada = admin ? 5000 : 3000;
+        this._reloj = setInterval(async () => {
+            if (document.hidden || ocupado) return;
+            ocupado = true; vueltas++;
+            try { await this._refrescar(admin && vueltas % Math.round(60000 / cada) === 0); } finally { ocupado = false; }
+        }, cada);
         this._alVolver = () => { if (!document.hidden) this._refrescar(admin); };
         document.addEventListener('visibilitychange', this._alVolver);
     },

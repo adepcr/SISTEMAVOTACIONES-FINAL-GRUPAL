@@ -176,15 +176,11 @@
             (_, i) =>
                 `<option value="${i + 1}" ${S.h === i + 1 ? "selected" : ""}>${i + 1}</option>`,
         ).join("");
-        const ms =
-            Array.from(
-                { length: 12 },
-                (_, i) =>
-                    `<option value="${i * 5}" ${S.mi === i * 5 ? "selected" : ""}>${pad(i * 5)}</option>`,
-            ).join("") +
-            (S.mi % 5
-                ? `<option value="${S.mi}" selected>${pad(S.mi)}</option>`
-                : "");
+        // Todos los minutos (00 a 59), para programar a la hora exacta
+        const ms = Array.from(
+            { length: 60 },
+            (_, i) => `<option value="${i}" ${S.mi === i ? "selected" : ""}>${pad(i)}</option>`,
+        ).join("");
         const hora = `<div class="cal-t"><label for="cal-h">Hora</label><select id="cal-h" aria-label="Hora">${hs}</select><b>:</b><select id="cal-m" aria-label="Minutos">${ms}</select>
         <span class="cal-ap"><button type="button" data-ap="0" aria-pressed="${!S.pm}">a. m.</button><button type="button" data-ap="1" aria-pressed="${S.pm}">p. m.</button></span></div>`;
         ov.querySelector(".cal-in").innerHTML = `
